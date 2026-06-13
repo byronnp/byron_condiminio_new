@@ -609,12 +609,12 @@ function goToCondominio() {
 .wizard-stepper {
   display: flex;
   flex-wrap: nowrap;
-  gap: 12px;
+  gap: 10px;
   overflow-x: auto;
-  padding: 14px;
+  padding: 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.9));
   border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 22px;
+  border-radius: 20px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -627,14 +627,14 @@ function goToCondominio() {
   align-items: center;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
+  border-radius: 16px;
   color: var(--app-text-muted);
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
-  gap: 10px;
-  min-height: 56px;
-  padding: 10px 16px 10px 12px;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 14px 8px 10px;
   text-align: left;
   transition:
     background-color 0.18s ease,
@@ -664,15 +664,15 @@ function goToCondominio() {
   border-radius: 999px;
   color: var(--app-primary);
   display: inline-flex;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
-  height: 26px;
+  height: 24px;
   justify-content: center;
-  width: 26px;
+  width: 24px;
 }
 
 .wizard-step__label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -1072,11 +1072,11 @@ function goToCondominio() {
   }
 
   .wizard-stepper {
-    padding: 12px;
+    padding: 10px;
   }
 
   .wizard-step {
-    min-height: 52px;
+    min-height: 48px;
     padding-inline: 12px;
   }
 
