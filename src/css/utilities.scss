@@ -1,0 +1,23 @@
+.app-surface {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  box-shadow: var(--app-shadow-soft);
+}
+
+.app-surface--soft {
+  background: var(--app-surface-soft);
+}
+
+.app-muted {
+  color: var(--app-text-muted);
+}
+
+.app-section {
+  padding: 20px;
+}
+
+.app-gap {
+  display: grid;
+  gap: 16px;
+}

@@ -7,6 +7,7 @@ import {
 } from 'vue-router';
 
 import routes from './routes';
+import { useSessionStore } from '@/stores/session.store';
 
 /*
  * If not building with SSR mode, you can
@@ -32,6 +33,42 @@ export default defineRouter((/* { store, ssrContext } */) => {
     // quasar.conf.js -> build -> vueRouterMode
     // quasar.conf.js -> build -> publicPath
     history: createHistory(import.meta.env.QUASAR_VUE_ROUTER_BASE),
+  });
+
+  Router.beforeEach((to) => {
+    const session = useSessionStore();
+    const isLoginRoute = to.name === 'login';
+    const isAuthenticated = session.isAuthenticated;
+
+    if (!isAuthenticated && !isLoginRoute) {
+      return { name: 'login', query: { redirect: to.fullPath } };
+    }
+
+    if (isAuthenticated && isLoginRoute) {
+      return { name: 'dashboard' };
+    }
+
+    const requiredRoles = to.meta.roles;
+    if (requiredRoles && requiredRoles.length > 0) {
+      const currentRole = session.role;
+
+      if (!currentRole || !requiredRoles.includes(currentRole)) {
+        return { name: 'dashboard' };
+      }
+    }
+
+    if (to.meta.requiresCondoContext) {
+      if (!session.activeCondominium) {
+        const fallbackCondo = session.allowedCondominiums[0];
+        if (fallbackCondo) {
+          session.setActiveCondo(fallbackCondo.id);
+        } else {
+          return { name: 'dashboard' };
+        }
+      }
+    }
+
+    return true;
   });
 
   return Router;

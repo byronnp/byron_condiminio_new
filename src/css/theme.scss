@@ -1,0 +1,51 @@
+:root {
+  --app-bg: #f6f8fb;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f8fbff;
+  --app-text: #0f172a;
+  --app-text-muted: #64748b;
+  --app-border: rgba(15, 23, 42, 0.08);
+  --app-primary: #2563eb;
+  --app-primary-soft: rgba(37, 99, 235, 0.12);
+  --app-success: #10b981;
+  --app-warning: #f59e0b;
+  --app-danger: #ef4444;
+  --app-info: #2563eb;
+  --app-radius-lg: 18px;
+  --app-radius-md: 14px;
+  --app-shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.06);
+  --app-shadow-panel: 0 18px 45px rgba(15, 23, 42, 0.08);
+  --app-font-family: 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+body .text-primary {
+  color: var(--app-primary) !important;
+}
+
+body .bg-primary {
+  background: var(--app-primary) !important;
+}
+
+body .text-positive {
+  color: var(--app-success) !important;
+}
+
+body .bg-positive {
+  background: var(--app-success) !important;
+}
+
+body .text-warning {
+  color: var(--app-warning) !important;
+}
+
+body .bg-warning {
+  background: var(--app-warning) !important;
+}
+
+body .text-negative {
+  color: var(--app-danger) !important;
+}
+
+body .bg-negative {
+  background: var(--app-danger) !important;
+}
