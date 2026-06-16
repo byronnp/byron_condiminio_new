@@ -1,11 +1,6 @@
 <template>
   <q-page class="new-condo-page">
     <div class="page-shell">
-      <q-breadcrumbs class="page-breadcrumbs" separator="›">
-        <q-breadcrumbs-el label="Condominios" @click="goBack" />
-        <q-breadcrumbs-el label="Nuevo condominio" />
-      </q-breadcrumbs>
-
       <header class="page-header">
         <div class="page-header__heading">
           <h1 class="page-header__title">Nuevo condominio</h1>
@@ -27,188 +22,347 @@
         </div>
       </header>
 
-      <div class="wizard-stepper">
-        <button
-          v-for="step in steps"
-          :key="step.name"
-          type="button"
-          class="wizard-step"
-          :class="{ 'wizard-step--active': activeStep === step.name }"
-          @click="activeStep = step.name"
+      <q-stepper
+        v-model="activeStep"
+        flat
+        bordered
+        animated
+        header-nav
+        active-color="primary"
+        done-color="primary"
+        inactive-color="grey-7"
+        class="wizard-stepper"
+      >
+        <q-step
+          name="info"
+          title="Información"
+          icon="info"
+          :done="completedSteps.info"
+          :error="stepError === 'info'"
+          :disable="!canAccessStep('info')"
         >
-          <span class="wizard-step__number">{{ step.number }}</span>
-          <span class="wizard-step__label">{{ step.label }}</span>
-        </button>
-      </div>
+          <q-form ref="infoFormRef" class="wizard-step__form">
+            <section class="form-layout">
+              <q-card flat bordered class="form-card">
+                <q-card-section>
+                  <div class="section-title">Información general</div>
 
-      <q-tab-panels v-model="activeStep" animated class="wizard-panels">
-        <q-tab-panel name="info" class="wizard-panel">
-          <section class="form-layout">
-            <q-card flat bordered class="form-card">
-              <q-card-section>
-                <div class="section-title">Información general</div>
+                  <div class="form-grid q-mt-md">
+                    <q-input
+                      v-model="form.name"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      label="Nombre del condominio *"
+                      :rules="[requiredRule]"
+                    />
+                    <q-select
+                      v-model="form.type"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      :options="typeOptions"
+                      label="Tipo de condominio *"
+                      :rules="[requiredRule]"
+                    />
+                  </div>
 
-                <div class="form-grid q-mt-md">
                   <q-input
-                    v-model="form.name"
+                    v-model="form.description"
+                    class="q-mt-md"
                     dense
                     outlined
-                    label="Nombre del condominio *"
-                    :rules="[requiredRule]"
+                    type="textarea"
+                    autogrow
+                    label="Descripción"
                   />
-                  <q-select
-                    v-model="form.type"
-                    dense
-                    outlined
-                    :options="typeOptions"
-                    label="Tipo de condominio *"
-                    :rules="[requiredRule]"
-                  />
-                </div>
 
-                <q-input
-                  v-model="form.description"
-                  class="q-mt-md"
-                  dense
-                  outlined
-                  type="textarea"
-                  autogrow
-                  label="Descripción"
-                />
-
-                <div class="form-grid form-grid--split q-mt-md">
-                  <div>
-                    <div class="mini-label">Estado</div>
-                    <div class="row items-center q-gutter-lg">
-                      <q-radio v-model="form.status" val="Activo" label="Activo" dense />
-                      <q-radio v-model="form.status" val="Inactivo" label="Inactivo" dense />
-                    </div>
-                  </div>
-
-                  <q-card flat bordered class="illustration-card">
-                    <div class="illustration-card__image"></div>
-                    <q-btn outline no-caps label="Cambiar imagen" class="q-mt-md full-width" />
-                    <div class="illustration-card__hint">JPG, PNG. Máx. 2MB</div>
-                  </q-card>
-                </div>
-              </q-card-section>
-            </q-card>
-
-            <aside class="summary-column">
-              <q-card flat bordered class="summary-card">
-                <q-card-section>
-                  <div class="section-title">Resumen del condominio</div>
-
-                  <div class="summary-preview q-mt-md">
-                    <div class="summary-preview__thumbnail"></div>
+                  <div class="form-grid form-grid--split q-mt-md">
                     <div>
-                      <div class="summary-preview__name">{{ form.name || 'Nuevo condominio' }}</div>
-                      <q-badge :color="form.status === 'Activo' ? 'positive' : 'grey-6'" rounded>
-                        {{ form.status }}
-                      </q-badge>
+                      <div class="mini-label">Estado</div>
+                      <div class="row items-center q-gutter-lg">
+                        <q-radio v-model="form.status" val="Activo" label="Activo" dense />
+                        <q-radio v-model="form.status" val="Inactivo" label="Inactivo" dense />
+                      </div>
                     </div>
-                  </div>
 
-                  <div class="summary-list q-mt-md">
-                    <div class="summary-item">
-                      <span class="summary-item__label">Tipo</span>
-                      <span class="summary-item__value">{{ form.type }}</span>
-                    </div>
-                    <div class="summary-item">
-                      <span class="summary-item__label">Descripción</span>
-                      <span class="summary-item__value summary-item__value--wrap">
-                        {{ form.description || 'Sin descripción' }}
-                      </span>
-                    </div>
+                    <q-card flat bordered class="support-card">
+                      <q-card-section class="support-card__content">
+                        <div class="support-card__icon">
+                          <q-icon name="image" size="20px" />
+                        </div>
+                        <div class="support-card__copy">
+                          <div class="support-card__title">Imagen principal</div>
+                          <div class="support-card__text">
+                            Sube una portada clara para identificar el condominio.
+                          </div>
+                        </div>
+                        <q-btn outline dense no-caps label="Cambiar" class="support-card__action" />
+                      </q-card-section>
+                      <q-separator />
+                      <q-card-section class="support-card__footer">
+                        JPG o PNG. Máx. 2 MB.
+                      </q-card-section>
+                    </q-card>
                   </div>
                 </q-card-section>
               </q-card>
 
-              <q-card flat bordered class="summary-card summary-card--admin">
-                <q-card-section>
-                  <div class="section-title">Administrador principal</div>
-                  <div class="admin-box q-mt-md">
-                    <q-avatar size="42px">
-                      <img src="https://i.pravatar.cc/100?img=12" alt="Administrador" />
-                    </q-avatar>
-                    <div>
-                      <div class="admin-box__name">Carlos Andrés Pérez Mendoza</div>
-                      <div class="admin-box__meta">carlos.perez@altodelvalle.com</div>
+              <aside class="summary-column">
+                <q-card flat bordered class="summary-panel">
+                  <q-card-section class="summary-panel__section">
+                    <div class="section-title">Ficha rápida</div>
+                    <div class="summary-preview q-mt-md">
+                      <q-avatar rounded size="52px" class="summary-preview__avatar">
+                        <q-icon name="apartment" size="24px" />
+                      </q-avatar>
+                      <div class="summary-preview__body">
+                        <div class="summary-preview__name">
+                          {{ form.name || 'Nuevo condominio' }}
+                        </div>
+                        <div class="summary-preview__meta">
+                          <q-badge :color="form.status === 'Activo' ? 'positive' : 'grey-6'" rounded>
+                            {{ form.status }}
+                          </q-badge>
+                          <q-badge outline color="primary" rounded>
+                            {{ form.type || 'Sin tipo' }}
+                          </q-badge>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </q-card-section>
-              </q-card>
-            </aside>
-          </section>
-        </q-tab-panel>
 
-        <q-tab-panel name="location" class="wizard-panel">
-          <section class="tab-layout">
-            <q-card flat bordered class="tab-card">
-              <q-card-section>
-                <div class="section-title">Ubicación del condominio</div>
-                <div class="tab-subtitle">Define dónde está ubicado el condominio y su referencia.</div>
+                    <div class="summary-list q-mt-md">
+                      <div class="summary-item">
+                        <span class="summary-item__label">Tipo</span>
+                        <span class="summary-item__value">{{ form.type || 'Sin tipo' }}</span>
+                      </div>
+                      <div class="summary-item">
+                        <span class="summary-item__label">Descripción</span>
+                        <span class="summary-item__value summary-item__value--wrap">
+                          {{ form.description || 'Sin descripción' }}
+                        </span>
+                      </div>
+                    </div>
 
-                <div class="form-grid q-mt-md">
-                  <q-select v-model="location.country" dense outlined :options="countryOptions" label="País *" />
-                  <q-select v-model="location.province" dense outlined :options="provinceOptions" label="Provincia *" />
-                  <q-select v-model="location.city" dense outlined :options="cityOptions" label="Ciudad *" />
-                  <q-input v-model="location.direction" dense outlined label="Dirección *" />
-                </div>
+                    <q-separator class="q-my-md" />
 
-                <div class="form-grid q-mt-md">
-                  <q-input v-model="location.reference" dense outlined label="Referencia (opcional)" />
-                  <q-input v-model="location.postalCode" dense outlined label="Código postal" />
-                </div>
-
-                <div class="map-card q-mt-md">
-                  <div class="map-card__header">
-                    <div class="map-card__title">Ubicación en el mapa</div>
-                    <q-btn flat dense no-caps label="Abrir mapa" icon="place" class="map-card__action" />
-                  </div>
-                  <div class="map-card__image"></div>
-                </div>
-              </q-card-section>
-            </q-card>
-          </section>
-        </q-tab-panel>
-
-        <q-tab-panel name="config" class="wizard-panel">
-          <section class="tab-layout">
-            <q-card flat bordered class="tab-card">
-              <q-card-section>
-                <div class="section-title">Configuración general</div>
-                <div class="tab-subtitle">Ajusta la estructura, moneda y parámetros base del condominio.</div>
-
-                <div class="form-grid q-mt-md">
-                  <q-input v-model="config.blocks" dense outlined type="number" label="Número de torres / bloques *" />
-                  <q-input v-model="config.units" dense outlined type="number" label="Número de unidades *" />
-                  <q-select v-model="config.currency" dense outlined :options="currencyOptions" label="Moneda *" />
-                  <q-select v-model="config.timezone" dense outlined :options="timezoneOptions" label="Zona horaria *" />
-                </div>
-
-                <div class="form-grid q-mt-md">
-                  <q-input v-model="config.dueDay" dense outlined type="number" label="Día de vencimiento de cuotas *" />
-                  <q-input v-model="config.monthlyFee" dense outlined prefix="$" label="Cuota mensual estimada" />
-                </div>
-
-                <q-card flat bordered class="config-block q-mt-md">
-                  <q-card-section>
-                    <div class="config-block__title">Recurrencia y notificaciones</div>
-                    <div class="config-block__grid">
-                      <q-toggle v-model="config.notifications" label="Enviar recordatorios automáticos" />
-                      <q-toggle v-model="config.billingLock" label="Bloquear accesos por mora" />
-                      <q-toggle v-model="config.onlinePayments" label="Habilitar pagos en línea" />
-                      <q-toggle v-model="config.documents" label="Publicar documentos del condominio" />
+                    <div class="section-title">Responsable asignado</div>
+                    <div class="admin-box admin-box--summary q-mt-md">
+                      <q-avatar size="42px" class="admin-box__avatar">
+                        <img src="https://i.pravatar.cc/100?img=12" alt="Administrador" />
+                      </q-avatar>
+                      <div class="admin-box__copy">
+                        <div class="admin-box__name">{{ adminFullName }}</div>
+                        <div class="admin-box__meta">{{ administrator.email || 'Sin correo' }}</div>
+                        <div class="admin-box__meta">
+                          Usuario: {{ administrator.username || 'Sin usuario' }}
+                        </div>
+                      </div>
                     </div>
                   </q-card-section>
                 </q-card>
-              </q-card-section>
-            </q-card>
-          </section>
-        </q-tab-panel>
+              </aside>
+            </section>
+          </q-form>
+        </q-step>
 
-        <q-tab-panel name="amenities" class="wizard-panel">
+        <q-step
+          name="location"
+          title="Ubicación"
+          icon="place"
+          :done="completedSteps.location"
+          :error="stepError === 'location'"
+          :disable="!canAccessStep('location')"
+        >
+          <q-form ref="locationFormRef" class="wizard-step__form">
+            <section class="tab-layout">
+              <q-card flat bordered class="tab-card">
+                <q-card-section>
+                  <div class="section-title">Ubicación del condominio</div>
+                  <div class="tab-subtitle">Define dónde está ubicado el condominio y su referencia.</div>
+
+                  <div class="form-grid q-mt-md">
+                    <q-select
+                      v-model="location.country"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      :options="countryOptions"
+                      label="País *"
+                      :rules="[requiredRule]"
+                    />
+                    <q-select
+                      v-model="location.province"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      :options="provinceOptions"
+                      label="Provincia *"
+                      :rules="[requiredRule]"
+                    />
+                    <q-select
+                      v-model="location.city"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      :options="cityOptions"
+                      label="Ciudad *"
+                      :rules="[requiredRule]"
+                    />
+                    <q-input
+                      v-model="location.direction"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      label="Dirección *"
+                      :rules="[requiredRule]"
+                    />
+                  </div>
+
+                  <div class="form-grid q-mt-md">
+                    <q-input v-model="location.reference" dense outlined label="Referencia (opcional)" />
+                    <q-input v-model="location.postalCode" dense outlined label="Código postal" />
+                  </div>
+
+                  <div class="map-card q-mt-md">
+                    <div class="map-card__header">
+                      <div class="map-card__title">Ubicación en el mapa</div>
+                      <q-btn flat dense no-caps label="Abrir mapa" icon="place" class="map-card__action" />
+                    </div>
+                    <div class="map-card__body">
+                      <q-icon name="map" size="28px" />
+                      <div class="map-card__copy">
+                        <div class="map-card__body-title">Vista referencial</div>
+                        <div class="map-card__body-text">
+                          La dirección se usará para geolocalización, entregas y comunicaciones.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </q-card-section>
+              </q-card>
+            </section>
+          </q-form>
+        </q-step>
+
+        <q-step
+          name="config"
+          title="Configuración"
+          icon="tune"
+          :done="completedSteps.config"
+          :error="stepError === 'config'"
+          :disable="!canAccessStep('config')"
+        >
+          <q-form ref="configFormRef" class="wizard-step__form">
+            <section class="tab-layout">
+              <q-card flat bordered class="tab-card">
+                <q-card-section>
+                  <div class="section-title">Configuración general</div>
+                  <div class="tab-subtitle">Ajusta la estructura, moneda y parámetros base del condominio.</div>
+
+                  <div class="form-grid q-mt-md">
+                    <q-input
+                      v-model="config.blocks"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      type="number"
+                      label="Número de torres / bloques *"
+                      :rules="[requiredRule, integerMinRule(1)]"
+                    />
+                    <q-input
+                      v-model="config.units"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      type="number"
+                      label="Número de unidades *"
+                      :rules="[requiredRule, integerMinRule(1)]"
+                    />
+                    <q-select
+                      v-model="config.currency"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      :options="currencyOptions"
+                      label="Moneda *"
+                      :rules="[requiredRule]"
+                    />
+                    <q-select
+                      v-model="config.timezone"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      :options="timezoneOptions"
+                      label="Zona horaria *"
+                      :rules="[requiredRule]"
+                    />
+                  </div>
+
+                  <div class="form-grid q-mt-md">
+                    <q-input
+                      v-model="config.dueDay"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      type="number"
+                      label="Día de vencimiento de cuotas *"
+                      :rules="[requiredRule, rangeRule(1, 31)]"
+                    />
+                    <q-input
+                      v-model="config.monthlyFee"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      prefix="$"
+                      label="Cuota mensual estimada"
+                      :rules="[currencyRule]"
+                    />
+                  </div>
+
+                  <div class="config-summary q-mt-md">
+                    <div class="config-summary__item">
+                      <span class="config-summary__label">Bloques</span>
+                      <span class="config-summary__value">{{ config.blocks || '0' }}</span>
+                    </div>
+                    <div class="config-summary__item">
+                      <span class="config-summary__label">Unidades</span>
+                      <span class="config-summary__value">{{ config.units || '0' }}</span>
+                    </div>
+                    <div class="config-summary__item">
+                      <span class="config-summary__label">Vencimiento</span>
+                      <span class="config-summary__value">{{ config.dueDay || '-' }}</span>
+                    </div>
+                    <div class="config-summary__item">
+                      <span class="config-summary__label">Moneda</span>
+                      <span class="config-summary__value">{{ config.currency || 'Sin moneda' }}</span>
+                    </div>
+                  </div>
+
+                  <q-card flat bordered class="config-block q-mt-md">
+                    <q-card-section>
+                      <div class="config-block__title">Recurrencia y notificaciones</div>
+                      <div class="config-block__grid">
+                        <q-toggle v-model="config.notifications" label="Enviar recordatorios automáticos" />
+                        <q-toggle v-model="config.billingLock" label="Bloquear accesos por mora" />
+                        <q-toggle v-model="config.onlinePayments" label="Habilitar pagos en línea" />
+                        <q-toggle v-model="config.documents" label="Publicar documentos del condominio" />
+                      </div>
+                    </q-card-section>
+                  </q-card>
+                </q-card-section>
+              </q-card>
+            </section>
+          </q-form>
+        </q-step>
+
+        <q-step
+          name="amenities"
+          title="Amenidades"
+          icon="pool"
+          :done="completedSteps.amenities"
+          :disable="!canAccessStep('amenities')"
+        >
           <section class="tab-layout">
             <q-card flat bordered class="tab-card">
               <q-card-section>
@@ -230,65 +384,117 @@
               </q-card-section>
             </q-card>
           </section>
-        </q-tab-panel>
+        </q-step>
 
-        <q-tab-panel name="admin" class="wizard-panel">
-          <section class="tab-layout">
-            <q-card flat bordered class="tab-card">
-              <q-card-section>
-                <div class="section-title">Administrador principal</div>
-                <div class="tab-subtitle">Define el usuario responsable del nuevo condominio.</div>
+        <q-step
+          name="admin"
+          title="Administrador"
+          icon="manage_accounts"
+          :done="completedSteps.admin"
+          :error="stepError === 'admin'"
+          :disable="!canAccessStep('admin')"
+        >
+          <q-form ref="adminFormRef" class="wizard-step__form">
+            <section class="tab-layout">
+              <q-card flat bordered class="tab-card">
+                <q-card-section>
+                  <div class="section-title">Administrador principal</div>
+                  <div class="tab-subtitle">Define el usuario responsable del nuevo condominio.</div>
 
-                <div class="form-grid q-mt-md">
-                  <q-input v-model="administrator.name" dense outlined label="Nombres *" />
-                  <q-input v-model="administrator.lastName" dense outlined label="Apellidos *" />
-                  <q-input v-model="administrator.email" dense outlined type="email" label="Correo electrónico *" />
-                  <q-input v-model="administrator.phone" dense outlined label="Teléfono" />
-                  <q-input v-model="administrator.username" dense outlined label="Usuario para acceso *" />
-                  <q-input
-                    v-model="administrator.password"
-                    dense
-                    outlined
-                    :type="showPassword ? 'text' : 'password'"
-                    label="Contraseña temporal *"
-                  >
-                    <template #append>
-                      <q-btn
-                        flat
-                        round
-                        dense
-                        :icon="showPassword ? 'visibility_off' : 'visibility'"
-                        @click="showPassword = !showPassword"
-                      />
-                    </template>
-                  </q-input>
+                  <div class="form-grid q-mt-md">
+                    <q-input
+                      v-model="administrator.name"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      label="Nombres *"
+                      :rules="[requiredRule]"
+                    />
+                    <q-input
+                      v-model="administrator.lastName"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      label="Apellidos *"
+                      :rules="[requiredRule]"
+                    />
+                    <q-input
+                      v-model="administrator.email"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      type="email"
+                      label="Correo electrónico *"
+                      :rules="[requiredRule, emailRule]"
+                    />
+                    <q-input
+                      v-model="administrator.phone"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      label="Teléfono"
+                      :rules="[phoneRule]"
+                    />
+                    <q-input
+                      v-model="administrator.username"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      label="Usuario para acceso *"
+                      :rules="[requiredRule, minLengthRule(4)]"
+                    />
+                    <q-input
+                      v-model="administrator.password"
+                      dense
+                      outlined
+                      hide-bottom-space
+                      :type="showPassword ? 'text' : 'password'"
+                      label="Contraseña temporal *"
+                      :rules="[requiredRule, minLengthRule(8)]"
+                    >
+                      <template #append>
+                        <q-btn
+                          flat
+                          round
+                          dense
+                          :icon="showPassword ? 'visibility_off' : 'visibility'"
+                          @click="showPassword = !showPassword"
+                        />
+                      </template>
+                    </q-input>
 
-                  <q-card flat bordered class="admin-box q-mt-md">
-                    <q-card-section class="admin-box__content">
-                      <q-avatar size="48px">
-                        <img src="https://i.pravatar.cc/100?img=12" alt="Administrador" />
-                      </q-avatar>
-                      <div class="admin-box__copy">
-                        <div class="admin-box__eyebrow">Responsable asignado</div>
-                        <div class="admin-box__name">Carlos Andrés Pérez Mendoza</div>
-                        <div class="admin-box__meta">carlos.perez@altodelvalle.com</div>
-                        <div class="admin-box__footer">
-                          <q-badge rounded color="primary" class="admin-box__badge">
-                            Usuario principal
-                          </q-badge>
-                          <span class="admin-box__separator">•</span>
-                          <span class="admin-box__status">Acceso temporal</span>
+                    <q-card flat bordered class="admin-box q-mt-md">
+                      <q-card-section class="admin-box__content">
+                        <q-avatar size="48px">
+                          <img src="https://i.pravatar.cc/100?img=12" alt="Administrador" />
+                        </q-avatar>
+                        <div class="admin-box__copy">
+                          <div class="admin-box__eyebrow">Responsable asignado</div>
+                          <div class="admin-box__name">{{ adminFullName }}</div>
+                          <div class="admin-box__meta">{{ administrator.email || 'Sin correo' }}</div>
+                          <div class="admin-box__footer">
+                            <q-badge rounded color="primary" class="admin-box__badge">
+                              Usuario principal
+                            </q-badge>
+                            <span class="admin-box__separator">•</span>
+                            <span class="admin-box__status">Acceso temporal</span>
+                          </div>
                         </div>
-                      </div>
-                    </q-card-section>
-                  </q-card>
-                </div>
-              </q-card-section>
-            </q-card>
-          </section>
-        </q-tab-panel>
+                      </q-card-section>
+                    </q-card>
+                  </div>
+                </q-card-section>
+              </q-card>
+            </section>
+          </q-form>
+        </q-step>
 
-        <q-tab-panel name="summary" class="wizard-panel">
+        <q-step
+          name="summary"
+          title="Resumen"
+          icon="fact_check"
+          :disable="!canAccessStep('summary')"
+        >
           <section class="tab-layout tab-layout--summary">
             <q-card flat bordered class="tab-card">
               <q-card-section>
@@ -297,16 +503,18 @@
 
                 <div class="summary-final q-mt-md">
                   <div class="summary-final__hero">
-                    <div class="summary-final__thumbnail"></div>
+                    <q-avatar rounded size="88px" class="summary-final__thumbnail">
+                      <q-icon name="apartment" size="36px" />
+                    </q-avatar>
                     <div class="summary-final__hero-copy">
                       <div class="summary-final__eyebrow">Vista ejecutiva</div>
-                      <div class="summary-final__name">{{ form.name }}</div>
+                      <div class="summary-final__name">{{ form.name || 'Nuevo condominio' }}</div>
                       <div class="summary-final__meta">
                         <q-badge :color="form.status === 'Activo' ? 'positive' : 'grey-6'" rounded>
                           {{ form.status }}
                         </q-badge>
                         <span class="summary-final__meta-dot">•</span>
-                        <span class="summary-final__meta-text">{{ form.type }}</span>
+                        <span class="summary-final__meta-text">{{ form.type || 'Sin tipo' }}</span>
                       </div>
                     </div>
                   </div>
@@ -315,20 +523,20 @@
                     <div class="summary-final__item">
                       <div class="summary-final__label">Ubicación principal</div>
                       <div class="summary-final__value">
-                        {{ location.city }}, {{ location.province }}
+                        {{ location.city || 'Sin ciudad' }}, {{ location.province || 'Sin provincia' }}
                       </div>
                     </div>
                     <div class="summary-final__item">
                       <div class="summary-final__label">Bloques</div>
-                      <div class="summary-final__value">{{ config.blocks }}</div>
+                      <div class="summary-final__value">{{ config.blocks || '0' }}</div>
                     </div>
                     <div class="summary-final__item">
                       <div class="summary-final__label">Unidades</div>
-                      <div class="summary-final__value">{{ config.units }}</div>
+                      <div class="summary-final__value">{{ config.units || '0' }}</div>
                     </div>
                     <div class="summary-final__item">
                       <div class="summary-final__label">Moneda base</div>
-                      <div class="summary-final__value">{{ config.currency }}</div>
+                      <div class="summary-final__value">{{ config.currency || 'Sin moneda' }}</div>
                     </div>
                   </div>
                 </div>
@@ -339,23 +547,28 @@
               <q-card-section class="summary-action-card">
                 <div class="section-title">Listo para crear</div>
                 <div class="summary-action-card__text">
-                  Cuando finalices, se abrirá un diálogo de confirmación con el nuevo condominio.
+                  El botón inferior validará todo el flujo y abrirá el diálogo de confirmación.
                 </div>
 
-                <q-btn
-                  color="primary"
-                  unelevated
-                  no-caps
-                  class="full-width q-mt-md"
-                  label="Crear condominio"
-                  @click="submitForm"
-                />
-                <q-btn outline no-caps class="full-width q-mt-sm" label="Guardar borrador" />
+                <div class="summary-checklist q-mt-md">
+                  <div class="summary-checklist__item">
+                    <q-icon name="check_circle" color="positive" size="18px" />
+                    <span>Información general capturada</span>
+                  </div>
+                  <div class="summary-checklist__item">
+                    <q-icon name="check_circle" color="positive" size="18px" />
+                    <span>Ubicación y parámetros base listos</span>
+                  </div>
+                  <div class="summary-checklist__item">
+                    <q-icon name="check_circle" color="positive" size="18px" />
+                    <span>Administrador principal definido</span>
+                  </div>
+                </div>
               </q-card-section>
             </q-card>
           </section>
-        </q-tab-panel>
-      </q-tab-panels>
+        </q-step>
+      </q-stepper>
 
       <q-card flat bordered class="wizard-footer">
         <div class="wizard-footer__left">
@@ -401,6 +614,13 @@ import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import CondominioCreatedDialog from './components/CondominioCreatedDialog.vue';
 
+type StepName = 'info' | 'location' | 'config' | 'amenities' | 'admin' | 'summary';
+
+type ValidatableForm = {
+  validate: () => Promise<boolean> | boolean;
+  resetValidation?: () => void;
+};
+
 type CondoForm = {
   name: string;
   type: string;
@@ -418,11 +638,11 @@ type LocationForm = {
 };
 
 type ConfigForm = {
-  blocks: number;
-  units: number;
+  blocks: string;
+  units: string;
   currency: string;
   timezone: string;
-  dueDay: number;
+  dueDay: string;
   monthlyFee: string;
   notifications: boolean;
   billingLock: boolean;
@@ -441,33 +661,39 @@ type AdministratorForm = {
 
 const router = useRouter();
 const createdDialogOpen = ref(false);
-const activeStep = ref<'info' | 'location' | 'config' | 'amenities' | 'admin' | 'summary'>('info');
+const activeStep = ref<StepName>('info');
 const showPassword = ref(false);
+const stepError = ref<StepName | null>(null);
+const highestAccessibleStepIndex = ref(0);
+
+const infoFormRef = ref<ValidatableForm | null>(null);
+const locationFormRef = ref<ValidatableForm | null>(null);
+const configFormRef = ref<ValidatableForm | null>(null);
+const adminFormRef = ref<ValidatableForm | null>(null);
 
 const form = reactive<CondoForm>({
-  name: 'Condominio Alto del Valle',
-  type: 'Condominio',
-  description:
-    'Condominio residencial ubicado en una zona exclusiva con amplias áreas verdes y seguridad 24/7.',
+  name: '',
+  type: '',
+  description: '',
   status: 'Activo',
 });
 
 const location = reactive<LocationForm>({
-  country: 'Ecuador',
-  province: 'Pichincha',
-  city: 'Quito',
-  direction: 'Av. de los Shyris y Portugal',
-  reference: 'Frente al parque La Carolina',
-  postalCode: '170135',
+  country: '',
+  province: '',
+  city: '',
+  direction: '',
+  reference: '',
+  postalCode: '',
 });
 
 const config = reactive<ConfigForm>({
-  blocks: 4,
-  units: 120,
-  currency: 'USD - Dólar',
-  timezone: '(GMT-05:00) Quito',
-  dueDay: 5,
-  monthlyFee: '120.00',
+  blocks: '',
+  units: '',
+  currency: '',
+  timezone: '',
+  dueDay: '',
+  monthlyFee: '',
   notifications: true,
   billingLock: false,
   onlinePayments: true,
@@ -475,12 +701,12 @@ const config = reactive<ConfigForm>({
 });
 
 const administrator = reactive<AdministratorForm>({
-  name: 'Carlos',
-  lastName: 'Andrés Pérez Mendoza',
-  email: 'carlos.perez@altodelvalle.com',
-  phone: '099 123 4567',
-  username: 'carlos.perez',
-  password: 'Temp#2026',
+  name: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  username: '',
+  password: '',
 });
 
 const typeOptions = ['Condominio', 'Urbanización', 'Edificio'];
@@ -510,14 +736,140 @@ const steps = [
   { number: '4', name: 'amenities', label: 'Amenidades' },
   { number: '5', name: 'admin', label: 'Administrador' },
   { number: '6', name: 'summary', label: 'Resumen' },
-] as const;
+] as const satisfies ReadonlyArray<{ number: string; name: StepName; label: string }>;
 
-const requiredRule = (value: string) => !!value || 'Campo requerido';
+const stepIndexByName = Object.fromEntries(steps.map((step, index) => [step.name, index])) as Record<
+  StepName,
+  number
+>;
 
-const currentStepIndex = computed(() => steps.findIndex((step) => step.name === activeStep.value));
+function toText(value: unknown) {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return '';
+}
+
+const requiredRule = (value: unknown) =>
+  toText(value).trim().length > 0 ? true : 'Campo requerido';
+
+const emailRule = (value: unknown) => {
+  const text = toText(value).trim();
+  if (!text) {
+    return 'Campo requerido';
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text) ? true : 'Ingresa un correo válido';
+};
+
+const minLengthRule = (min: number) => (value: unknown) => {
+  const text = toText(value).trim();
+  if (!text) {
+    return 'Campo requerido';
+  }
+
+  return text.length >= min ? true : `Debe tener al menos ${min} caracteres`;
+};
+
+const phoneRule = (value: unknown) => {
+  const text = toText(value).trim();
+  if (!text) {
+    return true;
+  }
+
+  return /^[0-9+()\-\s]{7,20}$/.test(text) ? true : 'Ingresa un teléfono válido';
+};
+
+const integerMinRule = (min: number) => (value: unknown) => {
+  const text = toText(value).trim();
+  if (!text) {
+    return 'Campo requerido';
+  }
+
+  const numericValue = Number(text);
+  if (!Number.isInteger(numericValue)) {
+    return 'Ingresa un número entero';
+  }
+
+  return numericValue >= min ? true : `Debe ser mayor o igual a ${min}`;
+};
+
+const rangeRule = (min: number, max: number) => (value: unknown) => {
+  const text = toText(value).trim();
+  if (!text) {
+    return 'Campo requerido';
+  }
+
+  const numericValue = Number(text);
+  if (!Number.isInteger(numericValue)) {
+    return 'Ingresa un número entero';
+  }
+
+  return numericValue >= min && numericValue <= max ? true : `Debe estar entre ${min} y ${max}`;
+};
+
+const currencyRule = (value: unknown) => {
+  const text = toText(value).trim();
+  if (!text) {
+    return true;
+  }
+
+  return /^\d+([.,]\d{1,2})?$/.test(text) ? true : 'Ingresa un monto válido';
+};
+
+const currentStepIndex = computed(() => stepIndexByName[activeStep.value]);
 const currentStepLabel = computed(() => steps[currentStepIndex.value]?.label ?? 'Información');
 const isFirstStep = computed(() => currentStepIndex.value === 0);
 const isLastStep = computed(() => currentStepIndex.value === steps.length - 1);
+const adminFullName = computed(() => `${administrator.name} ${administrator.lastName}`.trim() || 'Administrador principal');
+
+const completedSteps = reactive<Record<StepName, boolean>>({
+  info: false,
+  location: false,
+  config: false,
+  amenities: false,
+  admin: false,
+  summary: false,
+});
+
+function canAccessStep(stepName: StepName) {
+  return stepIndexByName[stepName] <= highestAccessibleStepIndex.value;
+}
+
+function setStepCompleted(stepName: StepName, value = true) {
+  completedSteps[stepName] = value;
+  if (!value && stepError.value === stepName) {
+    stepError.value = null;
+  }
+}
+
+async function validateCurrentStep(stepName: StepName) {
+  if (stepName === 'amenities' || stepName === 'summary') {
+    return true;
+  }
+
+  const formRefMap: Partial<Record<StepName, { value: ValidatableForm | null }>> = {
+    info: infoFormRef,
+    location: locationFormRef,
+    config: configFormRef,
+    admin: adminFormRef,
+  };
+
+  const formRef = formRefMap[stepName];
+  if (!formRef?.value) {
+    return true;
+  }
+
+  const isValid = await formRef.value.validate();
+  stepError.value = isValid ? null : stepName;
+
+  if (isValid) {
+    setStepCompleted(stepName);
+  }
+
+  return isValid;
+}
 
 function goPreviousStep() {
   const previousStep = steps[currentStepIndex.value - 1];
@@ -526,27 +878,49 @@ function goPreviousStep() {
   }
 }
 
-function goNextStep() {
+async function goNextStep() {
+  const currentStepName = activeStep.value;
+  const isValid = await validateCurrentStep(currentStepName);
+  if (!isValid) {
+    return;
+  }
+
   const nextStep = steps[currentStepIndex.value + 1];
-  if (nextStep) {
-    activeStep.value = nextStep.name;
+  if (!nextStep) {
+    return;
   }
+
+  if (currentStepName === 'amenities') {
+    setStepCompleted('amenities');
+  }
+
+  highestAccessibleStepIndex.value = Math.max(highestAccessibleStepIndex.value, currentStepIndex.value + 1);
+  activeStep.value = nextStep.name;
 }
 
-function handleFooterAction() {
+async function handleFooterAction() {
   if (isLastStep.value) {
-    submitForm();
+    await submitForm();
     return;
   }
 
-  goNextStep();
+  await goNextStep();
 }
 
-function submitForm() {
-  if (!form.name.trim() || !form.type) {
-    return;
+async function submitForm() {
+  const stepsToValidate: StepName[] = ['info', 'location', 'config', 'admin'];
+
+  for (const stepName of stepsToValidate) {
+    const isValid = await validateCurrentStep(stepName);
+    if (!isValid) {
+      activeStep.value = stepName;
+      highestAccessibleStepIndex.value = Math.max(highestAccessibleStepIndex.value, stepIndexByName[stepName]);
+      return;
+    }
   }
 
+  setStepCompleted('summary');
+  highestAccessibleStepIndex.value = Math.max(highestAccessibleStepIndex.value, stepIndexByName.summary);
   createdDialogOpen.value = true;
 }
 
@@ -568,22 +942,14 @@ function goToCondominio() {
 
 .page-shell {
   display: grid;
-  gap: 28px;
+  gap: 22px;
 }
 
 .page-breadcrumbs {
-  color: var(--app-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.page-header {
   align-items: flex-start;
   display: flex;
   justify-content: space-between;
   gap: 14px;
-  margin-top: 2px;
 }
 
 .page-header__heading {
@@ -621,83 +987,97 @@ function goToCondominio() {
 }
 
 .wizard-stepper {
-  display: flex;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.wizard-stepper :deep(.q-stepper__header) {
+  background: #fff;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
   padding: 10px;
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 16px;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  margin-top: 2px;
 }
 
-.wizard-stepper::-webkit-scrollbar {
+.wizard-stepper :deep(.q-stepper__header::-webkit-scrollbar) {
   display: none;
 }
 
-.wizard-step {
+.wizard-stepper :deep(.q-stepper__tab) {
   align-items: center;
   background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
   color: var(--app-text-muted);
-  cursor: pointer;
-  display: inline-flex;
   flex: 0 0 auto;
-  gap: 7px;
-  min-height: 44px;
-  padding: 7px 12px 7px 10px;
-  text-align: left;
+  margin: 0;
+  min-height: 46px;
+  padding-inline: 14px;
   transition:
     background-color 0.18s ease,
     border-color 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
 }
 
-.wizard-step:hover {
+.wizard-stepper :deep(.q-stepper__tab:hover) {
   border-color: rgba(37, 99, 235, 0.16);
   color: var(--app-text);
   transform: translateY(-1px);
 }
 
-.wizard-step--active {
+.wizard-stepper :deep(.q-stepper__tab--active) {
   background: linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.06));
   border-color: rgba(37, 99, 235, 0.28);
   color: var(--app-text);
   box-shadow: 0 14px 28px rgba(37, 99, 235, 0.12);
-  transform: translateY(-1px);
 }
 
-.wizard-step__number {
-  align-items: center;
-  background: rgba(37, 99, 235, 0.14);
-  border-radius: 999px;
-  color: var(--app-primary);
-  display: inline-flex;
-  font-size: 9px;
+.wizard-stepper :deep(.q-stepper__tab--done) {
+  border-color: rgba(34, 197, 94, 0.18);
+}
+
+.wizard-stepper :deep(.q-stepper__title) {
+  font-size: 10px;
   font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.wizard-stepper :deep(.q-stepper__caption) {
+  color: var(--app-text-muted);
+  font-size: 9px;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.wizard-stepper :deep(.q-stepper__dot) {
+  background: rgba(37, 99, 235, 0.14);
+  box-shadow: none;
+  color: var(--app-primary);
   height: 22px;
-  justify-content: center;
+  margin-right: 8px;
   width: 22px;
 }
 
-.wizard-step__label {
-  font-size: 10px;
-  font-weight: 800;
-  white-space: nowrap;
+.wizard-stepper :deep(.q-stepper__dot .q-icon) {
+  font-size: 13px;
 }
 
-.wizard-panels {
-  background: transparent;
+.wizard-stepper :deep(.q-stepper__tab--active .q-stepper__dot) {
+  background: rgba(37, 99, 235, 0.18);
 }
 
-.wizard-panel {
+.wizard-stepper :deep(.q-stepper__step) {
   padding: 16px 0 0;
+}
+
+.wizard-step__form {
+  display: block;
 }
 
 .form-layout,
@@ -707,7 +1087,8 @@ function goToCondominio() {
 }
 
 .form-layout {
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  align-items: start;
 }
 
 .tab-layout {
@@ -715,12 +1096,13 @@ function goToCondominio() {
 }
 
 .tab-layout--summary {
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  align-items: start;
 }
 
 .form-card,
-.summary-card,
-.tab-card {
+.tab-card,
+.summary-panel {
   border-radius: 16px;
   overflow: hidden;
 }
@@ -746,7 +1128,7 @@ function goToCondominio() {
 
 .form-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -784,7 +1166,15 @@ function goToCondominio() {
 
 .summary-column {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+}
+
+.summary-panel {
+  display: grid;
+}
+
+.summary-panel__section {
+  padding-bottom: 16px;
 }
 
 .summary-preview {
@@ -793,13 +1183,16 @@ function goToCondominio() {
   gap: 14px;
 }
 
-.summary-preview__thumbnail {
-  background:
-    url('https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=500&q=80')
-      center/cover;
-  border-radius: 14px;
-  height: 92px;
-  width: 92px;
+.summary-preview__avatar {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--app-primary);
+  flex-shrink: 0;
+}
+
+.summary-preview__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
 .summary-preview__name {
@@ -807,12 +1200,17 @@ function goToCondominio() {
   font-size: 14px;
   font-weight: 800;
   line-height: 1.2;
-  margin-bottom: 6px;
+}
+
+.summary-preview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .summary-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .summary-item {
@@ -842,16 +1240,14 @@ function goToCondominio() {
 
 .admin-box {
   border-radius: 14px;
-  overflow: hidden;
-}
-
-.admin-box__content {
   align-items: center;
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 14px;
+}
+
+.admin-box__avatar {
+  flex-shrink: 0;
 }
 
 .admin-box__copy {
@@ -906,7 +1302,6 @@ function goToCondominio() {
   background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 14px;
-  overflow: hidden;
   padding: 14px;
 }
 
@@ -927,18 +1322,66 @@ function goToCondominio() {
   color: var(--app-primary);
 }
 
-.map-card__image {
-  background:
-    url('https://images.unsplash.com/photo-1502920917128-1aa500764ce7?auto=format&fit=crop&w=1200&q=80')
-      center/cover;
+.map-card__body {
+  align-items: center;
+  background: rgba(37, 99, 235, 0.04);
+  border: 1px solid rgba(37, 99, 235, 0.08);
   border-radius: 12px;
-  height: 250px;
+  color: var(--app-text);
+  display: flex;
+  gap: 12px;
   margin-top: 12px;
+  min-height: 152px;
+  padding: 16px;
+}
+
+.map-card__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.map-card__body-title {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.map-card__body-text {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .config-block {
   background: #fff;
   border-radius: 14px;
+}
+
+.config-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.config-summary__item {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 12px;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+}
+
+.config-summary__label {
+  color: var(--app-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.config-summary__value {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .config-block__title {
@@ -949,14 +1392,14 @@ function goToCondominio() {
 
 .config-block__grid {
   display: grid;
-  gap: 10px 18px;
+  gap: 8px 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 14px;
 }
 
 .amenities-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -999,7 +1442,7 @@ function goToCondominio() {
 
 .summary-final {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .summary-final__hero {
@@ -1022,12 +1465,8 @@ function goToCondominio() {
 }
 
 .summary-final__thumbnail {
-  background:
-    url('https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=500&q=80')
-      center/cover;
-  border-radius: 14px;
-  height: 92px;
-  width: 92px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--app-primary);
 }
 
 .summary-final__name {
@@ -1057,7 +1496,7 @@ function goToCondominio() {
 
 .summary-final__grid {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -1088,6 +1527,73 @@ function goToCondominio() {
   font-size: 11px;
   line-height: 1.55;
   margin-top: 6px;
+}
+
+.summary-checklist {
+  display: grid;
+  gap: 10px;
+}
+
+.summary-checklist__item {
+  align-items: center;
+  color: var(--app-text);
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.support-card {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.support-card__content {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+}
+
+.support-card__icon {
+  align-items: center;
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 12px;
+  color: var(--app-primary);
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.support-card__copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.support-card__title {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.support-card__text {
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.support-card__action {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.support-card__footer {
+  color: var(--app-text-muted);
+  font-size: 11px;
+  padding: 10px 14px 12px;
 }
 
 .wizard-footer {
@@ -1132,9 +1638,8 @@ function goToCondominio() {
 }
 
 @media (max-width: 1180px) {
-  .form-layout,
-  .tab-layout--summary {
-    grid-template-columns: 1fr;
+  .config-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .amenities-grid {
@@ -1156,22 +1661,34 @@ function goToCondominio() {
   }
 
   .form-grid,
+  .config-summary,
   .config-block__grid,
   .summary-final__grid {
     grid-template-columns: 1fr;
+  }
+
+  .form-layout,
+  .tab-layout--summary {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    overflow-x: auto;
+  }
+
+  .summary-column,
+  .tab-card--sticky {
+    min-width: 280px;
   }
 
   .summary-final__hero {
     align-items: flex-start;
   }
 
-  .wizard-stepper {
+  .wizard-stepper :deep(.q-stepper__header) {
     padding: 8px;
   }
 
-  .wizard-step {
+  .wizard-stepper :deep(.q-stepper__tab) {
     min-height: 46px;
-    padding-inline: 11px;
+    padding-inline: 12px;
   }
 
   .wizard-footer {

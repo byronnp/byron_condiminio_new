@@ -1,7 +1,11 @@
 <template>
   <q-layout view="lHh Lpr lFf" class="auth-layout">
     <q-page-container class="auth-layout__container">
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <transition name="auth-fade" mode="out-in" appear>
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
+      </router-view>
     </q-page-container>
   </q-layout>
 </template>
@@ -20,5 +24,22 @@
 
 .auth-layout__container {
   min-height: 100vh;
+}
+
+.auth-fade-enter-active,
+.auth-fade-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.auth-fade-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.auth-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

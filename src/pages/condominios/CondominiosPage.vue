@@ -1,53 +1,21 @@
 <template>
   <q-page class="condominios-page">
-    <div class="page-shell">
-      <header class="page-hero">
-        <div class="page-hero__heading">
-          <h1 class="page-hero__title">Condominios</h1>
-          <p class="page-hero__subtitle">
-            Gestiona el catálogo de condominios registrados en la plataforma.
-          </p>
-        </div>
-
-        <div class="page-hero__actions">
-          <q-input
-            v-model="search"
-            dense
-            outlined
-            debounce="250"
-            placeholder="Buscar condominio..."
-            class="search-field"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-
-          <q-select
-            v-model="statusFilter"
-            :options="statusOptions"
-            dense
-            outlined
-            emit-value
-            map-options
-            class="status-field"
-          />
-
-          <q-btn outline no-caps icon="filter_alt" label="Filtros" class="header-action" />
-
-          <q-btn
-            color="primary"
-            unelevated
-            no-caps
-            icon="add_home_work"
-            label="Nuevo condominio"
-            class="header-action header-action--primary"
-            @click="goToNewCondominio"
-          />
-        </div>
-      </header>
-
-      <section class="stats-grid">
+    <AppListPageShell
+      v-model:search="search"
+      v-model:status="statusFilter"
+      v-model:rowsPerPage="pagination.rowsPerPage"
+      v-model:sortBy="sortBy"
+      title="Condominios"
+      subtitle="Gestiona el catalogo de condominios registrados en la plataforma."
+      search-placeholder="Buscar condominio..."
+      :status-options="statusOptions"
+      :rows-per-page-options="rowsPerPageOptions"
+      :sort-options="sortOptions"
+      action-label="Nuevo condominio"
+      action-icon="add_home_work"
+      @cta-click="goToNewCondominio"
+    >
+      <template #stats>
         <q-card v-for="card in statsCards" :key="card.label" flat bordered class="stat-card">
           <q-card-section class="stat-card__content">
             <div class="stat-card__icon" :style="{ background: card.tint.bg, color: card.tint.fg }">
@@ -60,117 +28,84 @@
             </div>
           </q-card-section>
         </q-card>
-      </section>
+      </template>
 
-      <q-card flat bordered class="table-card">
-        <q-card-section class="table-controls">
-          <div class="table-controls__left">
-            <span>Mostrar</span>
-            <q-select
-              v-model="pagination.rowsPerPage"
-              :options="rowsPerPageOptions"
-              dense
-              outlined
-              emit-value
-              map-options
-              class="rows-select"
-              @update:model-value="handleRowsPerPageChange"
-            />
-            <span>registros</span>
-          </div>
-
-          <div class="table-controls__right">
-            <span>Ordenar por:</span>
-            <q-select
-              v-model="sortBy"
-              :options="sortOptions"
-              dense
-              outlined
-              emit-value
-              map-options
-              class="order-select"
-              @update:model-value="handleSortChange"
-            />
-          </div>
-        </q-card-section>
-
-        <q-separator class="page-divider" />
-
-        <q-card-section class="table-wrap">
-          <q-table
-            flat
-            bordered
-            :rows="paginatedRows"
-            :columns="columns"
-            row-key="id"
-            hide-bottom
-            class="condominios-table"
-          >
-            <template #body-cell-condominio="props">
-              <q-td :props="props">
-                <div class="condo-cell">
-                  <q-avatar rounded size="38px">
-                    <img :src="props.row.image" :alt="props.row.name" />
-                  </q-avatar>
-                  <div>
-                    <div class="condo-cell__title">{{ props.row.name }}</div>
-                    <div class="condo-cell__subtitle">{{ props.row.location }}</div>
-                  </div>
+      <template #table>
+        <q-table
+          flat
+          bordered
+          :rows="paginatedRows"
+          :columns="columns"
+          row-key="id"
+          hide-bottom
+          class="list-table"
+        >
+          <template #body-cell-condominio="props">
+            <q-td :props="props">
+              <div class="entity-cell">
+                <q-avatar rounded size="38px" class="entity-avatar">
+                  <img :src="props.row.image" :alt="props.row.name" />
+                </q-avatar>
+                <div>
+                  <div class="entity-cell__title">{{ props.row.name }}</div>
+                  <div class="entity-cell__subtitle">{{ props.row.location }}</div>
                 </div>
-              </q-td>
-            </template>
+              </div>
+            </q-td>
+          </template>
 
-            <template #body-cell-type="props">
-              <q-td :props="props">
-                <q-badge outline color="primary" class="type-badge">{{ props.value }}</q-badge>
-              </q-td>
-            </template>
+          <template #body-cell-type="props">
+            <q-td :props="props">
+              <q-badge outline color="primary" class="type-badge">{{ props.value }}</q-badge>
+            </q-td>
+          </template>
 
-            <template #body-cell-status="props">
-              <q-td :props="props">
-                <q-badge :color="statusTone(props.value)" rounded class="status-badge">
-                  {{ props.value }}
-                </q-badge>
-              </q-td>
-            </template>
+          <template #body-cell-status="props">
+            <q-td :props="props">
+              <q-badge :color="statusTone(props.value)" rounded class="status-badge">
+                {{ props.value }}
+              </q-badge>
+            </q-td>
+          </template>
 
-            <template #body-cell-actions="props">
-              <q-td :props="props" class="table-actions">
-                <q-btn flat round dense icon="visibility" class="table-icon">
-                  <q-tooltip>Ver detalle</q-tooltip>
-                </q-btn>
-                <q-btn flat round dense icon="edit" class="table-icon">
-                  <q-tooltip>Editar</q-tooltip>
-                </q-btn>
-                <q-btn flat round dense icon="more_horiz" class="table-icon">
-                  <q-tooltip>Más acciones</q-tooltip>
-                </q-btn>
-              </q-td>
-            </template>
-          </q-table>
-        </q-card-section>
+          <template #body-cell-actions="props">
+            <q-td :props="props" class="table-actions">
+              <q-btn flat round dense icon="visibility" class="table-icon">
+                <q-tooltip>Ver detalle</q-tooltip>
+              </q-btn>
+              <q-btn flat round dense icon="edit" class="table-icon">
+                <q-tooltip>Editar</q-tooltip>
+              </q-btn>
+              <q-btn flat round dense icon="more_horiz" class="table-icon">
+                <q-tooltip>Más acciones</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+        </q-table>
+      </template>
 
-        <q-card-section class="table-footer">
-          <q-pagination
-            v-model="pagination.page"
-            :max="totalPages"
-            :max-pages="4"
-            boundary-links
-            direction-links
-            color="primary"
-            active-design="flat"
-            active-color="primary"
-            class="table-footer__pagination"
-          />
-        </q-card-section>
-      </q-card>
-    </div>
+      <template #footer>
+        <q-pagination
+          v-model="pagination.page"
+          :max="totalPages"
+          :max-pages="4"
+          boundary-links
+          direction-links
+          color="primary"
+          active-design="flat"
+          active-color="primary"
+          class="table-footer__pagination"
+        />
+      </template>
+    </AppListPageShell>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+
+import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 
 type CondoRow = {
   id: number;
@@ -202,18 +137,18 @@ const rows: CondoRow[] = [
     location: 'Quito, Pichincha',
     type: 'Condominio',
     units: 320,
-    principal: 'Carlos Pérez',
+    principal: 'Carlos Perez',
     status: 'Activo',
     image:
       'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=300&q=80',
   },
   {
     id: 2,
-    name: 'Urbanización Los Pinos',
+    name: 'Urbanizacion Los Pinos',
     location: 'Guayaquil, Guayas',
-    type: 'Urbanización',
+    type: 'Urbanizacion',
     units: 180,
-    principal: 'María González',
+    principal: 'Maria Gonzalez',
     status: 'Activo',
     image:
       'https://images.unsplash.com/photo-1560448070-20b9a0c4a843?auto=format&fit=crop&w=300&q=80',
@@ -224,7 +159,7 @@ const rows: CondoRow[] = [
     location: 'Cuenca, Azuay',
     type: 'Edificio',
     units: 96,
-    principal: 'Juan Rodríguez',
+    principal: 'Juan Rodriguez',
     status: 'Activo',
     image:
       'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=300&q=80',
@@ -232,7 +167,7 @@ const rows: CondoRow[] = [
   {
     id: 4,
     name: 'Condominio Jardines del Valle',
-    location: 'Samborondón, Guayas',
+    location: 'Samborondon, Guayas',
     type: 'Condominio',
     units: 250,
     principal: 'Ana Torres',
@@ -243,10 +178,10 @@ const rows: CondoRow[] = [
   {
     id: 5,
     name: 'Residencial El Bosque',
-    location: 'Manta, Manabí',
+    location: 'Manta, Manabi',
     type: 'Condominio',
     units: 150,
-    principal: 'Luis Ramírez',
+    principal: 'Luis Ramirez',
     status: 'Inactivo',
     image:
       'https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=300&q=80',
@@ -255,7 +190,7 @@ const rows: CondoRow[] = [
     id: 6,
     name: 'Altos del Sol',
     location: 'Machala, El Oro',
-    type: 'Urbanización',
+    type: 'Urbanizacion',
     units: 142,
     principal: 'Pedro Morales',
     status: 'Activo',
@@ -265,10 +200,10 @@ const rows: CondoRow[] = [
   {
     id: 7,
     name: 'Marina Bay',
-    location: 'Manta, Manabí',
+    location: 'Manta, Manabi',
     type: 'Edificio',
     units: 84,
-    principal: 'Sofía Castillo',
+    principal: 'Sofia Castillo',
     status: 'Activo',
     image:
       'https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=300&q=80',
@@ -288,9 +223,9 @@ const rows: CondoRow[] = [
     id: 9,
     name: 'Portales del Lago',
     location: 'Ibarra, Imbabura',
-    type: 'Urbanización',
+    type: 'Urbanizacion',
     units: 116,
-    principal: 'Karla Cedeño',
+    principal: 'Karla Cedeno',
     status: 'Inactivo',
     image:
       'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=300&q=80',
@@ -320,7 +255,7 @@ const rows: CondoRow[] = [
   {
     id: 12,
     name: 'Nuevo Horizonte',
-    location: 'Durán, Guayas',
+    location: 'Duran, Guayas',
     type: 'Condominio',
     units: 198,
     principal: 'Jorge Almeida',
@@ -340,30 +275,10 @@ const columns = [
 ];
 
 const statsBase = [
-  {
-    label: 'Total condominios',
-    value: '12',
-    hint: 'Todos los condominios registrados',
-    icon: 'apartment',
-  },
-  {
-    label: 'Condominios activos',
-    value: '9',
-    hint: 'Con acceso al sistema',
-    icon: 'domain',
-  },
-  {
-    label: 'Condominios inactivos',
-    value: '3',
-    hint: 'Sin acceso al sistema',
-    icon: 'groups',
-  },
-  {
-    label: 'Tipos registrados',
-    value: '3',
-    hint: 'Condominio, urbanización y edificio',
-    icon: 'category',
-  },
+  { label: 'Total condominios', value: '12', hint: 'Todos los condominios registrados', icon: 'apartment' },
+  { label: 'Condominios activos', value: '9', hint: 'Con acceso al sistema', icon: 'domain' },
+  { label: 'Condominios inactivos', value: '3', hint: 'Sin acceso al sistema', icon: 'groups' },
+  { label: 'Tipos registrados', value: '3', hint: 'Condominio, urbanizacion y edificio', icon: 'category' },
 ];
 
 const statsCards = computed(() => {
@@ -387,8 +302,8 @@ const statusOptions = [
 ];
 
 const sortOptions = [
-  { label: 'Más recientes', value: 'recent' },
-  { label: 'Más antiguos', value: 'oldest' },
+  { label: 'Mas recientes', value: 'recent' },
+  { label: 'Mas antiguos', value: 'oldest' },
   { label: 'Nombre A-Z', value: 'name' },
 ] as const;
 
@@ -421,7 +336,9 @@ const sortedRows = computed(() => {
   return source;
 });
 
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage)));
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage)),
+);
 
 const paginatedRows = computed(() => {
   const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
@@ -444,14 +361,6 @@ function statusTone(status: CondoRow['status']) {
   return status === 'Activo' ? 'positive' : 'negative';
 }
 
-function handleRowsPerPageChange() {
-  pagination.value.page = 1;
-}
-
-function handleSortChange() {
-  pagination.value.page = 1;
-}
-
 function goToNewCondominio() {
   void router.push('/condominios/nuevo');
 }
@@ -460,85 +369,6 @@ function goToNewCondominio() {
 <style scoped>
 .condominios-page {
   min-height: 100%;
-}
-
-.page-shell {
-  display: grid;
-  gap: 12px;
-}
-
-.page-breadcrumbs {
-  color: var(--app-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.page-hero {
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.page-hero__heading {
-  min-width: 0;
-}
-
-.page-hero__title {
-  color: var(--app-text);
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-}
-
-.page-hero__subtitle {
-  color: var(--app-text-muted);
-  font-size: 12px;
-  line-height: 1.4;
-  margin-top: 4px;
-  max-width: 720px;
-}
-
-.page-hero__actions {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: flex-end;
-  padding-top: 10px;
-}
-
-.table-card {
-  border-radius: 18px;
-  overflow: hidden;
-}
-
-.page-divider {
-  margin-inline: 22px;
-  opacity: 0.45;
-}
-
-.search-field {
-  width: 248px;
-}
-
-.status-field {
-  width: 154px;
-}
-
-.header-action {
-  min-height: 40px;
-}
-
-.header-action--primary {
-  min-width: 160px;
-}
-
-.stats-grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .stat-card {
@@ -583,39 +413,11 @@ function goToNewCondominio() {
   margin-top: 1px;
 }
 
-.table-controls {
-  align-items: center;
-  color: var(--app-text-muted);
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 14px 22px;
-}
-
-.table-controls__left,
-.table-controls__right {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-}
-
-.rows-select {
-  width: 92px;
-}
-
-.order-select {
-  width: 200px;
-}
-
-.table-wrap {
-  padding: 8px 22px 2px;
-}
-
-.condominios-table :deep(.q-table__container) {
+.list-table :deep(.q-table__container) {
   border-radius: 16px;
 }
 
-.condominios-table :deep(thead tr th) {
+.list-table :deep(thead tr th) {
   color: #334155;
   font-size: 12px;
   font-weight: 800;
@@ -623,30 +425,37 @@ function goToNewCondominio() {
   letter-spacing: -0.01em;
 }
 
-.condominios-table :deep(tbody tr td) {
+.list-table :deep(tbody tr td) {
   color: var(--app-text);
   font-size: 12px;
   height: 60px;
 }
 
-.condominios-table :deep(tbody tr:hover td) {
+.list-table :deep(tbody tr:hover td) {
   background: rgba(37, 99, 235, 0.025);
 }
 
-.condo-cell {
+.entity-cell {
   align-items: center;
   display: flex;
   gap: 12px;
 }
 
-.condo-cell__title {
+.entity-avatar {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--app-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.entity-cell__title {
   color: var(--app-text);
   font-size: 12px;
   font-weight: 800;
   line-height: 1.2;
 }
 
-.condo-cell__subtitle {
+.entity-cell__subtitle {
   color: var(--app-text-muted);
   font-size: 11px;
   margin-top: 2px;
@@ -672,13 +481,6 @@ function goToNewCondominio() {
   font-size: 16px;
 }
 
-.table-footer {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-  padding: 10px 22px 18px;
-}
-
 .table-footer__pagination :deep(.q-pagination__content) {
   gap: 6px;
 }
@@ -693,69 +495,5 @@ function goToNewCondominio() {
 .table-footer__pagination :deep(.q-btn--active) {
   background: var(--app-primary);
   color: #fff;
-}
-
-@media (max-width: 1180px) {
-  .page-hero,
-  .table-controls,
-  .table-footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .page-hero__actions {
-    justify-content: flex-start;
-    padding-top: 0;
-    width: 100%;
-  }
-
-  .search-field {
-    width: 100%;
-  }
-
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 767px) {
-  .page-hero__title {
-    font-size: 24px;
-  }
-
-  .header-action--primary {
-    flex: 1 1 100%;
-    width: 100%;
-  }
-
-  .status-field,
-  .rows-select,
-  .order-select {
-    width: 100%;
-  }
-}
-
-@media (max-width: 599px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .page-divider {
-    margin-inline: 16px;
-  }
-
-  .table-controls,
-  .table-wrap,
-  .table-footer {
-    padding-inline: 16px;
-  }
-
-  .table-card {
-    border-radius: 16px;
-  }
-
-  .table-footer__pagination {
-    width: 100%;
-  }
 }
 </style>

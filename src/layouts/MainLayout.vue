@@ -180,7 +180,11 @@
     </q-header>
 
     <q-page-container class="main-layout__container">
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <transition name="page-fade-slide" mode="out-in" appear>
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
+      </router-view>
     </q-page-container>
   </q-layout>
 </template>
@@ -522,6 +526,23 @@ function handleSignOut() {
 
 .toolbar-action {
   color: var(--app-text);
+}
+
+.page-fade-slide-enter-active,
+.page-fade-slide-leave-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.page-fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 @media (max-width: 1023px) {

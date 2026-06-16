@@ -20,8 +20,8 @@
       </q-card-section>
 
       <q-card-actions align="between" class="created-dialog__actions">
-        <q-btn flat no-caps label="Cerrar" v-close-popup @click="emit('close')" />
-        <q-btn color="primary" unelevated no-caps label="Ir al condominio" @click="emit('go-to-condominio')" />
+        <q-btn flat no-caps label="Cerrar" @click="closeDialog" />
+        <q-btn color="primary" unelevated no-caps label="Ir al condominio" @click="goToCondominio" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -47,6 +47,15 @@ const openProxy = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 });
+
+function closeDialog() {
+  openProxy.value = false;
+  emit('close');
+}
+
+function goToCondominio() {
+  emit('go-to-condominio');
+}
 </script>
 
 <style scoped>
