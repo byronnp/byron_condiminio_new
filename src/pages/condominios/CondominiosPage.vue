@@ -2,8 +2,7 @@
   <q-page class="condominios-page">
     <div class="page-shell">
       <header class="page-hero">
-        <div>
-          <div class="page-hero__eyebrow">Listado de condominios</div>
+        <div class="page-hero__heading">
           <h1 class="page-hero__title">Condominios</h1>
           <p class="page-hero__subtitle">
             Gestiona el catálogo de condominios registrados en la plataforma.
@@ -11,24 +10,48 @@
         </div>
 
         <div class="page-hero__actions">
-          <q-btn flat no-caps icon="filter_alt" label="Filtros" class="hero-action hero-action--ghost" />
+          <q-input
+            v-model="search"
+            dense
+            outlined
+            debounce="250"
+            placeholder="Buscar condominio..."
+            class="search-field"
+          >
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+
+          <q-select
+            v-model="statusFilter"
+            :options="statusOptions"
+            dense
+            outlined
+            emit-value
+            map-options
+            class="status-field"
+          />
+
+          <q-btn outline no-caps icon="filter_alt" label="Filtros" class="header-action" />
+
           <q-btn
             color="primary"
             unelevated
             no-caps
             icon="add_home_work"
             label="Nuevo condominio"
-            class="hero-action"
+            class="header-action header-action--primary"
             @click="goToNewCondominio"
           />
         </div>
       </header>
 
       <section class="stats-grid">
-        <q-card v-for="card in stats" :key="card.label" flat bordered class="stat-card">
+        <q-card v-for="card in statsCards" :key="card.label" flat bordered class="stat-card">
           <q-card-section class="stat-card__content">
             <div class="stat-card__icon" :style="{ background: card.tint.bg, color: card.tint.fg }">
-              <q-icon :name="card.icon" size="24px" />
+              <q-icon :name="card.icon" size="22px" />
             </div>
             <div>
               <div class="stat-card__label">{{ card.label }}</div>
@@ -39,57 +62,54 @@
         </q-card>
       </section>
 
-      <q-card flat bordered class="panel-card">
-        <q-card-section class="panel-card__header">
-          <div>
-            <div class="panel-card__title">Condominios registrados</div>
-            <div class="panel-card__subtitle">
-              Vista resumida de los condominios activos en la plataforma.
-            </div>
-          </div>
-
-          <div class="panel-card__actions">
-            <q-input
-              v-model="search"
-              dense
-              outlined
-              debounce="250"
-              placeholder="Buscar condominio..."
-              class="search-field"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
+      <q-card flat bordered class="table-card">
+        <q-card-section class="table-controls">
+          <div class="table-controls__left">
+            <span>Mostrar</span>
             <q-select
-              v-model="statusFilter"
-              :options="statusOptions"
+              v-model="pagination.rowsPerPage"
+              :options="rowsPerPageOptions"
               dense
               outlined
               emit-value
               map-options
-              class="status-field"
+              class="rows-select"
+              @update:model-value="handleRowsPerPageChange"
+            />
+            <span>registros</span>
+          </div>
+
+          <div class="table-controls__right">
+            <span>Ordenar por:</span>
+            <q-select
+              v-model="sortBy"
+              :options="sortOptions"
+              dense
+              outlined
+              emit-value
+              map-options
+              class="order-select"
+              @update:model-value="handleSortChange"
             />
           </div>
         </q-card-section>
 
-        <q-separator />
+        <q-separator class="page-divider" />
 
-        <q-card-section class="panel-card__body">
+        <q-card-section class="table-wrap">
           <q-table
             flat
             bordered
-            :rows="filteredRows"
+            :rows="paginatedRows"
             :columns="columns"
             row-key="id"
-            hide-pagination
-            :rows-per-page-options="[0]"
+            hide-bottom
             class="condominios-table"
           >
             <template #body-cell-condominio="props">
               <q-td :props="props">
                 <div class="condo-cell">
-                  <q-avatar rounded size="42px">
+                  <q-avatar rounded size="38px">
                     <img :src="props.row.image" :alt="props.row.name" />
                   </q-avatar>
                   <div>
@@ -102,13 +122,15 @@
 
             <template #body-cell-type="props">
               <q-td :props="props">
-                <q-badge outline color="primary">{{ props.value }}</q-badge>
+                <q-badge outline color="primary" class="type-badge">{{ props.value }}</q-badge>
               </q-td>
             </template>
 
             <template #body-cell-status="props">
               <q-td :props="props">
-                <q-badge :color="statusTone(props.value)" rounded>{{ props.value }}</q-badge>
+                <q-badge :color="statusTone(props.value)" rounded class="status-badge">
+                  {{ props.value }}
+                </q-badge>
               </q-td>
             </template>
 
@@ -127,13 +149,27 @@
             </template>
           </q-table>
         </q-card-section>
+
+        <q-card-section class="table-footer">
+          <q-pagination
+            v-model="pagination.page"
+            :max="totalPages"
+            :max-pages="4"
+            boundary-links
+            direction-links
+            color="primary"
+            active-design="flat"
+            active-color="primary"
+            class="table-footer__pagination"
+          />
+        </q-card-section>
       </q-card>
     </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 type CondoRow = {
@@ -142,18 +178,22 @@ type CondoRow = {
   location: string;
   type: string;
   units: number;
-  owners: number;
   principal: string;
   status: 'Activo' | 'Inactivo';
-  plan: string;
-  income: string;
-  delinquency: string;
   image: string;
 };
+
+type SortOption = 'recent' | 'oldest' | 'name';
 
 const router = useRouter();
 const search = ref('');
 const statusFilter = ref<'Todos' | 'Activo' | 'Inactivo'>('Todos');
+const sortBy = ref<SortOption>('recent');
+const rowsPerPageOptions = [10, 20, 50] as const;
+const pagination = ref({
+  page: 1,
+  rowsPerPage: 10,
+});
 
 const rows: CondoRow[] = [
   {
@@ -162,12 +202,8 @@ const rows: CondoRow[] = [
     location: 'Quito, Pichincha',
     type: 'Condominio',
     units: 320,
-    owners: 428,
     principal: 'Carlos Pérez',
     status: 'Activo',
-    plan: 'Enterprise',
-    income: '$46,850',
-    delinquency: '$1,250',
     image:
       'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=300&q=80',
   },
@@ -177,12 +213,8 @@ const rows: CondoRow[] = [
     location: 'Guayaquil, Guayas',
     type: 'Urbanización',
     units: 180,
-    owners: 256,
     principal: 'María González',
     status: 'Activo',
-    plan: 'Profesional',
-    income: '$10,420',
-    delinquency: '$2,180',
     image:
       'https://images.unsplash.com/photo-1560448070-20b9a0c4a843?auto=format&fit=crop&w=300&q=80',
   },
@@ -192,12 +224,8 @@ const rows: CondoRow[] = [
     location: 'Cuenca, Azuay',
     type: 'Edificio',
     units: 96,
-    owners: 120,
     principal: 'Juan Rodríguez',
     status: 'Activo',
-    plan: 'Profesional',
-    income: '$15,600',
-    delinquency: '$980',
     image:
       'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=300&q=80',
   },
@@ -207,12 +235,8 @@ const rows: CondoRow[] = [
     location: 'Samborondón, Guayas',
     type: 'Condominio',
     units: 250,
-    owners: 312,
     principal: 'Ana Torres',
     status: 'Activo',
-    plan: 'Enterprise',
-    income: '$22,150',
-    delinquency: '$1,040',
     image:
       'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?auto=format&fit=crop&w=300&q=80',
   },
@@ -222,14 +246,87 @@ const rows: CondoRow[] = [
     location: 'Manta, Manabí',
     type: 'Condominio',
     units: 150,
-    owners: 198,
     principal: 'Luis Ramírez',
     status: 'Inactivo',
-    plan: 'Básico',
-    income: '$3,200',
-    delinquency: '$1,120',
     image:
       'https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 6,
+    name: 'Altos del Sol',
+    location: 'Machala, El Oro',
+    type: 'Urbanización',
+    units: 142,
+    principal: 'Pedro Morales',
+    status: 'Activo',
+    image:
+      'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 7,
+    name: 'Marina Bay',
+    location: 'Manta, Manabí',
+    type: 'Edificio',
+    units: 84,
+    principal: 'Sofía Castillo',
+    status: 'Activo',
+    image:
+      'https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 8,
+    name: 'Costa Azul',
+    location: 'Salinas, Santa Elena',
+    type: 'Condominio',
+    units: 210,
+    principal: 'Diego Viteri',
+    status: 'Activo',
+    image:
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 9,
+    name: 'Portales del Lago',
+    location: 'Ibarra, Imbabura',
+    type: 'Urbanización',
+    units: 116,
+    principal: 'Karla Cedeño',
+    status: 'Inactivo',
+    image:
+      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 10,
+    name: 'Ciudadela Central',
+    location: 'Ambato, Tungurahua',
+    type: 'Condominio',
+    units: 174,
+    principal: 'Ricardo Vega',
+    status: 'Activo',
+    image:
+      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 11,
+    name: 'Terraza Norte',
+    location: 'Loja, Loja',
+    type: 'Edificio',
+    units: 68,
+    principal: 'Paola Mena',
+    status: 'Inactivo',
+    image:
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 12,
+    name: 'Nuevo Horizonte',
+    location: 'Durán, Guayas',
+    type: 'Condominio',
+    units: 198,
+    principal: 'Jorge Almeida',
+    status: 'Activo',
+    image:
+      'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=300&q=80',
   },
 ];
 
@@ -237,45 +334,51 @@ const columns = [
   { name: 'condominio', label: 'Condominio', field: 'name', align: 'left' as const },
   { name: 'type', label: 'Tipo', field: 'type', align: 'left' as const },
   { name: 'units', label: 'Unidades', field: 'units', align: 'right' as const },
-  { name: 'owners', label: 'Propietarios', field: 'owners', align: 'right' as const },
   { name: 'principal', label: 'Administrador principal', field: 'principal', align: 'left' as const },
   { name: 'status', label: 'Estado', field: 'status', align: 'center' as const },
-  { name: 'plan', label: 'Plan', field: 'plan', align: 'center' as const },
-  { name: 'income', label: 'Ingresos (mes)', field: 'income', align: 'right' as const },
-  { name: 'delinquency', label: 'Morosidad (mes)', field: 'delinquency', align: 'right' as const },
   { name: 'actions', label: 'Acciones', field: 'actions', align: 'right' as const },
 ];
 
-const stats = [
+const statsBase = [
   {
     label: 'Total condominios',
-    value: '24',
-    hint: '+2 este mes',
+    value: '12',
+    hint: 'Todos los condominios registrados',
     icon: 'apartment',
-    tint: { bg: 'rgba(37, 99, 235, 0.12)', fg: '#2563eb' },
   },
   {
-    label: 'Unidades totales',
-    value: '5,842',
-    hint: '+128 este mes',
+    label: 'Condominios activos',
+    value: '9',
+    hint: 'Con acceso al sistema',
     icon: 'domain',
-    tint: { bg: 'rgba(34, 197, 94, 0.12)', fg: '#16a34a' },
   },
   {
-    label: 'Administradores',
-    value: '38',
-    hint: '+4 este mes',
-    icon: 'manage_accounts',
-    tint: { bg: 'rgba(168, 85, 247, 0.12)', fg: '#7c3aed' },
+    label: 'Condominios inactivos',
+    value: '3',
+    hint: 'Sin acceso al sistema',
+    icon: 'groups',
   },
   {
-    label: 'Ingresos (mes)',
-    value: '$248,850',
-    hint: '+12.6% vs mes anterior',
-    icon: 'payments',
-    tint: { bg: 'rgba(249, 115, 22, 0.12)', fg: '#ea580c' },
+    label: 'Tipos registrados',
+    value: '3',
+    hint: 'Condominio, urbanización y edificio',
+    icon: 'category',
   },
 ];
+
+const statsCards = computed(() => {
+  const palette = [
+    { bg: 'rgba(37, 99, 235, 0.12)', fg: '#2563eb' },
+    { bg: 'rgba(34, 197, 94, 0.12)', fg: '#16a34a' },
+    { bg: 'rgba(249, 115, 22, 0.14)', fg: '#ea580c' },
+    { bg: 'rgba(124, 58, 237, 0.12)', fg: '#7c3aed' },
+  ] as const;
+
+  return statsBase.map((card, index) => ({
+    ...card,
+    tint: palette[index % palette.length]!,
+  }));
+});
 
 const statusOptions = [
   { label: 'Estado: Todos', value: 'Todos' },
@@ -283,8 +386,15 @@ const statusOptions = [
   { label: 'Inactivos', value: 'Inactivo' },
 ];
 
+const sortOptions = [
+  { label: 'Más recientes', value: 'recent' },
+  { label: 'Más antiguos', value: 'oldest' },
+  { label: 'Nombre A-Z', value: 'name' },
+] as const;
+
 const filteredRows = computed(() => {
   const query = search.value.trim().toLowerCase();
+
   return rows.filter((row) => {
     const matchesStatus = statusFilter.value === 'Todos' || row.status === statusFilter.value;
     const matchesQuery =
@@ -292,12 +402,54 @@ const filteredRows = computed(() => {
       row.name.toLowerCase().includes(query) ||
       row.location.toLowerCase().includes(query) ||
       row.principal.toLowerCase().includes(query);
+
     return matchesStatus && matchesQuery;
   });
 });
 
+const sortedRows = computed(() => {
+  const source = [...filteredRows.value];
+
+  if (sortBy.value === 'name') {
+    return source.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  if (sortBy.value === 'oldest') {
+    return source.reverse();
+  }
+
+  return source;
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage)));
+
+const paginatedRows = computed(() => {
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+  const end = start + pagination.value.rowsPerPage;
+  return sortedRows.value.slice(start, end);
+});
+
+watch(
+  () => [filteredRows.value.length, pagination.value.rowsPerPage] as const,
+  () => {
+    const maxPage = Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage));
+    if (pagination.value.page > maxPage) {
+      pagination.value.page = maxPage;
+    }
+  },
+  { immediate: true },
+);
+
 function statusTone(status: CondoRow['status']) {
-  return status === 'Activo' ? 'positive' : 'grey-6';
+  return status === 'Activo' ? 'positive' : 'negative';
+}
+
+function handleRowsPerPageChange() {
+  pagination.value.page = 1;
+}
+
+function handleSortChange() {
+  pagination.value.page = 1;
 }
 
 function goToNewCondominio() {
@@ -308,12 +460,17 @@ function goToNewCondominio() {
 <style scoped>
 .condominios-page {
   min-height: 100%;
-  padding: 6px 8px 0 4px;
 }
 
 .page-shell {
   display: grid;
-  gap: 20px;
+  gap: 12px;
+}
+
+.page-breadcrumbs {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .page-hero {
@@ -323,127 +480,157 @@ function goToNewCondominio() {
   gap: 16px;
 }
 
-.page-hero__eyebrow {
-  color: var(--app-primary);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+.page-hero__heading {
+  min-width: 0;
 }
 
 .page-hero__title {
   color: var(--app-text);
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.04em;
-  margin-top: 6px;
+  line-height: 1.1;
 }
 
 .page-hero__subtitle {
   color: var(--app-text-muted);
-  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
   max-width: 720px;
 }
 
 .page-hero__actions {
+  align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+  justify-content: flex-end;
+  padding-top: 10px;
 }
 
-.hero-action {
-  min-height: 42px;
+.table-card {
+  border-radius: 18px;
+  overflow: hidden;
 }
 
-.hero-action--ghost {
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+.page-divider {
+  margin-inline: 22px;
+  opacity: 0.45;
+}
+
+.search-field {
+  width: 248px;
+}
+
+.status-field {
+  width: 154px;
+}
+
+.header-action {
+  min-height: 40px;
+}
+
+.header-action--primary {
+  min-width: 160px;
 }
 
 .stats-grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stat-card {
+  border-radius: 16px;
 }
 
 .stat-card__content {
   align-items: center;
   display: flex;
-  gap: 14px;
-  min-height: 108px;
+  gap: 12px;
+  min-height: 94px;
 }
 
 .stat-card__icon {
   align-items: center;
-  border-radius: 18px;
+  border-radius: 999px;
   display: inline-flex;
   flex-shrink: 0;
-  height: 52px;
+  height: 44px;
   justify-content: center;
-  width: 52px;
+  width: 44px;
 }
 
 .stat-card__label {
   color: var(--app-text-muted);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .stat-card__value {
   color: var(--app-text);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.04em;
-  margin-top: 4px;
+  line-height: 1.05;
+  margin-top: 2px;
 }
 
 .stat-card__hint {
   color: var(--app-text-muted);
-  font-size: 12px;
-  margin-top: 2px;
+  font-size: 11px;
+  margin-top: 1px;
 }
 
-.panel-card {
-  overflow: hidden;
-}
-
-.panel-card__header {
-  display: grid;
-  gap: 16px;
-}
-
-.panel-card__title {
-  color: var(--app-text);
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.panel-card__subtitle {
+.table-controls {
+  align-items: center;
   color: var(--app-text-muted);
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.panel-card__actions {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 22px;
 }
 
-.search-field {
-  flex: 1;
-  min-width: 220px;
+.table-controls__left,
+.table-controls__right {
+  align-items: center;
+  display: flex;
+  gap: 10px;
 }
 
-.status-field {
-  min-width: 180px;
+.rows-select {
+  width: 92px;
 }
 
-.panel-card__body {
-  padding-top: 0;
+.order-select {
+  width: 200px;
+}
+
+.table-wrap {
+  padding: 8px 22px 2px;
 }
 
 .condominios-table :deep(.q-table__container) {
   border-radius: 16px;
+}
+
+.condominios-table :deep(thead tr th) {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  height: 50px;
+  letter-spacing: -0.01em;
+}
+
+.condominios-table :deep(tbody tr td) {
+  color: var(--app-text);
+  font-size: 12px;
+  height: 60px;
+}
+
+.condominios-table :deep(tbody tr:hover td) {
+  background: rgba(37, 99, 235, 0.025);
 }
 
 .condo-cell {
@@ -454,13 +641,20 @@ function goToNewCondominio() {
 
 .condo-cell__title {
   color: var(--app-text);
+  font-size: 12px;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .condo-cell__subtitle {
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: 11px;
   margin-top: 2px;
+}
+
+.type-badge,
+.status-badge {
+  font-weight: 700;
 }
 
 .table-actions {
@@ -468,32 +662,100 @@ function goToNewCondominio() {
 }
 
 .table-icon {
-  color: var(--app-text-muted);
+  border-color: rgba(37, 99, 235, 0.14);
+  color: var(--app-primary);
+  height: 34px;
+  width: 34px;
+}
+
+.table-icon :deep(.q-icon) {
+  font-size: 16px;
+}
+
+.table-footer {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: 10px 22px 18px;
+}
+
+.table-footer__pagination :deep(.q-pagination__content) {
+  gap: 6px;
+}
+
+.table-footer__pagination :deep(.q-btn) {
+  border-radius: 10px;
+  font-weight: 700;
+  min-height: 34px;
+  min-width: 34px;
+}
+
+.table-footer__pagination :deep(.q-btn--active) {
+  background: var(--app-primary);
+  color: #fff;
 }
 
 @media (max-width: 1180px) {
+  .page-hero,
+  .table-controls,
+  .table-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-hero__actions {
+    justify-content: flex-start;
+    padding-top: 0;
+    width: 100%;
+  }
+
+  .search-field {
+    width: 100%;
+  }
+
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 767px) {
-  .page-hero {
-    flex-direction: column;
+  .page-hero__title {
+    font-size: 24px;
   }
 
-  .page-hero__actions {
+  .header-action--primary {
+    flex: 1 1 100%;
     width: 100%;
   }
 
-  .hero-action {
-    flex: 1;
+  .status-field,
+  .rows-select,
+  .order-select {
+    width: 100%;
   }
 }
 
 @media (max-width: 599px) {
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .page-divider {
+    margin-inline: 16px;
+  }
+
+  .table-controls,
+  .table-wrap,
+  .table-footer {
+    padding-inline: 16px;
+  }
+
+  .table-card {
+    border-radius: 16px;
+  }
+
+  .table-footer__pagination {
+    width: 100%;
   }
 }
 </style>

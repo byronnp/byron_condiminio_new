@@ -1,33 +1,28 @@
 <template>
   <q-page class="new-condo-page">
     <div class="page-shell">
-      <header class="page-hero">
-        <div>
-          <div class="page-hero__eyebrow">2. Crear condominio - información general</div>
-          <h1 class="page-hero__title">Nuevo condominio</h1>
-          <p class="page-hero__subtitle">
+      <q-breadcrumbs class="page-breadcrumbs" separator="›">
+        <q-breadcrumbs-el label="Condominios" @click="goBack" />
+        <q-breadcrumbs-el label="Nuevo condominio" />
+      </q-breadcrumbs>
+
+      <header class="page-header">
+        <div class="page-header__heading">
+          <h1 class="page-header__title">Nuevo condominio</h1>
+          <p class="page-header__subtitle">
             Registra la información base del condominio antes de continuar con el resto del
             asistente.
           </p>
         </div>
 
-        <div class="page-hero__actions">
+        <div class="page-header__actions">
           <q-btn
             flat
             no-caps
             label="Volver"
             icon="arrow_back"
-            class="hero-action hero-action--ghost"
+            class="header-action header-action--ghost"
             @click="goBack"
-          />
-          <q-btn
-            color="primary"
-            unelevated
-            no-caps
-            :label="primaryActionLabel"
-            :icon="primaryActionIcon"
-            class="hero-action"
-            @click="handlePrimaryAction"
           />
         </div>
       </header>
@@ -267,6 +262,26 @@
                       />
                     </template>
                   </q-input>
+
+                  <q-card flat bordered class="admin-box q-mt-md">
+                    <q-card-section class="admin-box__content">
+                      <q-avatar size="48px">
+                        <img src="https://i.pravatar.cc/100?img=12" alt="Administrador" />
+                      </q-avatar>
+                      <div class="admin-box__copy">
+                        <div class="admin-box__eyebrow">Responsable asignado</div>
+                        <div class="admin-box__name">Carlos Andrés Pérez Mendoza</div>
+                        <div class="admin-box__meta">carlos.perez@altodelvalle.com</div>
+                        <div class="admin-box__footer">
+                          <q-badge rounded color="primary" class="admin-box__badge">
+                            Usuario principal
+                          </q-badge>
+                          <span class="admin-box__separator">•</span>
+                          <span class="admin-box__status">Acceso temporal</span>
+                        </div>
+                      </div>
+                    </q-card-section>
+                  </q-card>
                 </div>
               </q-card-section>
             </q-card>
@@ -283,17 +298,22 @@
                 <div class="summary-final q-mt-md">
                   <div class="summary-final__hero">
                     <div class="summary-final__thumbnail"></div>
-                    <div>
+                    <div class="summary-final__hero-copy">
+                      <div class="summary-final__eyebrow">Vista ejecutiva</div>
                       <div class="summary-final__name">{{ form.name }}</div>
-                      <q-badge :color="form.status === 'Activo' ? 'positive' : 'grey-6'" rounded>
-                        {{ form.status }}
-                      </q-badge>
+                      <div class="summary-final__meta">
+                        <q-badge :color="form.status === 'Activo' ? 'positive' : 'grey-6'" rounded>
+                          {{ form.status }}
+                        </q-badge>
+                        <span class="summary-final__meta-dot">•</span>
+                        <span class="summary-final__meta-text">{{ form.type }}</span>
+                      </div>
                     </div>
                   </div>
 
                   <div class="summary-final__grid">
                     <div class="summary-final__item">
-                      <div class="summary-final__label">Ubicación</div>
+                      <div class="summary-final__label">Ubicación principal</div>
                       <div class="summary-final__value">
                         {{ location.city }}, {{ location.province }}
                       </div>
@@ -307,7 +327,7 @@
                       <div class="summary-final__value">{{ config.units }}</div>
                     </div>
                     <div class="summary-final__item">
-                      <div class="summary-final__label">Moneda</div>
+                      <div class="summary-final__label">Moneda base</div>
                       <div class="summary-final__value">{{ config.currency }}</div>
                     </div>
                   </div>
@@ -499,18 +519,6 @@ const currentStepLabel = computed(() => steps[currentStepIndex.value]?.label ?? 
 const isFirstStep = computed(() => currentStepIndex.value === 0);
 const isLastStep = computed(() => currentStepIndex.value === steps.length - 1);
 
-const primaryActionLabel = computed(() => {
-  if (isLastStep.value) return 'Guardar condominio';
-  const nextStep = steps[currentStepIndex.value + 1];
-  return nextStep ? `Siguiente: ${nextStep.label}` : 'Siguiente';
-});
-
-const primaryActionIcon = computed(() => (isLastStep.value ? 'check' : 'arrow_forward'));
-
-function handlePrimaryAction() {
-  handleFooterAction();
-}
-
 function goPreviousStep() {
   const previousStep = steps[currentStepIndex.value - 1];
   if (previousStep) {
@@ -560,48 +568,54 @@ function goToCondominio() {
 
 .page-shell {
   display: grid;
-  gap: 20px;
+  gap: 28px;
 }
 
-.page-hero {
+.page-breadcrumbs {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.page-header {
   align-items: flex-start;
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
+  margin-top: 2px;
 }
 
-.page-hero__eyebrow {
-  color: var(--app-primary);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+.page-header__heading {
+  min-width: 0;
 }
 
-.page-hero__title {
+.page-header__title {
   color: var(--app-text);
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.04em;
-  margin-top: 6px;
+  line-height: 1.1;
 }
 
-.page-hero__subtitle {
+.page-header__subtitle {
   color: var(--app-text-muted);
-  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 4px;
   max-width: 720px;
 }
 
-.page-hero__actions {
+.page-header__actions {
   display: flex;
   gap: 10px;
 }
 
-.hero-action {
+.header-action {
   min-height: 42px;
 }
 
-.hero-action--ghost {
+.header-action--ghost {
   background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.08);
 }
@@ -609,14 +623,15 @@ function goToCondominio() {
 .wizard-stepper {
   display: flex;
   flex-wrap: nowrap;
-  gap: 10px;
+  gap: 8px;
   overflow-x: auto;
-  padding: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.9));
+  padding: 10px;
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 20px;
+  border-radius: 16px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  margin-top: 2px;
 }
 
 .wizard-stepper::-webkit-scrollbar {
@@ -625,16 +640,16 @@ function goToCondominio() {
 
 .wizard-step {
   align-items: center;
-  background: rgba(255, 255, 255, 0.88);
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
+  border-radius: 14px;
   color: var(--app-text-muted);
   cursor: pointer;
   display: inline-flex;
   flex: 0 0 auto;
-  gap: 8px;
-  min-height: 52px;
-  padding: 8px 14px 8px 10px;
+  gap: 7px;
+  min-height: 44px;
+  padding: 7px 12px 7px 10px;
   text-align: left;
   transition:
     background-color 0.18s ease,
@@ -664,15 +679,15 @@ function goToCondominio() {
   border-radius: 999px;
   color: var(--app-primary);
   display: inline-flex;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  height: 24px;
+  height: 22px;
   justify-content: center;
-  width: 24px;
+  width: 22px;
 }
 
 .wizard-step__label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -682,13 +697,13 @@ function goToCondominio() {
 }
 
 .wizard-panel {
-  padding: 18px 0 0;
+  padding: 16px 0 0;
 }
 
 .form-layout,
 .tab-layout {
   display: grid;
-  gap: 20px;
+  gap: 18px;
 }
 
 .form-layout {
@@ -706,6 +721,7 @@ function goToCondominio() {
 .form-card,
 .summary-card,
 .tab-card {
+  border-radius: 16px;
   overflow: hidden;
 }
 
@@ -716,19 +732,21 @@ function goToCondominio() {
 
 .section-title {
   color: var(--app-text);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .tab-subtitle {
   color: var(--app-text-muted);
-  font-size: 13px;
-  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 4px;
 }
 
 .form-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -744,17 +762,16 @@ function goToCondominio() {
 }
 
 .illustration-card {
-  border-radius: 18px;
+  border-radius: 14px;
   padding: 14px;
 }
 
 .illustration-card__image {
   aspect-ratio: 1 / 1;
   background:
-    linear-gradient(180deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.02)),
     url('https://images.unsplash.com/photo-1527576539890-d7b211f9b5d9?auto=format&fit=crop&w=700&q=80')
       center/cover;
-  border-radius: 16px;
+  border-radius: 12px;
   min-height: 220px;
 }
 
@@ -767,7 +784,7 @@ function goToCondominio() {
 
 .summary-column {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
 .summary-preview {
@@ -778,19 +795,19 @@ function goToCondominio() {
 
 .summary-preview__thumbnail {
   background:
-    linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0.02)),
     url('https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=500&q=80')
       center/cover;
-  border-radius: 18px;
+  border-radius: 14px;
   height: 92px;
   width: 92px;
 }
 
 .summary-preview__name {
   color: var(--app-text);
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 800;
-  margin-bottom: 8px;
+  line-height: 1.2;
+  margin-bottom: 6px;
 }
 
 .summary-list {
@@ -806,47 +823,89 @@ function goToCondominio() {
 
 .summary-item__label {
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
+  text-transform: uppercase;
 }
 
 .summary-item__value {
   color: var(--app-text);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 800;
   text-align: right;
 }
 
 .summary-item__value--wrap {
-  max-width: 180px;
+  max-width: 170px;
   white-space: normal;
 }
 
 .admin-box {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.admin-box__content {
   align-items: center;
-  background: rgba(15, 23, 42, 0.03);
-  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   display: flex;
   gap: 12px;
-  padding: 14px;
+  padding: 12px;
+}
+
+.admin-box__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-box__eyebrow {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .admin-box__name {
   color: var(--app-text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
 .admin-box__meta {
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: 11px;
+}
+
+.admin-box__footer {
+  align-items: center;
+  color: var(--app-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 2px;
 }
 
+.admin-box__badge {
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.admin-box__separator {
+  color: rgba(15, 23, 42, 0.28);
+  font-size: 12px;
+}
+
+.admin-box__status {
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .map-card {
-  background: rgba(15, 23, 42, 0.02);
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 18px;
+  border-radius: 14px;
   overflow: hidden;
   padding: 14px;
 }
@@ -860,7 +919,7 @@ function goToCondominio() {
 
 .map-card__title {
   color: var(--app-text);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -870,43 +929,42 @@ function goToCondominio() {
 
 .map-card__image {
   background:
-    linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.04)),
     url('https://images.unsplash.com/photo-1502920917128-1aa500764ce7?auto=format&fit=crop&w=1200&q=80')
       center/cover;
-  border-radius: 16px;
+  border-radius: 12px;
   height: 250px;
   margin-top: 12px;
 }
 
 .config-block {
-  background: rgba(15, 23, 42, 0.02);
-  border-radius: 18px;
+  background: #fff;
+  border-radius: 14px;
 }
 
 .config-block__title {
   color: var(--app-text);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
 }
 
 .config-block__grid {
   display: grid;
-  gap: 12px 20px;
+  gap: 10px 18px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 14px;
 }
 
 .amenities-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .amenity-card {
   align-items: center;
-  background: rgba(15, 23, 42, 0.02);
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 18px;
+  border-radius: 14px;
   display: flex;
   gap: 14px;
   padding: 14px;
@@ -935,67 +993,99 @@ function goToCondominio() {
 
 .amenity-card__subtitle {
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: 11px;
   margin-top: 2px;
 }
 
 .summary-final {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .summary-final__hero {
   align-items: center;
   display: flex;
-  gap: 14px;
+  gap: 12px;
+}
+
+.summary-final__hero-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.summary-final__eyebrow {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .summary-final__thumbnail {
   background:
-    linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0.02)),
     url('https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=500&q=80')
       center/cover;
-  border-radius: 18px;
+  border-radius: 14px;
   height: 92px;
   width: 92px;
 }
 
 .summary-final__name {
   color: var(--app-text);
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 800;
-  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.summary-final__meta {
+  align-items: center;
+  color: var(--app-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-final__meta-dot {
+  color: rgba(15, 23, 42, 0.28);
+  font-size: 12px;
+}
+
+.summary-final__meta-text {
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .summary-final__grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .summary-final__item {
-  background: rgba(15, 23, 42, 0.02);
+  background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 16px;
-  padding: 14px;
+  border-radius: 14px;
+  padding: 12px 14px;
 }
 
 .summary-final__label {
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .summary-final__value {
   color: var(--app-text);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
   margin-top: 4px;
 }
 
 .summary-action-card__text {
   color: var(--app-text-muted);
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1.55;
   margin-top: 6px;
 }
@@ -1003,11 +1093,11 @@ function goToCondominio() {
 .wizard-footer {
   align-items: center;
   background: #fff;
-  border-radius: 18px;
+  border-radius: 16px;
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 12px 16px;
 }
 
 .wizard-footer__left {
@@ -1017,14 +1107,14 @@ function goToCondominio() {
 
 .wizard-footer__step {
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .wizard-footer__label {
   color: var(--app-text);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -1053,15 +1143,15 @@ function goToCondominio() {
 }
 
 @media (max-width: 767px) {
-  .page-hero {
+  .page-header {
     flex-direction: column;
   }
 
-  .page-hero__actions {
+  .page-header__actions {
     width: 100%;
   }
 
-  .hero-action {
+  .header-action {
     flex: 1;
   }
 
@@ -1071,13 +1161,17 @@ function goToCondominio() {
     grid-template-columns: 1fr;
   }
 
+  .summary-final__hero {
+    align-items: flex-start;
+  }
+
   .wizard-stepper {
-    padding: 10px;
+    padding: 8px;
   }
 
   .wizard-step {
-    min-height: 48px;
-    padding-inline: 12px;
+    min-height: 46px;
+    padding-inline: 11px;
   }
 
   .wizard-footer {
