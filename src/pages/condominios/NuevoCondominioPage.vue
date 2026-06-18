@@ -23,21 +23,35 @@
 
       <q-card flat bordered class="wizard-frame">
         <div class="wizard-steps">
-          <button
-            v-for="(step, index) in steps"
-            :key="step.name"
-            type="button"
-            class="wizard-step"
-            :aria-pressed="activeStep === step.name"
-            :class="{
-              'wizard-step--active': activeStep === step.name,
-              'wizard-step--done': stepIndexByName[step.name] < currentStepIndex,
-            }"
-            @click="activeStep = step.name"
-          >
-            <span class="wizard-step__number">{{ index + 1 }}</span>
-            <span class="wizard-step__label">{{ step.label }}</span>
-          </button>
+          <template v-for="(step, index) in steps" :key="step.name">
+            <button
+              type="button"
+              class="wizard-step"
+              :aria-pressed="activeStep === step.name"
+              :class="{
+                'wizard-step--active': activeStep === step.name,
+                'wizard-step--done': stepIndexByName[step.name] < currentStepIndex,
+              }"
+              @click="activeStep = step.name"
+            >
+              <span class="wizard-step__number">
+                <q-icon
+                  v-if="stepIndexByName[step.name] < currentStepIndex"
+                  name="check"
+                  size="14px"
+                />
+                <span v-else>{{ index + 1 }}</span>
+              </span>
+              <span class="wizard-step__label">{{ step.label }}</span>
+            </button>
+
+            <span
+              v-if="index < steps.length - 1"
+              class="wizard-step-connector"
+              :class="{ 'wizard-step-connector--active': index < currentStepIndex }"
+              aria-hidden="true"
+            />
+          </template>
         </div>
 
         <q-separator class="wizard-divider" />
@@ -324,14 +338,14 @@
                           <div class="location-panel__header">
                             <div class="location-panel__heading">
                               <q-icon name="palette" size="18px" />
-                              <span>Identidad y servicios</span>
+                              <span>Identidad visual</span>
                             </div>
                             <div class="location-panel__hint">
-                              Refuerza la identidad visual y las amenidades visibles del condominio.
+                              Refuerza la identidad del condominio con una imagen reconocible.
                             </div>
                           </div>
 
-                          <div class="logo-upload logo-upload--premium">
+                          <div class="logo-upload">
                             <div class="logo-upload__preview">
                               <div class="logo-upload__artwork">
                                 <img
@@ -339,43 +353,81 @@
                                   :src="logoPreviewUrl"
                                   alt="Vista previa del logo del condominio"
                                 />
-                                <q-icon v-else name="image" size="30px" />
+                                <q-icon v-else name="add_photo_alternate" size="34px" />
                               </div>
                             </div>
-                            <q-file
-                              v-model="config.logo"
-                              class="logo-upload__dropzone"
-                              accept="image/*"
-                              dense
-                              outlined
-                              hide-bottom-space
-                              label="Arrastra o selecciona el logo"
-                            >
-                              <template #prepend>
-                                <q-icon name="cloud_upload" />
-                              </template>
-                              <template #append>
-                                <q-badge outline color="primary" rounded>Subir</q-badge>
-                              </template>
-                            </q-file>
+
+                            <div class="logo-upload__content">
+                              <div class="logo-upload__heading">
+                                <div class="logo-upload__title">Logo del condominio</div>
+                                <q-btn
+                                  v-if="config.logo"
+                                  flat
+                                  round
+                                  dense
+                                  icon="close"
+                                  class="logo-upload__clear"
+                                  @click="clearLogo"
+                                >
+                                  <q-tooltip>Quitar logo</q-tooltip>
+                                </q-btn>
+                              </div>
+
+                              <q-file
+                                v-model="config.logo"
+                                class="logo-upload__dropzone"
+                                accept="image/*"
+                                dense
+                                outlined
+                                hide-bottom-space
+                                label="Seleccionar imagen"
+                              >
+                                <template #prepend>
+                                  <q-icon name="cloud_upload" />
+                                </template>
+                                <template #append>
+                                  <q-badge outline color="primary" rounded>Subir</q-badge>
+                                </template>
+                              </q-file>
+
+                              <div class="logo-upload__file-name">
+                                {{ logoFileName }}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="field-group location-layout__panel location-panel config-panel config-panel--features">
+                          <div class="location-panel__header">
+                            <div class="location-panel__heading">
+                              <q-icon name="widgets" size="18px" />
+                              <span>Características</span>
+                            </div>
+                            <div class="location-panel__hint">
+                              Selecciona las amenidades y servicios disponibles para el condominio.
+                            </div>
                           </div>
 
-                          <div class="field-group config-panel__subgroup q-mt-md">
-                            <div class="field-group__title">Características</div>
-                            <div class="feature-grid">
-                              <q-btn
-                                v-for="feature in characteristicOptions"
-                                :key="feature.value"
-                                flat
-                                no-caps
-                                class="feature-toggle"
-                                :class="{ 'feature-toggle--active': isFeatureSelected(feature.value) }"
-                                @click="toggleFeature(feature.value)"
-                              >
-                                <q-icon :name="feature.icon" size="18px" />
-                                <span>{{ feature.label }}</span>
-                              </q-btn>
-                            </div>
+                          <div class="feature-grid">
+                            <button
+                              v-for="feature in characteristicOptions"
+                              :key="feature.value"
+                              type="button"
+                              class="feature-toggle"
+                              :class="{ 'feature-toggle--active': isFeatureSelected(feature.value) }"
+                              @click="toggleFeature(feature.value)"
+                            >
+                              <span class="feature-toggle__icon">
+                                <q-icon :name="feature.icon" size="17px" />
+                              </span>
+                              <span class="feature-toggle__label">{{ feature.label }}</span>
+                              <q-icon
+                                v-if="isFeatureSelected(feature.value)"
+                                name="check_circle"
+                                size="16px"
+                                class="feature-toggle__check"
+                              />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -586,46 +638,50 @@
             <q-card flat bordered class="summary-panel summary-panel--sticky">
               <q-card-section class="summary-panel__section">
                 <div class="summary-panel__kicker">Resumen ejecutivo</div>
+                <div class="summary-panel__subtitle">Identidad del condominio</div>
 
-                <div class="summary-preview summary-preview--hero q-mt-sm">
-                  <div class="summary-preview__illustration">
-                    <q-icon name="apartment" size="34px" />
-                  </div>
-                  <div class="summary-preview__body">
-                    <div class="summary-preview__eyebrow">Condominio</div>
-                    <div class="summary-preview__name">
-                      {{ form.name || 'Nuevo condominio' }}
-                    </div>
-                    <div class="summary-preview__meta">
-                      <q-badge :color="form.status === 'Activo' ? 'positive' : 'grey-6'" rounded>
-                        {{ form.status }}
-                      </q-badge>
-                      <q-badge outline color="primary" rounded>
-                        {{ form.type || 'Sin tipo' }}
-                      </q-badge>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="summary-checklist q-mt-md">
-                  <div v-for="item in summaryChecklist" :key="item.label" class="summary-checklist__item">
-                    <q-icon
-                      :name="item.done ? 'task_alt' : 'radio_button_unchecked'"
-                      :class="item.done ? 'text-positive' : 'text-grey-5'"
-                      size="18px"
+                <div class="summary-identity q-mt-md">
+                  <div class="summary-identity__media">
+                    <img
+                      v-if="logoPreviewUrl"
+                      :src="logoPreviewUrl"
+                      alt="Logo del condominio"
                     />
-                    <div class="summary-checklist__copy">
-                      <div class="summary-checklist__label">{{ item.label }}</div>
-                      <div class="summary-checklist__value">{{ item.value }}</div>
+                    <q-icon v-else name="apartment" size="32px" />
+                  </div>
+                  <div class="summary-identity__copy">
+                    <div class="summary-identity__name">
+                      {{ summaryIdentityName }}
                     </div>
+                    <div class="summary-identity__type">
+                      {{ summaryIdentityType }}
+                    </div>
+                    <q-badge :color="form.status === 'Activo' ? 'positive' : 'grey-6'" rounded>
+                      {{ form.status }}
+                    </q-badge>
                   </div>
                 </div>
 
-                <div class="summary-exec-grid q-mt-md">
-                  <div v-for="item in summaryHighlights" :key="item.label" class="summary-exec-card">
-                    <div class="summary-exec-card__label">{{ item.label }}</div>
-                    <div class="summary-exec-card__value">{{ item.value }}</div>
+                <div class="summary-identity-list q-mt-md">
+                  <div
+                    v-for="item in summaryIdentityItems"
+                    :key="item.label"
+                    class="summary-identity-row"
+                  >
+                    <span>{{ item.label }}</span>
+                    <strong>{{ item.value }}</strong>
                   </div>
+                </div>
+
+                <div
+                  class="summary-identity-status q-mt-md"
+                  :class="{ 'summary-identity-status--complete': isIdentitySummaryComplete }"
+                >
+                  <q-icon
+                    :name="isIdentitySummaryComplete ? 'task_alt' : 'info'"
+                    size="18px"
+                  />
+                  <span>{{ identitySummaryMessage }}</span>
                 </div>
               </q-card-section>
             </q-card>
@@ -809,50 +865,36 @@ function toggleFeature(value: string) {
   config.characteristics.splice(index, 1);
 }
 
-const summaryHighlights = computed(() => [
-  { label: 'Estado', value: form.status },
-  { label: 'Torres', value: config.towers || '0' },
-  { label: 'Casas', value: config.houses || '0' },
-  { label: 'Avance', value: `${completionPercent.value}%` },
-]);
+function clearLogo() {
+  config.logo = null;
+}
 
-const summaryChecklist = computed(() => [
-  {
-    label: 'Información general',
-    value: form.name ? form.name : 'Pendiente',
-    done: Boolean(form.name && form.ruc && form.type && form.status),
-  },
-  {
-    label: 'Ubicación',
-    value: location.country ? `${location.country} · ${location.city || 'Sin ciudad'}` : 'Pendiente',
-    done: Boolean(location.country && location.province && location.city && location.direction),
-  },
-  {
-    label: 'Configuración',
-    value: config.currency ? `${config.currency} · ${config.towers || '0'} torres` : 'Pendiente',
-    done: Boolean(config.currency && config.towers && config.houses),
-  },
-  {
-    label: 'Administrador',
-    value: adminFullName.value || 'Pendiente',
-    done: Boolean(
-      administrator.name &&
-        administrator.lastName &&
-        administrator.email &&
-        administrator.username &&
-        administrator.password,
-    ),
-  },
-]);
+const summaryIdentityName = computed(() => form.name.trim() || 'Nuevo condominio');
+const summaryIdentityType = computed(() => form.type || 'Sin tipo');
+const unitsSummary = computed(() => {
+  const houses = config.houses.trim() || '0';
+  const towers = config.towers.trim() || '0';
 
-const completionPercent = computed(() => {
-  const completedCount =
-    Number(Boolean(form.name)) +
-    Number(Boolean(location.country)) +
-    Number(Boolean(config.currency)) +
-    Number(Boolean(adminFullName.value));
-  return Math.round((completedCount / 4) * 100);
+  return `${houses} casas · ${towers} torres`;
 });
+
+const summaryIdentityItems = computed(() => [
+  { label: 'Nombre', value: summaryIdentityName.value },
+  { label: 'Tipo', value: summaryIdentityType.value },
+  { label: 'Unidades', value: unitsSummary.value },
+  { label: 'Moneda', value: config.currency || 'Sin moneda' },
+  { label: 'Estado', value: form.status },
+]);
+
+const isIdentitySummaryComplete = computed(() =>
+  Boolean(form.name && form.type && config.houses && config.towers && config.currency && form.status),
+);
+
+const identitySummaryMessage = computed(() =>
+  isIdentitySummaryComplete.value
+    ? 'Identidad básica completa.'
+    : 'Completa nombre, tipo, unidades y moneda para finalizar la ficha.',
+);
 
 const currentStepIndex = computed(() => stepIndexByName[activeStep.value]);
 const isFirstStep = computed(() => currentStepIndex.value === 0);
@@ -1008,14 +1050,13 @@ function goToCondominio() {
 <style scoped>
 .new-condo-page {
   min-height: 100%;
-  padding: 24px;
+  padding: 16px 0 0;
 }
 
 .page-shell {
   display: grid;
   gap: 18px;
-  margin: 0 auto;
-  max-width: 1440px;
+  width: 100%;
 }
 
 .page-header {
@@ -1048,10 +1089,12 @@ function goToCondominio() {
 }
 
 .wizard-steps {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 18px 18px 0;
+  gap: 6px;
+  max-width: max-content;
+  padding: 14px 16px 0;
 }
 
 .wizard-step {
@@ -1063,9 +1106,9 @@ function goToCondominio() {
   cursor: pointer;
   display: inline-flex;
   gap: 10px;
-  min-height: 46px;
+  min-height: 38px;
   width: auto;
-  padding: 0 14px;
+  padding: 0 11px;
   position: relative;
   transition:
     border-color 0.18s ease,
@@ -1097,23 +1140,49 @@ function goToCondominio() {
   display: inline-flex;
   font-size: 11px;
   font-weight: 800;
-  height: 24px;
+  height: 22px;
   justify-content: center;
-  width: 24px;
+  width: 22px;
 }
 
 .wizard-step__label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1.15;
 }
 
 .wizard-step--done .wizard-step__number {
-  background: rgba(37, 99, 235, 0.16);
+  background: var(--app-primary);
+  color: #fff;
 }
 
 .wizard-step--done .wizard-step__label {
   color: var(--app-text);
+}
+
+.wizard-step-connector {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  flex: 0 0 24px;
+  height: 3px;
+  min-width: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.wizard-step-connector::before {
+  background: var(--app-primary);
+  border-radius: inherit;
+  content: '';
+  inset: 0;
+  position: absolute;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.22s ease;
+}
+
+.wizard-step-connector--active::before {
+  transform: scaleX(1);
 }
 
 .wizard-divider {
@@ -1189,6 +1258,10 @@ function goToCondominio() {
 .config-panel,
 .admin-panel {
   min-width: 0;
+}
+
+.config-panel--features {
+  grid-column: 1 / -1;
 }
 
 .config-panel--visual,
@@ -1486,57 +1559,38 @@ function goToCondominio() {
 .logo-upload {
   align-items: center;
   background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.92));
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.09), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.94));
   border: 1px solid rgba(37, 99, 235, 0.1);
   border-radius: 20px;
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(72px, 86px) minmax(0, 1fr);
-  padding: 12px;
+  gap: 14px;
+  grid-template-columns: 82px minmax(0, 1fr);
+  padding: 16px;
   position: relative;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
-}
-
-.logo-upload::after {
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.12), transparent);
-  border-radius: 999px;
-  content: '';
-  height: 1px;
-  left: 16px;
-  position: absolute;
-  right: 16px;
-  top: 16px;
-}
-
-.logo-upload--premium {
-  overflow: hidden;
 }
 
 .logo-upload__preview {
   align-items: center;
   display: grid;
-  gap: 4px;
   justify-items: center;
   min-width: 0;
 }
 
-.logo-upload__copy {
+.logo-upload__content {
+  align-content: start;
   display: grid;
   gap: 8px;
   min-width: 0;
 }
 
-.logo-upload__badge {
-  background: rgba(37, 99, 235, 0.12);
-  border: 1px solid rgba(37, 99, 235, 0.12);
-  border-radius: 999px;
-  color: var(--app-primary);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 4px 10px;
-  text-transform: uppercase;
+.logo-upload__heading {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
 }
 
 .logo-upload__artwork {
@@ -1551,10 +1605,10 @@ function goToCondominio() {
     0 12px 24px rgba(37, 99, 235, 0.12);
   color: var(--app-primary);
   display: inline-flex;
-  height: 64px;
+  height: 72px;
   justify-content: center;
   overflow: hidden;
-  width: 64px;
+  width: 72px;
 }
 
 .logo-upload__artwork img {
@@ -1562,11 +1616,6 @@ function goToCondominio() {
   height: 100%;
   object-fit: cover;
   width: 100%;
-}
-
-.config-panel__subgroup {
-  background: rgba(255, 255, 255, 0.82);
-  margin-top: 16px;
 }
 
 .map-preview__canvas {
@@ -1637,64 +1686,42 @@ function goToCondominio() {
   padding-inline: 12px;
 }
 
-.logo-upload__eyebrow {
-  color: var(--app-primary);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .logo-upload__title {
   color: var(--app-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.25;
 }
 
-.logo-upload__subtitle {
+.logo-upload__clear {
   color: var(--app-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.logo-upload__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 2px;
+  flex: 0 0 auto;
 }
 
 .logo-upload__dropzone {
   align-items: center;
-  background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.96));
+  background: rgba(255, 255, 255, 0.92);
   border: 1.5px dashed rgba(37, 99, 235, 0.24);
-  border-radius: 22px;
+  border-radius: 16px;
   color: var(--app-text-muted);
   display: grid;
-  gap: 14px;
-  grid-column: 1 / -1;
-  min-height: 132px;
-  padding: 18px 18px 16px;
+  min-height: 42px;
+  padding: 0 12px;
   transition:
     border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
+    box-shadow 0.18s ease;
 }
 
 .logo-upload__dropzone:hover {
   border-color: rgba(37, 99, 235, 0.36);
-  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.1);
-  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.08);
 }
 
 .logo-upload__dropzone :deep(.q-field__control) {
   background: transparent;
   border: 0;
-  min-height: 58px;
+  min-height: 42px;
   padding: 0;
 }
 
@@ -1719,47 +1746,34 @@ function goToCondominio() {
   flex: 0 0 auto;
 }
 
-.logo-upload__dropzone-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.logo-upload__dropzone-copy strong {
-  color: var(--app-text);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.logo-upload__dropzone-copy span {
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.logo-upload__picker-hint {
+.logo-upload__file-name {
   color: var(--app-text-muted);
   font-size: 11px;
+  font-weight: 700;
   line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feature-grid {
   display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .feature-toggle {
   align-items: center;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
+  border-radius: 13px;
   color: var(--app-text);
-  display: inline-flex;
+  cursor: pointer;
+  display: grid;
   gap: 8px;
-  justify-content: flex-start;
-  min-height: 40px;
-  padding: 8px 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 38px;
+  padding: 8px 10px;
   text-align: left;
   transition:
     background-color 0.18s ease,
@@ -1771,40 +1785,47 @@ function goToCondominio() {
 }
 
 .feature-toggle:hover {
-  border-color: rgba(37, 99, 235, 0.24);
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  background: rgba(37, 99, 235, 0.04);
+  border-color: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
   transform: translateY(-1px);
 }
 
 .feature-toggle--active {
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.05));
-  border-color: rgba(37, 99, 235, 0.2);
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.22);
   color: var(--app-primary);
-  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.04);
 }
 
-.feature-toggle :deep(.q-btn__content) {
+.feature-toggle__icon {
   align-items: center;
-  display: inline-flex;
-  gap: 7px;
-  justify-content: flex-start;
-  width: 100%;
+  background: rgba(37, 99, 235, 0.08);
+  border-radius: 10px;
+  color: var(--app-primary);
+  display: flex;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
 }
 
-.feature-toggle :deep(.q-icon) {
-  color: currentColor;
+.feature-toggle__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feature-toggle__check {
+  color: var(--app-primary);
   flex: 0 0 auto;
 }
 
-.feature-toggle span {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.feature-toggle--active span {
-  font-weight: 800;
+.feature-toggle--active .feature-toggle__icon {
+  background: rgba(37, 99, 235, 0.14);
 }
 
 .review-grid {
@@ -1891,121 +1912,123 @@ function goToCondominio() {
   text-transform: uppercase;
 }
 
-.summary-preview {
+.summary-panel__subtitle {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.summary-identity {
   align-items: center;
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
-.summary-preview--hero {
-  align-items: flex-start;
-}
-
-.summary-preview__illustration {
+.summary-identity__media {
   align-items: center;
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.04));
-  border-radius: 16px;
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.86), rgba(37, 99, 235, 0.12)),
+    linear-gradient(180deg, rgba(37, 99, 235, 0.16), rgba(37, 99, 235, 0.06));
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 18px;
   color: var(--app-primary);
-  display: grid;
-  flex-shrink: 0;
-  height: 64px;
+  display: inline-flex;
+  flex: 0 0 68px;
+  height: 68px;
   justify-content: center;
-  width: 64px;
+  overflow: hidden;
+  width: 68px;
 }
 
-.summary-preview__body {
+.summary-identity__media img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.summary-identity__copy {
+  align-content: center;
   display: grid;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
-.summary-preview__eyebrow {
-  color: var(--app-primary);
-  font-size: 10px;
+.summary-identity__name {
+  color: var(--app-text);
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
-.summary-preview__name {
-  color: var(--app-text);
-  font-size: 13px;
-  font-weight: 800;
+.summary-identity__type {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1.2;
 }
 
-.summary-preview__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.summary-checklist {
-  display: grid;
-  gap: 10px;
-}
-
-.summary-checklist__item {
-  align-items: center;
+.summary-identity-list {
   background: rgba(248, 250, 252, 0.76);
   border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 16px;
-  display: flex;
-  gap: 12px;
+  display: grid;
+  overflow: hidden;
+}
+
+.summary-identity-row {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(74px, 0.7fr) minmax(0, 1.3fr);
   padding: 12px 14px;
 }
 
-.summary-checklist__copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
+.summary-identity-row + .summary-identity-row {
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.summary-checklist__label {
-  color: var(--app-text);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.summary-checklist__value {
+.summary-identity-row span {
   color: var(--app-text-muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.summary-exec-grid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.summary-exec-card {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 14px;
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-}
-
-.summary-exec-card__label {
-  color: var(--app-text-muted);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.04em;
+  line-height: 1.3;
   text-transform: uppercase;
 }
 
-.summary-exec-card__value {
+.summary-identity-row strong {
   color: var(--app-text);
   font-size: 12px;
   font-weight: 800;
-  line-height: 1.25;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
-.summary-note--compact {
-  color: var(--app-text-muted);
+.summary-identity-status {
+  align-items: flex-start;
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.1);
+  border-radius: 16px;
+  color: var(--app-primary);
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.summary-identity-status--complete {
+  background: rgba(34, 197, 94, 0.09);
+  border-color: rgba(34, 197, 94, 0.16);
+  color: var(--app-success);
+}
+
+.summary-identity-status span {
+  color: var(--app-text);
   font-size: 11px;
+  font-weight: 700;
   line-height: 1.45;
 }
 
@@ -2062,39 +2085,6 @@ function goToCondominio() {
   gap: 8px;
 }
 
-.summary-checklist {
-  display: grid;
-  gap: 10px;
-}
-
-.summary-checklist__item {
-  align-items: flex-start;
-  display: flex;
-  gap: 10px;
-}
-
-.summary-checklist__item--done .summary-checklist__label {
-  color: var(--app-text);
-}
-
-.summary-checklist__copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.summary-checklist__label {
-  color: var(--app-text);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.summary-checklist__detail {
-  color: var(--app-text-muted);
-  font-size: 10px;
-  line-height: 1.35;
-}
-
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition:
@@ -2120,7 +2110,7 @@ function goToCondominio() {
 
 @media (max-width: 720px) {
   .new-condo-page {
-    padding: 16px;
+    padding: 12px 0 0;
   }
 
   .page-header {
@@ -2128,9 +2118,38 @@ function goToCondominio() {
     flex-direction: column;
   }
 
+  .wizard-steps {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 12px 14px 0;
+    scrollbar-width: none;
+  }
+
+  .wizard-steps::-webkit-scrollbar {
+    display: none;
+  }
+
+  .wizard-step {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0 10px;
+  }
+
+  .wizard-step__label {
+    max-width: 108px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wizard-step-connector {
+    flex: 0 0 22px;
+    min-width: 22px;
+  }
+
   .step-grid,
-  .review-grid,
-  .summary-exec-grid {
+  .review-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -2150,14 +2169,6 @@ function goToCondominio() {
 
   .feature-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .summary-exec-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .summary-checklist__item {
-    padding: 11px 12px;
   }
 
   .field-group {
@@ -2187,8 +2198,8 @@ function goToCondominio() {
     flex-direction: column;
   }
 
-  .logo-upload__input {
-    justify-self: stretch;
+  .logo-upload__heading {
+    align-items: start;
   }
 
   .toggle-grid--soft {

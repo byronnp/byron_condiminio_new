@@ -14,6 +14,7 @@ interface ApiUser {
   name?: string;
   email?: string;
   role?: string;
+  roles?: unknown[];
   condominium?: unknown;
   condominiums?: unknown[];
   activeCondominium?: unknown;
@@ -32,6 +33,7 @@ interface LoginResponseShape {
   condominium?: unknown;
   activeCondominium?: unknown;
   active_condominium?: unknown;
+  roles?: unknown[];
 }
 
 export interface AuthSessionPayload {
@@ -53,7 +55,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeRole(role: string | undefined): UserRole {
-  return role === 'senior' ? 'senior' : 'admin';
+  const normalized = role?.trim().toLowerCase() ?? '';
+  const normalizedKey = normalized
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const seniorCodes = new Set([
+    'senior',
+    'senior_admin',
+    'admin_senior',
+    'administrador_senior',
+    'super_admin',
+    'superadministrador',
+    'super_administrador',
+    'root',
+  ]);
+
+  return seniorCodes.has(normalizedKey) ||
+    normalizedKey.includes('senior') ||
+    normalizedKey.includes('super_admin') ||
+    normalizedKey.includes('superadministrador')
+    ? 'senior'
+    : 'admin';
 }
 
 function normalizeCondominium(item: unknown): CondoOption | null {
@@ -73,8 +97,10 @@ function normalizeCondominium(item: unknown): CondoOption | null {
   const id = String(rawId);
   const name = typeof item.name === 'string' && item.name.trim() ? item.name : 'Condominio';
   const city = typeof item.city === 'string' ? item.city : '';
-  const units = typeof item.units === 'number' && Number.isFinite(item.units) ? item.units : 0;
-  const active = item.active !== false;
+  const rawUnits = item.units ?? item.total_units;
+  const units = typeof rawUnits === 'number' && Number.isFinite(rawUnits) ? rawUnits : 0;
+  const rawActive = item.active ?? item.is_active;
+  const active = rawActive !== false;
 
   return {
     id,
@@ -89,6 +115,12 @@ function extractCondominiums(...sources: unknown[]): CondoOption[] {
   const condensed = new Map<string, CondoOption>();
 
   for (const source of sources) {
+    const singleCondo = normalizeCondominium(source);
+    if (singleCondo) {
+      condensed.set(singleCondo.id, singleCondo);
+      continue;
+    }
+
     if (!Array.isArray(source)) {
       continue;
     }
@@ -102,6 +134,30 @@ function extractCondominiums(...sources: unknown[]): CondoOption[] {
   }
 
   return [...condensed.values()];
+}
+
+function extractRoleFromRoles(source: unknown) {
+  if (!Array.isArray(source)) {
+    return null;
+  }
+
+  for (const role of source) {
+    if (!isRecord(role)) {
+      continue;
+    }
+
+    const code = role.code;
+    if (typeof code === 'string' && code.trim()) {
+      return code;
+    }
+
+    const name = role.name;
+    if (typeof name === 'string' && name.trim()) {
+      return name;
+    }
+  }
+
+  return null;
 }
 
 function extractActiveCondoId(user: ApiUser, condominiums: CondoOption[], fallback: string | null) {
@@ -148,12 +204,23 @@ function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
   };
   const resolvedName: string = typeof user.name === 'string' && user.name.trim() ? user.name : fallbackEmail;
   const resolvedEmail: string = typeof user.email === 'string' && user.email.trim() ? user.email : fallbackEmail;
-  const resolvedRole: string = typeof user.role === 'string' ? user.role : 'admin';
+  const roles = Array.isArray(user.roles)
+    ? user.roles
+    : Array.isArray(record.roles)
+      ? record.roles
+      : Array.isArray(dataRecord.roles)
+        ? dataRecord.roles
+        : [];
+  const resolvedRole: string =
+    typeof user.role === 'string'
+      ? user.role
+      : (extractRoleFromRoles(roles) ?? 'admin');
 
   return {
     name: resolvedName,
     email: resolvedEmail,
     role: resolvedRole,
+    roles,
     condominium: user.condominium ?? record.condominium ?? dataRecord.condominium ?? null,
     condominiums: [
       ...(Array.isArray(user.condominiums) ? user.condominiums : []),
@@ -165,6 +232,29 @@ function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
     active_condominium:
       user.active_condominium ?? record.active_condominium ?? dataRecord.active_condominium ?? null,
   };
+}
+
+async function fetchCondominiumsForSenior(token: string | null) {
+  if (!token) {
+    return [];
+  }
+
+  try {
+    const { response, data } = await requestJson<Record<string, unknown>>('/api/condominiums', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok || !data) {
+      return [];
+    }
+
+    return extractCondominiums(isRecord(data) ? data.data : data);
+  } catch {
+    return [];
+  }
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T | null> {
@@ -213,19 +303,29 @@ async function hydrateUserSession(
 
       if (response.ok && data && typeof data === 'object') {
         const meUser = resolveUser(data, fallbackEmail);
+        const userRole = normalizeRole(meUser.role);
         const meCondominiums = extractCondominiums(
+          meUser.condominium,
+          meUser.activeCondominium,
+          meUser.active_condominium,
           meUser.condominiums,
           payloadCondominiums,
         );
+        const seniorCondominiums =
+          userRole === 'senior' ? await fetchCondominiumsForSenior(token) : [];
+        const allowedCondominiums = extractCondominiums(seniorCondominiums, meCondominiums);
 
         return {
           user: {
             name: meUser.name ?? fallbackEmail,
             email: meUser.email ?? fallbackEmail,
-            role: normalizeRole(meUser.role),
+            role: userRole,
           },
-          allowedCondominiums: meCondominiums,
-          activeCondoId: extractActiveCondoId(meUser, meCondominiums, null),
+          allowedCondominiums,
+          activeCondoId:
+            userRole === 'senior' && !meUser.activeCondominium && !meUser.active_condominium
+              ? null
+              : extractActiveCondoId(meUser, allowedCondominiums, null),
         };
       }
     } catch {

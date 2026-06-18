@@ -6,14 +6,17 @@
       bordered
       dark
       :width="292"
+      :mini="isDrawerMini"
+      :mini-width="82"
       class="main-layout__drawer text-white"
+      :class="{ 'main-layout__drawer--mini': isDrawerMini }"
       :content-style="drawerContentStyle"
     >
       <div class="drawer-brand">
         <div class="drawer-brand__logo">
           <q-icon name="apartment" size="26px" />
         </div>
-        <div class="drawer-brand__copy">
+        <div v-if="!isDrawerMini" class="drawer-brand__copy">
           <div class="drawer-brand__title">CondoAdmin</div>
           <div class="drawer-brand__subtitle">Plataforma Multi-Condominio</div>
         </div>
@@ -21,7 +24,7 @@
 
       <q-scroll-area class="drawer-scroll">
         <div v-for="section in visibleMenuSections" :key="section.key" class="drawer-section">
-          <div class="drawer-section__label">{{ section.label }}</div>
+          <div v-if="!isDrawerMini" class="drawer-section__label">{{ section.label }}</div>
           <q-list class="drawer-nav">
             <q-item
               v-for="item in section.items"
@@ -36,18 +39,21 @@
               <q-item-section avatar>
                 <q-icon :name="item.icon ?? 'chevron_right'" size="18px" />
               </q-item-section>
-              <q-item-section>
+              <q-item-section v-if="!isDrawerMini">
                 <q-item-label>{{ item.label }}</q-item-label>
               </q-item-section>
-              <q-item-section side v-if="item.trailingIcon">
+              <q-item-section side v-if="item.trailingIcon && !isDrawerMini">
                 <q-icon :name="item.trailingIcon" size="16px" />
               </q-item-section>
+              <q-tooltip v-if="isDrawerMini" anchor="center right" self="center left">
+                {{ item.label }}
+              </q-tooltip>
             </q-item>
           </q-list>
         </div>
       </q-scroll-area>
 
-      <q-card class="drawer-plan" flat>
+      <q-card v-if="!isDrawerMini" class="drawer-plan" flat>
         <q-card-section class="drawer-plan__header">
           <div class="drawer-plan__icon">
             <q-icon name="workspace_premium" size="18px" />
@@ -95,14 +101,9 @@
 
         <q-space />
 
-        <q-chip square class="toolbar-chip">
-          <q-icon name="apartment" size="16px" class="q-mr-xs" />
-          {{ session.contextLabel }}
-        </q-chip>
-
-        <q-btn v-if="session.isSenior" flat no-caps class="toolbar-condo-switcher">
+        <q-btn v-if="canSwitchCondominiumContext" flat no-caps class="toolbar-condo-switcher">
           <div class="toolbar-condo-switcher__content">
-            <span class="toolbar-condo-switcher__eyebrow">Condominio</span>
+            <span class="toolbar-condo-switcher__eyebrow">Contexto</span>
             <span class="toolbar-condo-switcher__name">{{ activeCondominiumName }}</span>
             <span class="toolbar-condo-switcher__meta">
               {{ activeCondominiumMeta }}
@@ -218,6 +219,52 @@
             </q-list>
           </q-menu>
         </q-btn>
+
+        <q-btn
+          flat
+          round
+          dense
+          icon="more_vert"
+          aria-label="Más opciones"
+          class="toolbar-more"
+        >
+          <q-menu anchor="bottom right" self="top right" class="toolbar-more-menu">
+            <q-list class="toolbar-more-menu__list">
+              <q-item>
+                <q-item-section>
+                  <q-item-label class="text-weight-bold">{{ session.user?.name }}</q-item-label>
+                  <q-item-label caption>
+                    {{ session.isSenior ? 'Administrador senior' : 'Administrador de condominio' }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <q-item clickable v-close-popup>
+                <q-item-section avatar>
+                  <q-icon name="notifications_none" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Notificaciones</q-item-label>
+                  <q-item-label caption>3 pendientes</q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <q-badge color="negative" rounded>3</q-badge>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <q-item clickable v-close-popup @click="handleSignOut">
+                <q-item-section avatar>
+                  <q-icon name="logout" />
+                </q-item-section>
+                <q-item-section>Cerrar sesión</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
       </q-toolbar>
     </q-header>
 
@@ -243,13 +290,18 @@ const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
 const { loadAuthMenu } = useAuthMenu();
-const leftDrawerOpen = ref(false);
+const leftDrawerOpen = ref(true);
+const drawerMini = ref(false);
 const drawerContentStyle = {
   background: 'linear-gradient(180deg, #07162d 0%, #0b1e3b 42%, #071225 100%)',
   color: '#fff',
 };
 
 const visibleMenuSections = computed(() => session.menuSections);
+const isDrawerMini = computed(() => drawerMini.value && !$q.screen.lt.md);
+const canSwitchCondominiumContext = computed(
+  () => session.isSenior || session.condoOptions.length > 1,
+);
 
 const pageTitle = computed(() => {
   const title = route.meta.title;
@@ -262,15 +314,20 @@ const pageSubtitle = computed(() => {
 });
 
 const activeCondominiumName = computed(() => {
-  if (session.isSenior && session.activeCondoId === null) {
-    return 'Vista global';
+  if (canSwitchCondominiumContext.value) {
+    return session.activeCondoId === null
+      ? 'Vista global'
+      : (session.activeCondominium?.name ?? 'Vista global');
   }
 
   return session.activeCondominium?.name ?? 'Sin condominio';
 });
 
 const activeCondominiumMeta = computed(() => {
-  if (session.isSenior && session.activeCondoId === null) {
+  if (
+    canSwitchCondominiumContext.value &&
+    (session.activeCondoId === null || !session.activeCondominium)
+  ) {
     return `${session.condoOptions.length} condominios disponibles`;
   }
 
@@ -307,7 +364,12 @@ onMounted(() => {
 });
 
 function toggleLeftDrawer() {
-  leftDrawerOpen.value = !leftDrawerOpen.value;
+  if ($q.screen.lt.md) {
+    leftDrawerOpen.value = !leftDrawerOpen.value;
+    return;
+  }
+
+  drawerMini.value = !drawerMini.value;
 }
 
 function handleMenuItemClick(item: { to?: string }) {
@@ -363,11 +425,20 @@ function handleSignOut() {
   padding: 18px 14px 14px;
 }
 
+.main-layout__drawer--mini {
+  padding-inline: 10px;
+}
+
 .drawer-brand {
   align-items: center;
   display: flex;
   gap: 12px;
   padding: 12px 12px 16px;
+}
+
+.main-layout__drawer--mini .drawer-brand {
+  justify-content: center;
+  padding-inline: 0;
 }
 
 .drawer-brand__logo {
@@ -401,6 +472,10 @@ function handleSignOut() {
   height: calc(100vh - 314px);
 }
 
+.main-layout__drawer--mini .drawer-scroll {
+  height: calc(100vh - 94px);
+}
+
 .drawer-section {
   margin-top: 6px;
 }
@@ -419,6 +494,11 @@ function handleSignOut() {
   padding: 0 4px;
 }
 
+.main-layout__drawer--mini .drawer-nav {
+  justify-items: center;
+  padding: 0;
+}
+
 .drawer-nav__item {
   border-radius: 14px;
   color: rgba(226, 232, 240, 0.84);
@@ -426,8 +506,23 @@ function handleSignOut() {
   padding: 0 12px;
 }
 
+.main-layout__drawer--mini .drawer-nav__item {
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0;
+  width: 44px;
+}
+
 .drawer-nav__item :deep(.q-item__section--avatar) {
   min-width: 32px;
+}
+
+.main-layout__drawer--mini .drawer-nav__item :deep(.q-item__section--avatar) {
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding-right: 0;
 }
 
 .drawer-nav__item :deep(.q-item__section) {
@@ -526,24 +621,38 @@ function handleSignOut() {
 
 .main-toolbar {
   gap: 12px;
-  min-height: 84px;
+  min-height: 72px;
   padding: 0 24px;
 }
 
 .main-toolbar__menu {
   color: var(--app-text);
+  height: 38px;
+  width: 38px;
+}
+
+.toolbar-title {
+  min-width: 0;
 }
 
 .toolbar-title__greeting {
   font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.02em;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toolbar-title__subtitle {
   color: var(--app-text-muted);
   font-size: 12px;
+  line-height: 1.3;
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toolbar-chip {
@@ -563,15 +672,15 @@ function handleSignOut() {
   align-items: center;
   background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
   color: var(--app-text);
   display: inline-flex;
   gap: 12px;
-  min-height: 58px;
-  padding: 8px 12px 8px 14px;
+  min-height: 48px;
+  padding: 7px 11px 7px 13px;
   text-align: left;
-  width: 286px;
+  width: 268px;
 }
 
 .toolbar-condo-switcher :deep(.q-btn__content) {
@@ -589,7 +698,7 @@ function handleSignOut() {
 
 .toolbar-condo-switcher__eyebrow {
   color: var(--app-text-muted);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1.1;
@@ -682,6 +791,19 @@ function handleSignOut() {
 
 .toolbar-action {
   color: var(--app-text);
+  height: 38px;
+  width: 38px;
+}
+
+.toolbar-more {
+  color: var(--app-text);
+  display: none;
+  height: 38px;
+  width: 38px;
+}
+
+.toolbar-more-menu__list {
+  min-width: 250px;
 }
 
 .page-fade-slide-enter-active,
@@ -703,12 +825,131 @@ function handleSignOut() {
 
 @media (max-width: 1023px) {
   .main-toolbar {
+    gap: 10px;
     padding: 0 14px;
+  }
+
+  .toolbar-title {
+    flex: 1 1 160px;
+  }
+
+  .toolbar-condo-switcher {
+    width: 230px;
   }
 }
 
 @media (max-width: 767px) {
+  .main-layout__header {
+    background: rgba(248, 250, 252, 0.96);
+  }
+
+  .main-toolbar {
+    align-content: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-height: 106px;
+    padding: 8px 10px 10px;
+  }
+
+  .main-toolbar :deep(.q-space) {
+    display: none;
+  }
+
+  .main-toolbar__menu {
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    order: 1;
+    flex: 0 0 36px;
+    height: 36px;
+    width: 36px;
+  }
+
+  .toolbar-title {
+    flex: 1 1 calc(100% - 122px);
+    min-width: 0;
+    order: 2;
+  }
+
+  .toolbar-title__greeting {
+    font-size: 15px;
+    line-height: 1.15;
+  }
+
+  .toolbar-title__subtitle {
+    display: none;
+  }
+
   .toolbar-condo-switcher {
+    border-color: rgba(37, 99, 235, 0.14);
+    border-radius: 13px;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    flex: 1 0 100%;
+    min-height: 46px;
+    order: 5;
+    padding: 7px 10px 7px 12px;
+    width: 100%;
+  }
+
+  .toolbar-condo-switcher :deep(.q-btn__content) {
+    gap: 8px;
+  }
+
+  .toolbar-condo-switcher__eyebrow {
+    font-size: 8px;
+    letter-spacing: 0.06em;
+  }
+
+  .toolbar-condo-switcher__name {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .toolbar-condo-switcher__meta {
+    font-size: 9px;
+    max-width: calc(100vw - 68px);
+  }
+
+  .toolbar-chip {
+    border-radius: 13px;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    min-height: 42px;
+    order: 5;
+  }
+
+  .toolbar-action {
+    display: none;
+  }
+
+  .toolbar-more {
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    display: inline-flex;
+    flex: 0 0 36px;
+    height: 36px;
+    order: 3;
+    width: 36px;
+  }
+
+  .toolbar-condo-menu__card {
+    min-width: min(320px, calc(100vw - 24px));
+  }
+
+  .toolbar-more-menu__list {
+    min-width: min(270px, calc(100vw - 24px));
+  }
+}
+
+@media (max-width: 420px) {
+  .main-toolbar {
+    min-height: 102px;
+  }
+
+  .toolbar-title__greeting {
+    font-size: 14px;
+  }
+
+  .toolbar-condo-switcher__meta {
     display: none;
   }
 }

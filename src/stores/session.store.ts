@@ -322,7 +322,11 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   function setActiveCondo(condoId: string) {
-    if (!allowedCondominiums.value.some((condo) => condo.id === condoId)) {
+    const canUseCondo =
+      allowedCondominiums.value.some((condo) => condo.id === condoId) ||
+      condoOptions.value.some((condo) => condo.id === condoId);
+
+    if (!canUseCondo) {
       return;
     }
 

@@ -15,6 +15,19 @@ This is a Quasar + Vue 3 + TypeScript SPA for multi-condominium administration.
 
 List screens should follow the shared shell pattern: header, search, status filter, CTA, stats cards, table controls, table, and pagination.
 
+## UI Design Guidelines
+Use the current `NuevoCondominioPage.vue` implementation as a reference for future form-heavy screens and new module screens.
+
+- Prefer a clean `page-shell` structure with a concise header, subtle actions, and clear section hierarchy.
+- New pages should use the full width provided by `MainLayout`: set the page shell to `width: 100%`, avoid local side padding, and use only top spacing such as `padding: 16px 0 0` on desktop and `padding: 12px 0 0` on mobile.
+- For multi-step forms, use compact custom steps with progressive connectors; avoid full-width progress bars when the step navigation already communicates progress.
+- Keep form content grouped by intent using light panels, subtle borders, moderate radii, and small icon-led headers.
+- Separate functional sections clearly, as in the condominium creation flow: base data, location, configuration, administrator, and review.
+- Use executive summary side panels only when they help the user review or validate a long workflow.
+- Preserve restrained spacing, dense Quasar controls, and low-contrast surfaces instead of decorative or marketing-style layouts.
+- On mobile, reduce visual noise: compact headers, one-column forms, horizontally scrollable step navigation when needed, and fewer always-visible actions.
+- Do not nest UI cards inside other cards unless the nested element is a repeated item or a true modal/tool surface.
+
 ## Build, Test, and Development Commands
 - `npm run dev`: start the Quasar dev server
 - `npm run build`: create the production build
