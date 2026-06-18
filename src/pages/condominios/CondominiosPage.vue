@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <q-page class="condominios-page">
     <AppListPageShell
       v-model:search="search"
@@ -78,6 +78,28 @@
               </q-btn>
               <q-btn flat round dense icon="more_horiz" class="table-icon">
                 <q-tooltip>Más acciones</q-tooltip>
+                <q-menu anchor="bottom right" self="top right">
+                  <q-list dense style="min-width: 220px">
+                    <q-item clickable v-close-popup @click="goToNewAdministrator(props.row)">
+                      <q-item-section avatar>
+                        <q-icon name="person_add" color="primary" />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label>Agregar administrador</q-item-label>
+                        <q-item-label caption>Registrar acceso para este condominio</q-item-label>
+                      </q-item-section>
+                    </q-item>
+                    <q-item clickable v-close-popup @click="goToNewUnit(props.row)">
+                      <q-item-section avatar>
+                        <q-icon name="add_home_work" color="primary" />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label>Agregar unidades</q-item-label>
+                        <q-item-label caption>Crear nuevas unidades en este condominio</q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
               </q-btn>
             </q-td>
           </template>
@@ -364,6 +386,27 @@ function statusTone(status: CondoRow['status']) {
 function goToNewCondominio() {
   void router.push('/condominios/nuevo');
 }
+
+function goToNewAdministrator(row: CondoRow) {
+  void router.push({
+    path: '/administradores/nuevo',
+    query: {
+      condominioId: String(row.id),
+      condominio: row.name,
+    },
+  });
+}
+
+function goToNewUnit(row: CondoRow) {
+  void router.push({
+    path: '/unidades/nueva',
+    query: {
+      condominioId: String(row.id),
+      condominio: row.name,
+    },
+  });
+}
+
 </script>
 
 <style scoped>
@@ -497,3 +540,5 @@ function goToNewCondominio() {
   color: #fff;
 }
 </style>
+
+

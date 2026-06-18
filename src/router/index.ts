@@ -48,15 +48,6 @@ export default defineRouter((/* { store, ssrContext } */) => {
       return { name: 'dashboard' };
     }
 
-    const requiredRoles = to.meta.roles;
-    if (requiredRoles && requiredRoles.length > 0) {
-      const currentRole = session.role;
-
-      if (!currentRole || !requiredRoles.includes(currentRole)) {
-        return { name: 'dashboard' };
-      }
-    }
-
     if (to.meta.requiresCondoContext) {
       if (!session.activeCondominium) {
         const fallbackCondo = session.allowedCondominiums[0];

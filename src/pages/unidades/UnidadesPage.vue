@@ -1,198 +1,103 @@
 <template>
   <q-page class="unidades-page">
-    <div class="unidades-shell">
-      <section class="unidades-shell__main">
-        <div class="page-hero">
-          <div>
-            <div class="page-hero__eyebrow">Módulo / Unidades</div>
-            <div class="page-hero__title">Gestión de unidades</div>
-            <div class="page-hero__subtitle">
-              Visualiza, filtra y administra las unidades del condominio.
+    <AppListPageShell
+      v-model:search="search"
+      v-model:status="statusFilter"
+      v-model:rowsPerPage="pagination.rowsPerPage"
+      v-model:sortBy="sortBy"
+      title="Unidades"
+      subtitle="Gestiona unidades, propietarios y estados operativos."
+      search-placeholder="Buscar unidad, bloque o propietario..."
+      :status-options="statusOptions"
+      :rows-per-page-options="rowsPerPageOptions"
+      :sort-options="sortOptions"
+      action-label="Nueva unidad"
+      action-icon="add"
+      @cta-click="goToNewUnit"
+    >
+      <template #stats>
+        <q-card v-for="card in statsCards" :key="card.label" flat bordered class="stat-card">
+          <q-card-section class="stat-card__content">
+            <div class="stat-card__icon" :style="{ background: card.tint.bg, color: card.tint.fg }">
+              <q-icon :name="card.icon" size="22px" />
             </div>
-          </div>
-
-          <div class="page-hero__actions">
-            <q-btn flat no-caps icon="download" label="Exportar" class="hero-action hero-action--ghost" />
-            <q-btn
-              color="primary"
-              unelevated
-              no-caps
-              icon="add"
-              label="Nueva unidad"
-              class="hero-action"
-              @click="openCreateDialog"
-            />
-          </div>
-        </div>
-
-        <div class="stats-grid">
-          <q-card v-for="card in stats" :key="card.label" class="stat-card">
-            <q-card-section class="stat-card__content">
-              <div class="stat-card__icon">
-                <q-icon :name="card.icon" size="22px" />
-              </div>
-              <div>
-                <div class="stat-card__label">{{ card.label }}</div>
-                <div class="stat-card__value">{{ card.value }}</div>
-                <div class="stat-card__hint">{{ card.hint }}</div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-
-        <q-card class="panel-card">
-          <q-card-section class="panel-card__header">
             <div>
-              <div class="panel-card__title">Listado de unidades</div>
-              <div class="panel-card__subtitle">Filtra por estado y busca por número o propietario.</div>
+              <div class="stat-card__label">{{ card.label }}</div>
+              <div class="stat-card__value">{{ card.value }}</div>
+              <div class="stat-card__hint">{{ card.hint }}</div>
             </div>
-            <q-chip dense outline color="primary">{{ filteredRows.length }} unidades</q-chip>
           </q-card-section>
+        </q-card>
+      </template>
 
-          <q-card-section class="filters-bar">
-            <q-input
-              v-model="search"
-              dense
-              outlined
-              clearable
-              debounce="250"
-              placeholder="Buscar unidad, bloque o propietario..."
-              class="filters-bar__search"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
+      <template #table>
+        <q-table flat bordered :rows="paginatedRows" :columns="columns" row-key="id" hide-bottom class="list-table">
+          <template #body-cell-numero="props">
+            <q-td :props="props">
+              <div class="entity-cell">
+                <q-avatar rounded size="38px" class="entity-avatar">
+                  <q-icon name="domain" size="18px" />
+                </q-avatar>
+                <div>
+                  <div class="entity-cell__title">{{ props.row.numero }}</div>
+                  <div class="entity-cell__subtitle">{{ props.row.bloque }} · Piso {{ props.row.piso }}</div>
+                </div>
+              </div>
+            </q-td>
+          </template>
 
-            <div class="filters-bar__chips">
-              <q-btn
-                v-for="status in statusFilters"
-                :key="status.label"
-                flat
-                dense
-                no-caps
-                :label="status.label"
-                :class="['status-chip', { 'status-chip--active': statusFilter === status.value }]"
-                @click="statusFilter = status.value"
+          <template #body-cell-propietario="props">
+            <q-td :props="props">
+              <div class="table-primary">{{ props.row.propietario }}</div>
+              <div class="table-secondary">{{ props.row.observaciones }}</div>
+            </q-td>
+          </template>
+
+          <template #body-cell-estado="props">
+            <q-td :props="props">
+              <q-badge :color="statusTone(props.row.estado)" rounded class="status-badge">
+                {{ props.row.estado }}
+              </q-badge>
+            </q-td>
+          </template>
+
+          <template #body-cell-alDia="props">
+            <q-td :props="props">
+              <q-icon
+                :name="props.row.alDia ? 'check_circle' : 'cancel'"
+                :class="props.row.alDia ? 'text-positive' : 'text-negative'"
+                size="18px"
               />
-            </div>
-          </q-card-section>
+            </q-td>
+          </template>
 
-          <q-separator />
+          <template #body-cell-actions="props">
+            <q-td :props="props" class="table-actions">
+              <q-btn flat round dense icon="edit" class="table-icon" @click="openEditDialog(props.row)">
+                <q-tooltip>Editar unidad</q-tooltip>
+              </q-btn>
+              <q-btn flat round dense icon="more_horiz" class="table-icon">
+                <q-tooltip>Más acciones</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+        </q-table>
+      </template>
 
-          <q-card-section class="table-wrap">
-            <q-table
-              flat
-              bordered
-              :rows="filteredRows"
-              :columns="columns"
-              row-key="id"
-              hide-pagination
-              :rows-per-page-options="[0]"
-              no-data-label="No hay unidades para mostrar"
-              :pagination="{ rowsPerPage: 0 }"
-              class="units-table"
-            >
-              <template #body-cell-numero="props">
-                <q-td :props="props">
-                  <div class="unit-code">{{ props.row.numero }}</div>
-                  <div class="unit-code__sub">{{ props.row.bloque }} · Piso {{ props.row.piso }}</div>
-                </q-td>
-              </template>
-
-              <template #body-cell-estado="props">
-                <q-td :props="props">
-                  <q-badge :color="statusTone(props.row.estado)" rounded>
-                    {{ props.row.estado }}
-                  </q-badge>
-                </q-td>
-              </template>
-
-              <template #body-cell-alDia="props">
-                <q-td :props="props">
-                  <q-icon
-                    :name="props.row.alDia ? 'check_circle' : 'cancel'"
-                    :class="props.row.alDia ? 'text-positive' : 'text-negative'"
-                    size="18px"
-                  />
-                </q-td>
-              </template>
-
-              <template #body-cell-actions="props">
-                <q-td :props="props" class="table-actions">
-                  <q-btn flat round dense icon="visibility" @click="selectUnit(props.row)">
-                    <q-tooltip>Ver detalle</q-tooltip>
-                  </q-btn>
-                  <q-btn flat round dense icon="edit" @click="openEditDialog(props.row)">
-                    <q-tooltip>Editar unidad</q-tooltip>
-                  </q-btn>
-                  <q-btn flat round dense icon="more_vert">
-                    <q-tooltip>Más acciones</q-tooltip>
-                  </q-btn>
-                </q-td>
-              </template>
-            </q-table>
-          </q-card-section>
-        </q-card>
-      </section>
-
-      <aside class="unidades-shell__aside">
-        <q-card class="panel-card panel-card--sticky">
-          <q-card-section class="panel-card__header">
-            <div>
-              <div class="panel-card__title">Detalle de unidad</div>
-              <div class="panel-card__subtitle">Vista rápida de la selección actual.</div>
-            </div>
-          </q-card-section>
-
-          <q-card-section v-if="selectedUnit" class="detail-card">
-            <div class="detail-card__badge">
-              <q-icon name="domain" size="18px" />
-              {{ selectedUnit.numero }}
-            </div>
-
-            <div class="detail-card__grid">
-              <div>
-                <div class="detail-card__label">Propietario</div>
-                <div class="detail-card__value">{{ selectedUnit.propietario }}</div>
-              </div>
-              <div>
-                <div class="detail-card__label">Estado</div>
-                <q-badge :color="statusTone(selectedUnit.estado)" rounded>
-                  {{ selectedUnit.estado }}
-                </q-badge>
-              </div>
-              <div>
-                <div class="detail-card__label">Área</div>
-                <div class="detail-card__value">{{ selectedUnit.area }} m²</div>
-              </div>
-              <div>
-                <div class="detail-card__label">Habitaciones</div>
-                <div class="detail-card__value">{{ selectedUnit.habitaciones }}</div>
-              </div>
-              <div>
-                <div class="detail-card__label">Baños</div>
-                <div class="detail-card__value">{{ selectedUnit.banos }}</div>
-              </div>
-              <div>
-                <div class="detail-card__label">Estacionamientos</div>
-                <div class="detail-card__value">{{ selectedUnit.estacionamientos }}</div>
-              </div>
-            </div>
-
-            <div class="detail-card__note">
-              <div class="detail-card__label">Observaciones</div>
-              <div class="detail-card__text">{{ selectedUnit.observaciones }}</div>
-            </div>
-
-            <div class="detail-card__footer">
-              <q-btn flat no-caps label="Editar" icon="edit" @click="openEditDialog(selectedUnit)" />
-              <q-btn color="primary" unelevated no-caps label="Nueva unidad" icon="add" @click="openCreateDialog" />
-            </div>
-          </q-card-section>
-        </q-card>
-      </aside>
-    </div>
+      <template #footer>
+        <q-pagination
+          v-model="pagination.page"
+          :max="totalPages"
+          :max-pages="4"
+          boundary-links
+          direction-links
+          color="primary"
+          active-design="flat"
+          active-color="primary"
+          class="table-footer__pagination"
+        />
+      </template>
+    </AppListPageShell>
 
     <UnidadFormDialog
       v-model="dialogOpen"
@@ -205,53 +110,78 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import UnidadFormDialog from './components/UnidadFormDialog.vue';
 import { type UnidadRow, useUnidades } from '@/composables/unidades/useUnidades';
 
-const {
-  search,
-  statusFilter,
-  dialogOpen,
-  editingId,
-  form,
-  stats,
-  filteredRows,
-  selectedUnit,
-  openCreateDialog,
-  openEditDialog,
-  selectUnit,
-  saveUnit,
-} = useUnidades();
+const router = useRouter();
+const { search, statusFilter, dialogOpen, editingId, form, stats, filteredRows, openEditDialog, saveUnit } =
+  useUnidades();
+
+const rowsPerPageOptions = [10, 20, 50] as const;
+const pagination = ref({ page: 1, rowsPerPage: 10 });
+const sortBy = ref<'recent' | 'area' | 'numero'>('recent');
 
 const columns = [
-  {
-    name: 'numero',
-    label: 'Unidad',
-    field: 'numero',
-    align: 'left' as const,
-    sortable: true,
-  },
+  { name: 'numero', label: 'Unidad', field: 'numero', align: 'left' as const, sortable: true },
   { name: 'propietario', label: 'Propietario', field: 'propietario', align: 'left' as const },
   { name: 'area', label: 'Área', field: 'area', align: 'right' as const },
   { name: 'habitaciones', label: 'Hab.', field: 'habitaciones', align: 'center' as const },
   { name: 'banos', label: 'Baños', field: 'banos', align: 'center' as const },
-  {
-    name: 'estado',
-    label: 'Estado',
-    field: 'estado',
-    align: 'center' as const,
-  },
+  { name: 'estado', label: 'Estado', field: 'estado', align: 'center' as const },
   { name: 'alDia', label: 'Al día', field: 'alDia', align: 'center' as const },
   { name: 'actions', label: 'Acciones', field: 'actions', align: 'right' as const },
 ];
 
-const statusFilters = [
-  { label: 'Todas', value: 'Todas' as const },
-  { label: 'Disponible', value: 'Disponible' as const },
-  { label: 'Ocupada', value: 'Ocupada' as const },
-  { label: 'Mora', value: 'Mora' as const },
-  { label: 'Exonerada', value: 'Exonerada' as const },
+const statusOptions = [
+  { label: 'Estado: Todas', value: 'Todas' },
+  { label: 'Disponibles', value: 'Disponible' },
+  { label: 'Ocupadas', value: 'Ocupada' },
+  { label: 'Mora', value: 'Mora' },
+  { label: 'Exoneradas', value: 'Exonerada' },
 ];
+
+const sortOptions = [
+  { label: 'Más recientes', value: 'recent' },
+  { label: 'Mayor área', value: 'area' },
+  { label: 'Número A-Z', value: 'numero' },
+] as const;
+
+const statsCards = computed(() => {
+  const palette = [
+    { bg: 'rgba(37, 99, 235, 0.12)', fg: '#2563eb' },
+    { bg: 'rgba(34, 197, 94, 0.12)', fg: '#16a34a' },
+    { bg: 'rgba(249, 115, 22, 0.14)', fg: '#ea580c' },
+    { bg: 'rgba(124, 58, 237, 0.12)', fg: '#7c3aed' },
+  ] as const;
+
+  return stats.value.map((card, index) => ({ ...card, tint: palette[index % palette.length]! }));
+});
+
+const sortedRows = computed(() => {
+  const source = [...filteredRows.value];
+  if (sortBy.value === 'area') return source.sort((a, b) => b.area - a.area);
+  if (sortBy.value === 'numero') return source.sort((a, b) => a.numero.localeCompare(b.numero));
+  return source;
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage)));
+
+const paginatedRows = computed(() => {
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+  return sortedRows.value.slice(start, start + pagination.value.rowsPerPage);
+});
+
+watch(
+  () => [sortedRows.value.length, pagination.value.rowsPerPage] as const,
+  () => {
+    const maxPage = Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage));
+    if (pagination.value.page > maxPage) pagination.value.page = maxPage;
+  },
+  { immediate: true },
+);
 
 function statusTone(status: UnidadRow['estado']) {
   if (status === 'Disponible') return 'positive';
@@ -259,274 +189,153 @@ function statusTone(status: UnidadRow['estado']) {
   if (status === 'Mora') return 'negative';
   return 'warning';
 }
+
+function goToNewUnit() {
+  void router.push('/unidades/nueva');
+}
 </script>
 
 <style scoped>
 .unidades-page {
   min-height: 100%;
-  padding: 6px 8px 0 4px;
 }
 
-.unidades-shell {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: minmax(0, 1fr) 340px;
-}
-
-.unidades-shell__main,
-.unidades-shell__aside {
-  display: grid;
-  gap: 20px;
-}
-
-.page-hero {
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.page-hero__eyebrow {
-  color: var(--app-primary);
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.page-hero__title {
-  color: var(--app-text);
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  margin-top: 6px;
-}
-
-.page-hero__subtitle {
-  color: var(--app-text-muted);
-  margin-top: 8px;
-}
-
-.page-hero__actions {
-  display: flex;
-  gap: 10px;
-}
-
-.hero-action {
-  min-height: 42px;
-}
-
-.hero-action--ghost {
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.stats-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.stat-card {
+  border-radius: 16px;
 }
 
 .stat-card__content {
   align-items: center;
   display: flex;
-  gap: 14px;
-  min-height: 108px;
+  gap: 12px;
+  min-height: 94px;
 }
 
 .stat-card__icon {
   align-items: center;
-  background: rgba(37, 99, 235, 0.12);
-  border-radius: 18px;
-  color: var(--app-primary);
+  border-radius: 999px;
   display: inline-flex;
   flex-shrink: 0;
-  height: 52px;
+  height: 44px;
   justify-content: center;
-  width: 52px;
+  width: 44px;
 }
 
 .stat-card__label {
   color: var(--app-text-muted);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .stat-card__value {
   color: var(--app-text);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.04em;
-  margin-top: 4px;
+  line-height: 1.05;
+  margin-top: 2px;
 }
 
 .stat-card__hint {
   color: var(--app-text-muted);
-  font-size: 12px;
-  margin-top: 2px;
+  font-size: 11px;
+  margin-top: 1px;
 }
 
-.panel-card {
-  overflow: hidden;
-}
-
-.panel-card--sticky {
-  position: sticky;
-  top: 20px;
-}
-
-.panel-card__header {
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.panel-card__title {
-  color: var(--app-text);
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.panel-card__subtitle {
-  color: var(--app-text-muted);
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.filters-bar {
-  display: grid;
-  gap: 14px;
-}
-
-.filters-bar__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.status-chip {
-  background: rgba(15, 23, 42, 0.03);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  color: var(--app-text-muted);
-}
-
-.status-chip--active {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: rgba(37, 99, 235, 0.18);
-  color: var(--app-primary);
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-.units-table :deep(.q-table__container) {
+.list-table :deep(.q-table__container) {
   border-radius: 16px;
 }
 
-.unit-code {
-  color: var(--app-text);
+.list-table :deep(thead tr th) {
+  color: #334155;
+  font-size: 12px;
   font-weight: 800;
+  height: 50px;
+  letter-spacing: -0.01em;
 }
 
-.unit-code__sub {
-  color: var(--app-text-muted);
+.list-table :deep(tbody tr td) {
+  color: var(--app-text);
   font-size: 12px;
+  height: 60px;
+}
+
+.list-table :deep(tbody tr:hover td) {
+  background: rgba(37, 99, 235, 0.025);
+}
+
+.entity-cell {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.entity-avatar {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--app-primary);
+}
+
+.entity-cell__title {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.entity-cell__subtitle {
+  color: var(--app-text-muted);
+  font-size: 11px;
   margin-top: 2px;
+}
+
+.table-primary {
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.table-secondary {
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  margin-top: 2px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-badge {
+  font-weight: 700;
 }
 
 .table-actions {
   white-space: nowrap;
 }
 
-.detail-card {
-  display: grid;
-  gap: 16px;
-}
-
-.detail-card__badge {
-  align-items: center;
-  background: rgba(37, 99, 235, 0.08);
-  border-radius: 14px;
+.table-icon {
+  border-color: rgba(37, 99, 235, 0.14);
   color: var(--app-primary);
-  display: inline-flex;
-  gap: 8px;
-  font-weight: 800;
-  padding: 10px 12px;
-  width: fit-content;
+  height: 34px;
+  width: 34px;
 }
 
-.detail-card__grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.table-icon :deep(.q-icon) {
+  font-size: 16px;
 }
 
-.detail-card__label {
-  color: var(--app-text-muted);
-  font-size: 12px;
+.table-footer__pagination :deep(.q-pagination__content) {
+  gap: 6px;
+}
+
+.table-footer__pagination :deep(.q-btn) {
+  border-radius: 10px;
   font-weight: 700;
+  min-height: 34px;
+  min-width: 34px;
 }
 
-.detail-card__value {
-  color: var(--app-text);
-  font-size: 14px;
-  font-weight: 800;
-  margin-top: 4px;
-}
-
-.detail-card__note {
-  background: rgba(15, 23, 42, 0.03);
-  border-radius: 16px;
-  padding: 14px;
-}
-
-.detail-card__text {
-  color: var(--app-text);
-  line-height: 1.6;
-  margin-top: 6px;
-}
-
-.detail-card__footer {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-@media (max-width: 1439px) {
-  .unidades-shell {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 1180px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 767px) {
-  .page-hero {
-    flex-direction: column;
-  }
-
-  .page-hero__actions {
-    width: 100%;
-  }
-
-  .hero-action {
-    flex: 1;
-  }
-}
-
-@media (max-width: 599px) {
-  .stats-grid,
-  .detail-card__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-card__footer {
-    flex-direction: column;
-  }
+.table-footer__pagination :deep(.q-btn--active) {
+  background: var(--app-primary);
+  color: #fff;
 }
 </style>

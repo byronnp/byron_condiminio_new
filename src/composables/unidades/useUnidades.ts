@@ -30,6 +30,19 @@ export interface UnidadFormState {
   observaciones: string;
 }
 
+export const createUnidadForm = (): UnidadFormState => ({
+  bloque: '',
+  numero: '',
+  piso: null,
+  area: null,
+  habitaciones: null,
+  banos: null,
+  estacionamientos: null,
+  propietario: '',
+  estado: 'Disponible',
+  observaciones: '',
+});
+
 const initialUnits: UnidadRow[] = [
   {
     id: 1,
@@ -103,29 +116,16 @@ const initialUnits: UnidadRow[] = [
   },
 ];
 
-const defaultForm = (): UnidadFormState => ({
-  bloque: '',
-  numero: '',
-  piso: null,
-  area: null,
-  habitaciones: null,
-  banos: null,
-  estacionamientos: null,
-  propietario: '',
-  estado: 'Disponible',
-  observaciones: '',
-});
+const search = ref('');
+const statusFilter = ref<'Todas' | UnidadStatus>('Todas');
+const dialogOpen = ref(false);
+const saving = ref(false);
+const editingId = ref<number | null>(null);
+const selectedUnit = ref<UnidadRow | null>(initialUnits[0] ?? null);
+const rows = ref<UnidadRow[]>([...initialUnits]);
+const form = ref<UnidadFormState>(createUnidadForm());
 
 export function useUnidades() {
-  const search = ref('');
-  const statusFilter = ref<'Todas' | UnidadStatus>('Todas');
-  const dialogOpen = ref(false);
-  const saving = ref(false);
-  const editingId = ref<number | null>(null);
-  const selectedUnit = ref<UnidadRow | null>(initialUnits[0] ?? null);
-  const rows = ref<UnidadRow[]>([...initialUnits]);
-  const form = ref<UnidadFormState>(defaultForm());
-
   const stats = computed(() => {
     const total = rows.value.length;
     const disponibles = rows.value.filter((row) => row.estado === 'Disponible').length;
@@ -157,7 +157,7 @@ export function useUnidades() {
 
   function openCreateDialog() {
     editingId.value = null;
-    form.value = defaultForm();
+    form.value = createUnidadForm();
     dialogOpen.value = true;
   }
 

@@ -33,7 +33,6 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Condominios',
           subtitle: 'Gestión general de condominios',
-          roles: ['senior'],
         },
       },
       {
@@ -43,7 +42,6 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Nuevo condominio',
           subtitle: 'Registro y configuración inicial del condominio',
-          roles: ['senior'],
         },
       },
       {
@@ -53,7 +51,15 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Administradores',
           subtitle: 'Administración de usuarios senior',
-          roles: ['senior'],
+        },
+      },
+      {
+        path: 'administradores/nuevo',
+        name: 'administradores-nuevo',
+        component: () => import('@/pages/administradores/NuevoAdministradorPage.vue'),
+        meta: {
+          title: 'Nuevo administrador',
+          subtitle: 'Registro y permisos de acceso',
         },
       },
       {
@@ -63,6 +69,16 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Unidades',
           subtitle: 'Gestión de unidades',
+          requiresCondoContext: true,
+        },
+      },
+      {
+        path: 'unidades/nueva',
+        name: 'unidades-nueva',
+        component: () => import('@/pages/unidades/NuevaUnidadPage.vue'),
+        meta: {
+          title: 'Nueva unidad',
+          subtitle: 'Registro de una nueva unidad',
           requiresCondoContext: true,
         },
       },

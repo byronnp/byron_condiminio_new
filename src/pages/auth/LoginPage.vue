@@ -82,7 +82,7 @@
             <div class="auth-panel__subtitle">Inicia sesión para continuar</div>
           </div>
 
-          <q-form class="auth-form" @submit.prevent="submitLogin">
+          <q-form class="auth-form" @submit.prevent="handleSubmitLogin">
             <q-input
               v-model="email"
               dense
@@ -91,6 +91,7 @@
               label="Correo electrónico"
               placeholder="Ingresa tu correo electrónico"
               :rules="[requiredRule, emailRule]"
+              :disable="isSubmitting"
             >
               <template #prepend>
                 <q-icon name="mail_outline" />
@@ -105,12 +106,14 @@
               label="Contraseña"
               placeholder="Ingresa tu contraseña"
               :rules="[requiredRule]"
+              :disable="isSubmitting"
             >
               <template #prepend>
                 <q-icon name="lock_outline" />
               </template>
               <template #append>
                 <q-btn
+                  type="button"
                   flat
                   round
                   dense
@@ -121,20 +124,25 @@
             </q-input>
 
             <div class="auth-form__meta">
-              <q-checkbox v-model="rememberMe" dense label="Recordarme" />
+              <q-checkbox v-model="rememberMe" dense label="Recordarme" :disable="isSubmitting" />
               <q-btn flat dense no-caps label="¿Olvidaste tu contraseña?" class="auth-link" />
             </div>
 
             <div class="auth-form__helper">
-              El backend determinará el rol y el condominio permitido tras autenticarte.
+              El inicio de sesión se valida contra el backend y luego se resuelve el rol,
+              el condominio y el contexto de trabajo.
             </div>
 
             <q-banner class="auth-form__demo">
-              <div class="auth-form__demo-title">Acceso temporal de prueba</div>
+              <div class="auth-form__demo-title">Autenticación con API</div>
               <div class="auth-form__demo-body">
-                <div><strong>Senior:</strong> senior@condominio.com</div>
-                <div><strong>Clave:</strong> Senior123*</div>
+                <div>POST <strong>/api/auth/login</strong></div>
+                <div>El backend devuelve usuario, token y contexto de sesión.</div>
               </div>
+            </q-banner>
+
+            <q-banner v-if="errorMessage" class="auth-form__error" dense rounded>
+              {{ errorMessage }}
             </q-banner>
 
             <q-btn
@@ -145,6 +153,8 @@
               label="Iniciar sesión"
               icon="login"
               type="submit"
+              :loading="isSubmitting"
+              :disable="isSubmitting"
             />
 
             <div class="auth-form__security">
@@ -166,21 +176,18 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
+
+import { useAuthLogin } from '@/composables/auth/useAuthLogin';
 import loginHero from '@/referencias/referencia_login_multicondominio.png';
-import { useSessionStore } from '@/stores/session.store';
 
-const router = useRouter();
-const route = useRoute();
-const session = useSessionStore();
-
-const demoSeniorEmail = 'senior@condominio.com';
-const demoSeniorPassword = 'Senior123*';
-
-const email = ref(demoSeniorEmail);
-const password = ref(demoSeniorPassword);
+const email = ref('');
+const password = ref('');
 const rememberMe = ref(true);
 const showPassword = ref(false);
+const route = useRoute();
+
+const { errorMessage, isSubmitting, submitLogin } = useAuthLogin();
 
 const features = [
   {
@@ -215,18 +222,14 @@ const features = [
   },
 ];
 
-function submitLogin() {
-  const isSeniorCredentials =
-    email.value.trim() === demoSeniorEmail && password.value === demoSeniorPassword;
-
-  session.signInDemo({
-    email: email.value.trim() || 'admin@condominio.com',
+async function handleSubmitLogin() {
+  await submitLogin({
+    email: email.value,
     password: password.value,
-    role: isSeniorCredentials ? 'senior' : 'admin',
+    rememberMe: rememberMe.value,
+    redirectTo:
+      typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard',
   });
-
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard';
-  void router.push(redirect);
 }
 
 const requiredRule = (value: string) => !!value || 'Campo requerido';
@@ -531,6 +534,13 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   gap: 4px;
   font-size: 13px;
   margin-top: 6px;
+}
+
+.auth-form__error {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: 14px;
+  color: #b91c1c;
 }
 
 .auth-form__submit {

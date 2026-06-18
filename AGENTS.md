@@ -49,6 +49,7 @@ Use short, imperative commit messages such as `feat: update login layout` or `fi
 
 ## Agent Instructions
 Do not reintroduce condo selection in the login screen. The backend determines role and tenant context after authentication.
+Backend documentation: `http://localhost:8001/api/documentation`
 
 - Senior users can see all condominiums and switch context.
 - Condominium admins only see their assigned condominium.

@@ -20,45 +20,21 @@
       </div>
 
       <q-scroll-area class="drawer-scroll">
-        <div class="drawer-section">
-          <div class="drawer-section__label">PRINCIPAL</div>
+        <div v-for="section in visibleMenuSections" :key="section.key" class="drawer-section">
+          <div class="drawer-section__label">{{ section.label }}</div>
           <q-list class="drawer-nav">
             <q-item
-              v-for="item in visiblePrimaryNavigation"
+              v-for="item in section.items"
               :key="item.label"
-              :to="item.to"
-              clickable
-              exact
-              active-class="drawer-nav__item--active"
-              class="drawer-nav__item"
-              @click="handleNavClick"
-            >
-              <q-item-section avatar>
-                <q-icon :name="item.icon" size="18px" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ item.label }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </div>
-
-        <div class="drawer-section">
-          <div class="drawer-section__label">HERRAMIENTAS</div>
-          <q-list class="drawer-nav">
-            <q-item
-              v-for="item in visibleToolNavigation"
-              :key="item.label"
-              :to="item.to"
               :clickable="Boolean(item.to)"
-              exact
+              :active="isMenuItemActive(item)"
               active-class="drawer-nav__item--active"
               class="drawer-nav__item"
               :class="{ 'drawer-nav__item--static': !item.to }"
-              @click="handleToolClick(item)"
+              @click="handleMenuItemClick(item)"
             >
               <q-item-section avatar>
-                <q-icon :name="item.icon" size="18px" />
+                <q-icon :name="item.icon ?? 'chevron_right'" size="18px" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ item.label }}</q-item-label>
@@ -124,27 +100,93 @@
           {{ session.contextLabel }}
         </q-chip>
 
-        <q-select
-          v-if="session.isSenior"
-          v-model="condoSelectValue"
-          :options="condoOptions"
-          option-label="name"
-          option-value="id"
-          emit-value
-          map-options
-          dense
-          outlined
-          bg-color="white"
-          label="Condominio"
-          class="toolbar-condo-select"
-        >
-          <template #selected>
-            <div class="toolbar-condo-select__selected">
-              <span class="toolbar-condo-select__label">Condominio</span>
-              <span class="toolbar-condo-select__value">{{ activeCondominiumName }}</span>
-            </div>
-          </template>
-        </q-select>
+        <q-btn v-if="session.isSenior" flat no-caps class="toolbar-condo-switcher">
+          <div class="toolbar-condo-switcher__content">
+            <span class="toolbar-condo-switcher__eyebrow">Condominio</span>
+            <span class="toolbar-condo-switcher__name">{{ activeCondominiumName }}</span>
+            <span class="toolbar-condo-switcher__meta">
+              {{ activeCondominiumMeta }}
+            </span>
+          </div>
+          <q-icon name="expand_more" size="18px" class="toolbar-condo-switcher__chevron" />
+
+          <q-menu anchor="bottom right" self="top right" class="toolbar-condo-menu">
+            <q-card flat bordered class="toolbar-condo-menu__card">
+              <q-card-section class="toolbar-condo-menu__header">
+                <div class="toolbar-condo-menu__eyebrow">Contexto de trabajo</div>
+                <div class="toolbar-condo-menu__title">Cambiar condominio</div>
+                <div class="toolbar-condo-menu__subtitle">
+                  Selecciona el condominio activo para esta sesión.
+                </div>
+              </q-card-section>
+
+              <q-separator />
+
+              <q-list class="toolbar-condo-menu__list">
+                <q-item
+                  clickable
+                  v-close-popup
+                  :active="session.activeCondoId === null"
+                  active-class="toolbar-condo-menu__item--active"
+                  class="toolbar-condo-menu__item"
+                  @click="setActiveCondoContext('__global__')"
+                >
+                  <q-item-section avatar>
+                    <q-avatar size="32px" class="toolbar-condo-menu__avatar">
+                      <q-icon name="public" size="16px" />
+                    </q-avatar>
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label class="toolbar-condo-menu__name">Vista global</q-item-label>
+                    <q-item-label caption>Todos los condominios</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-icon
+                      v-if="session.activeCondoId === null"
+                      name="check"
+                      size="16px"
+                      color="primary"
+                    />
+                  </q-item-section>
+                </q-item>
+
+                <q-item
+                  v-for="condo in session.condoOptions"
+                  :key="condo.id"
+                  clickable
+                  v-close-popup
+                  :active="session.activeCondoId === condo.id"
+                  active-class="toolbar-condo-menu__item--active"
+                  class="toolbar-condo-menu__item"
+                  @click="setActiveCondoContext(condo.id)"
+                >
+                  <q-item-section avatar>
+                    <q-avatar
+                      size="32px"
+                      class="toolbar-condo-menu__avatar toolbar-condo-menu__avatar--condo"
+                    >
+                      <q-icon name="apartment" size="16px" />
+                    </q-avatar>
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label class="toolbar-condo-menu__name">{{ condo.name }}</q-item-label>
+                    <q-item-label caption>
+                      {{ condo.city }} · {{ condo.units }} unidades
+                    </q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-icon
+                      v-if="session.activeCondoId === condo.id"
+                      name="check"
+                      size="16px"
+                      color="primary"
+                    />
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </q-menu>
+        </q-btn>
 
         <q-chip v-else square class="toolbar-chip toolbar-chip--solid">
           <q-icon name="pin_drop" size="16px" class="q-mr-xs" />
@@ -190,27 +232,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { useRoute, useRouter } from 'vue-router';
-import { filterNavigationByRole, primaryNavigation, toolNavigation, type NavigationItem } from '@/config/navigation';
-import { condoCatalogOptions, useSessionStore } from '@/stores/session.store';
+import { useSessionStore } from '@/stores/session.store';
+import { useAuthMenu } from '@/composables/auth/useAuthMenu';
 
 const $q = useQuasar();
 const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
+const { loadAuthMenu } = useAuthMenu();
 const leftDrawerOpen = ref(false);
 const drawerContentStyle = {
   background: 'linear-gradient(180deg, #07162d 0%, #0b1e3b 42%, #071225 100%)',
   color: '#fff',
 };
 
-const visiblePrimaryNavigation = computed(() =>
-  filterNavigationByRole(primaryNavigation, session.role),
-);
-
-const visibleToolNavigation = computed(() => filterNavigationByRole(toolNavigation, session.role));
+const visibleMenuSections = computed(() => session.menuSections);
 
 const pageTitle = computed(() => {
   const title = route.meta.title;
@@ -222,25 +261,6 @@ const pageSubtitle = computed(() => {
   return typeof subtitle === 'string' ? subtitle : 'Vista consolidada del sistema';
 });
 
-const condoOptions = computed(() =>
-  session.isSenior
-    ? [{ id: '__global__', name: 'Vista global', city: 'Todos', units: 0, active: true }, ...condoCatalogOptions]
-    : condoCatalogOptions,
-);
-
-const condoSelectValue = computed<string>({
-  get: () =>
-    session.isSenior && session.activeCondoId === null ? '__global__' : session.activeCondoId ?? '__global__',
-  set: (value) => {
-    if (value === '__global__') {
-      session.activeCondoId = null;
-      return;
-    }
-
-    session.setActiveCondo(value);
-  },
-});
-
 const activeCondominiumName = computed(() => {
   if (session.isSenior && session.activeCondoId === null) {
     return 'Vista global';
@@ -249,36 +269,80 @@ const activeCondominiumName = computed(() => {
   return session.activeCondominium?.name ?? 'Sin condominio';
 });
 
+const activeCondominiumMeta = computed(() => {
+  if (session.isSenior && session.activeCondoId === null) {
+    return `${session.condoOptions.length} condominios disponibles`;
+  }
+
+  const active = session.activeCondominium;
+  if (!active) {
+    return 'Sin detalle disponible';
+  }
+
+  return `${active.city ?? 'Sin ciudad'} · ${active.units ?? 0} unidades`;
+});
+
 const planTitle = computed(() => (session.isSenior ? 'Plan Enterprise' : 'Plan Condominio'));
 const planSubtitle = computed(() =>
-  session.isSenior ? 'Condominios activos' : session.activeCondominium?.name ?? 'Condominio asignado',
+  session.isSenior
+    ? 'Condominios activos'
+    : (session.activeCondominium?.name ?? 'Condominio asignado'),
 );
 const planMetric = computed(() =>
-  session.isSenior ? `${session.allowedCondominiums.length} / ${condoCatalogOptions.length}` : '1 / 1',
+  session.isSenior
+    ? `${session.allowedCondominiums.length} / ${session.condoOptions.length}`
+    : '1 / 1',
 );
 const planProgress = computed(() =>
   session.isSenior
-    ? Math.min(1, session.allowedCondominiums.length / Math.max(condoCatalogOptions.length, 1))
+    ? Math.min(1, session.allowedCondominiums.length / Math.max(session.condoOptions.length, 1))
     : 1,
 );
 const planProgressLabel = computed(() =>
   session.isSenior ? 'Acceso global' : 'Acceso restringido al condominio asignado',
 );
 
+onMounted(() => {
+  void loadAuthMenu(session.accessToken);
+});
+
 function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value;
 }
 
-function handleNavClick() {
+function handleMenuItemClick(item: { to?: string }) {
+  if (!item.to) {
+    return;
+  }
+  const target = item.to.trim();
+  if (target.startsWith('http://') || target.startsWith('https://')) {
+    window.location.href = target;
+  } else if (target.startsWith('#/')) {
+    void router.push(target.slice(1));
+  } else if (target.startsWith('/')) {
+    void router.push(target);
+  } else if (router.hasRoute(target)) {
+    void router.push({ name: target });
+  } else {
+    void router.push(`/${target}`);
+  }
+
   if ($q.screen.lt.md) {
     leftDrawerOpen.value = false;
   }
 }
 
-function handleToolClick(item: NavigationItem) {
-  if (item.to && $q.screen.lt.md) {
-    leftDrawerOpen.value = false;
+function isMenuItemActive(item: { to?: string }) {
+  return typeof item.to === 'string' && route.path === item.to;
+}
+
+function setActiveCondoContext(value: string) {
+  if (value === '__global__') {
+    session.activeCondoId = null;
+    return;
   }
+
+  session.setActiveCondo(value);
 }
 
 function handleSignOut() {
@@ -495,33 +559,125 @@ function handleSignOut() {
   border-color: transparent;
 }
 
-.toolbar-condo-select {
-  width: 260px;
+.toolbar-condo-switcher {
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  color: var(--app-text);
+  display: inline-flex;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 12px 8px 14px;
+  text-align: left;
+  width: 286px;
 }
 
-.toolbar-condo-select :deep(.q-field__control) {
-  border-radius: 999px;
-}
-
-.toolbar-condo-select__selected {
-  align-items: flex-start;
+.toolbar-condo-switcher :deep(.q-btn__content) {
+  align-items: center;
   display: flex;
-  flex-direction: column;
-  line-height: 1.1;
+  gap: 12px;
+  justify-content: space-between;
+  width: 100%;
 }
 
-.toolbar-condo-select__label {
+.toolbar-condo-switcher__content {
+  display: grid;
+  min-width: 0;
+}
+
+.toolbar-condo-switcher__eyebrow {
   color: var(--app-text-muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
   text-transform: uppercase;
 }
 
-.toolbar-condo-select__value {
+.toolbar-condo-switcher__name {
   color: var(--app-text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
+  line-height: 1.15;
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-condo-switcher__meta {
+  color: var(--app-text-muted);
+  font-size: 10px;
+  line-height: 1.2;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-condo-switcher__chevron {
+  color: var(--app-text-muted);
+  flex-shrink: 0;
+}
+
+.toolbar-condo-menu__card {
+  border-radius: 16px;
+  min-width: 320px;
+  overflow: hidden;
+}
+
+.toolbar-condo-menu__header {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 12px;
+  padding-top: 12px;
+}
+
+.toolbar-condo-menu__eyebrow {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toolbar-condo-menu__title {
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.toolbar-condo-menu__subtitle {
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.toolbar-condo-menu__list {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+}
+
+.toolbar-condo-menu__item {
+  border-radius: 12px;
+  min-height: 54px;
+}
+
+.toolbar-condo-menu__item--active {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.toolbar-condo-menu__avatar {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--app-primary);
+}
+
+.toolbar-condo-menu__avatar--condo {
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .toolbar-action {
@@ -552,7 +708,7 @@ function handleSignOut() {
 }
 
 @media (max-width: 767px) {
-  .toolbar-condo-select {
+  .toolbar-condo-switcher {
     display: none;
   }
 }

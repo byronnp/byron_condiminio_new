@@ -168,14 +168,14 @@ const emit = defineEmits<{
 <style scoped>
 .page-shell {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .page-hero {
   align-items: flex-start;
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
 }
 
 .page-hero__heading {
@@ -184,7 +184,7 @@ const emit = defineEmits<{
 
 .page-hero__title {
   color: var(--app-text);
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.1;
@@ -192,9 +192,9 @@ const emit = defineEmits<{
 
 .page-hero__subtitle {
   color: var(--app-text-muted);
-  font-size: 12px;
-  line-height: 1.4;
-  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
   max-width: 720px;
 }
 
@@ -202,13 +202,13 @@ const emit = defineEmits<{
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
-  padding-top: 10px;
+  padding-top: 6px;
 }
 
 .header-action {
-  min-height: 40px;
+  min-height: 38px;
 }
 
 .header-action--primary {
@@ -216,26 +216,26 @@ const emit = defineEmits<{
 }
 
 .search-field {
-  width: 248px;
+  width: 232px;
 }
 
 .status-field {
-  width: 154px;
+  width: 146px;
 }
 
 .stats-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .table-card {
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
 }
 
 .page-divider {
-  margin-inline: 22px;
+  margin-inline: 18px;
   opacity: 0.45;
 }
 
@@ -244,34 +244,34 @@ const emit = defineEmits<{
   color: var(--app-text-muted);
   display: flex;
   justify-content: space-between;
-  gap: 18px;
-  padding: 14px 22px;
+  gap: 14px;
+  padding: 12px 18px;
 }
 
 .table-controls__left,
 .table-controls__right {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .rows-select {
-  width: 92px;
+  width: 86px;
 }
 
 .order-select {
-  width: 200px;
+  width: 180px;
 }
 
 .table-wrap {
-  padding: 8px 22px 2px;
+  padding: 6px 18px 0;
 }
 
 .table-footer {
   align-items: center;
   display: flex;
   justify-content: center;
-  padding: 10px 22px 18px;
+  padding: 8px 18px 16px;
 }
 
 @media (max-width: 1180px) {
@@ -284,7 +284,7 @@ const emit = defineEmits<{
 
   .page-hero__actions {
     justify-content: flex-start;
-    padding-top: 0;
+    padding-top: 2px;
     width: 100%;
   }
 
@@ -320,13 +320,13 @@ const emit = defineEmits<{
   }
 
   .page-divider {
-    margin-inline: 16px;
+    margin-inline: 14px;
   }
 
   .table-controls,
   .table-wrap,
   .table-footer {
-    padding-inline: 16px;
+    padding-inline: 14px;
   }
 
   .table-card {

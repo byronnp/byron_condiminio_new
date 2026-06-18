@@ -13,6 +13,7 @@
       :sort-options="sortOptions"
       action-label="Nuevo administrador"
       action-icon="person_add"
+      @cta-click="goToNewAdministrator"
     >
       <template #stats>
         <q-card v-for="card in statsCards" :key="card.label" flat bordered class="stat-card">
@@ -112,6 +113,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 
@@ -128,6 +130,7 @@ type AdminRow = {
 type SortOption = 'recent' | 'oldest' | 'name';
 
 const search = ref('');
+const router = useRouter();
 const statusFilter = ref<'Todos' | 'Activo' | 'Pendiente' | 'Suspendido'>('Todos');
 const sortBy = ref<SortOption>('recent');
 const rowsPerPageOptions = [10, 20, 50] as const;
@@ -246,6 +249,10 @@ function statusTone(status: AdminRow['status']) {
   if (status === 'Activo') return 'positive';
   if (status === 'Pendiente') return 'warning';
   return 'negative';
+}
+
+function goToNewAdministrator() {
+  void router.push({ name: 'administradores-nuevo' });
 }
 </script>
 
