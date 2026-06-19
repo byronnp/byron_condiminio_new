@@ -67,3 +67,8 @@ Backend documentation: `http://localhost:8001/api/documentation`
 - Senior users can see all condominiums and switch context.
 - Condominium admins only see their assigned condominium.
 - Preserve the established list-page shell and visual rhythm when adding new list screens.
+- In `NuevoCondominioPage.vue`, the location step must load data from the backend instead of hardcoded lists:
+  - countries from `GET /api/countries`
+  - provinces from `GET /api/countries/{country}/provinces`
+  - cities from `GET /api/provinces/{province}/cities`
+- When saving the condominium, the location payload must use `country_code`, `province_id`, and `city_id`.

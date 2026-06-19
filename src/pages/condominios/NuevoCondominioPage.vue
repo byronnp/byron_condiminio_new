@@ -150,34 +150,51 @@
 
                         <div class="step-grid">
                           <q-select
-                            v-model="location.country"
+                            v-model="location.countryCode"
                             class="step-field"
                             dense
                             outlined
                             hide-bottom-space
+                            emit-value
+                            map-options
+                            option-label="label"
+                            option-value="value"
                             :options="countryOptions"
+                            :loading="countryOptionsLoading"
                             label="País *"
                             :rules="[requiredRule]"
                           />
                           <q-select
-                            v-model="location.province"
+                            v-model="location.provinceId"
                             class="step-field"
                             dense
                             outlined
                             hide-bottom-space
+                            emit-value
+                            map-options
+                            option-label="label"
+                            option-value="value"
                             :options="provinceOptions"
+                            :loading="provinceOptionsLoading"
                             label="Provincia *"
                             :rules="[requiredRule]"
+                            :disable="!location.countryCode"
                           />
                           <q-select
-                            v-model="location.city"
+                            v-model="location.cityId"
                             class="step-field"
                             dense
                             outlined
                             hide-bottom-space
+                            emit-value
+                            map-options
+                            option-label="label"
+                            option-value="value"
                             :options="cityOptions"
+                            :loading="cityOptionsLoading"
                             label="Ciudad *"
                             :rules="[requiredRule]"
+                            :disable="!location.provinceId"
                           />
                           <q-input
                             v-model="location.direction"
@@ -614,14 +631,14 @@
                           <div class="review-card__list">
                             <div class="review-card__row">
                               <span>País</span
-                              ><strong>{{ location.country || 'Sin datos' }}</strong>
+                              ><strong>{{ selectedCountryName || 'Sin datos' }}</strong>
                             </div>
                             <div class="review-card__row">
                               <span>Provincia</span
-                              ><strong>{{ location.province || 'Sin datos' }}</strong>
+                              ><strong>{{ selectedProvinceName || 'Sin datos' }}</strong>
                             </div>
                             <div class="review-card__row">
-                              <span>Ciudad</span><strong>{{ location.city || 'Sin datos' }}</strong>
+                              <span>Ciudad</span><strong>{{ selectedCityName || 'Sin datos' }}</strong>
                             </div>
                             <div class="review-card__row review-card__row--stacked">
                               <span>Dirección</span
@@ -790,6 +807,8 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchCatalogItems } from '@/services/catalog.service';
+import { fetchCities, fetchCountries, fetchProvinces } from '@/services/location.service';
+import { useSessionStore } from '@/stores/session.store';
 import CondominioCreatedDialog from './components/CondominioCreatedDialog.vue';
 
 type StepName = 'info' | 'location' | 'config' | 'admin' | 'review';
@@ -807,9 +826,9 @@ type CondoForm = {
 };
 
 type LocationForm = {
-  country: string;
-  province: string;
-  city: string;
+  countryCode: string;
+  provinceId: number | null;
+  cityId: number | null;
   direction: string;
   reference: string;
 };
@@ -838,6 +857,7 @@ type StepDefinition = {
 };
 
 const router = useRouter();
+const session = useSessionStore();
 
 const steps: StepDefinition[] = [
   { name: 'info', label: 'Información' },
@@ -867,9 +887,9 @@ const form = reactive<CondoForm>({
 });
 
 const location = reactive<LocationForm>({
-  country: '',
-  province: '',
-  city: '',
+  countryCode: '',
+  provinceId: null,
+  cityId: null,
   direction: '',
   reference: '',
 });
@@ -899,9 +919,12 @@ const statusRadioOptions = [
   { label: 'Activo', value: 'Activo' },
   { label: 'Inactivo', value: 'Inactivo' },
 ];
-const countryOptions = ['Ecuador', 'Colombia', 'Perú'];
-const provinceOptions = ['Guayas', 'Pichincha', 'Azuay'];
-const cityOptions = ['Guayaquil', 'Quito', 'Cuenca'];
+const countryOptions = ref<{ label: string; value: string }[]>([]);
+const countryOptionsLoading = ref(false);
+const provinceOptions = ref<{ label: string; value: number }[]>([]);
+const provinceOptionsLoading = ref(false);
+const cityOptions = ref<{ label: string; value: number }[]>([]);
+const cityOptionsLoading = ref(false);
 const currencyOptions = ['USD', 'EUR', 'MXN'];
 const fallbackDocumentTypeOptions = ['Cédula', 'RUC', 'Pasaporte'];
 const documentTypeOptions = ref<string[]>([...fallbackDocumentTypeOptions]);
@@ -922,6 +945,8 @@ const logoFileName = computed(() => config.logo?.name ?? 'Sin archivo');
 const logoPreviewUrl = ref<string | null>(null);
 
 let logoObjectUrl: string | null = null;
+let provinceLoadToken = 0;
+let cityLoadToken = 0;
 
 async function loadCatalogOptions(
   code: string,
@@ -942,6 +967,76 @@ async function loadCatalogOptions(
   }
 }
 
+async function loadCountryOptions() {
+  countryOptionsLoading.value = true;
+
+  try {
+    const countries = await fetchCountries(session.accessToken);
+    countryOptions.value = countries.map((country) => ({
+      label: country.name,
+      value: country.code,
+    }));
+  } catch {
+    countryOptions.value = [];
+  } finally {
+    countryOptionsLoading.value = false;
+  }
+}
+
+async function loadProvinceOptions(countryCode: string) {
+  const requestToken = ++provinceLoadToken;
+  provinceOptionsLoading.value = true;
+
+  try {
+    const provinces = await fetchProvinces(countryCode, session.accessToken);
+    if (requestToken !== provinceLoadToken) {
+      return;
+    }
+
+    provinceOptions.value = provinces.map((province) => ({
+      label: province.name,
+      value: province.id,
+    }));
+  } catch {
+    if (requestToken !== provinceLoadToken) {
+      return;
+    }
+
+    provinceOptions.value = [];
+  } finally {
+    if (requestToken === provinceLoadToken) {
+      provinceOptionsLoading.value = false;
+    }
+  }
+}
+
+async function loadCityOptions(provinceId: number) {
+  const requestToken = ++cityLoadToken;
+  cityOptionsLoading.value = true;
+
+  try {
+    const cities = await fetchCities(provinceId, session.accessToken);
+    if (requestToken !== cityLoadToken) {
+      return;
+    }
+
+    cityOptions.value = cities.map((city) => ({
+      label: city.name,
+      value: city.id,
+    }));
+  } catch {
+    if (requestToken !== cityLoadToken) {
+      return;
+    }
+
+    cityOptions.value = [];
+  } finally {
+    if (requestToken === cityLoadToken) {
+      cityOptionsLoading.value = false;
+    }
+  }
+}
+
 onMounted(() => {
   void loadCatalogOptions(
     'condominium_types',
@@ -955,6 +1050,55 @@ onMounted(() => {
     fallbackDocumentTypeOptions,
     documentTypeOptionsLoading,
   );
+  void loadCountryOptions();
+});
+
+watch(
+  () => location.countryCode,
+  async (countryCode) => {
+    provinceLoadToken += 1;
+    cityLoadToken += 1;
+    location.provinceId = null;
+    location.cityId = null;
+    provinceOptions.value = [];
+    cityOptions.value = [];
+
+    if (!countryCode) {
+      return;
+    }
+
+    await loadProvinceOptions(countryCode);
+  },
+);
+
+watch(
+  () => location.provinceId,
+  async (provinceId) => {
+    cityLoadToken += 1;
+    location.cityId = null;
+    cityOptions.value = [];
+
+    if (!provinceId) {
+      return;
+    }
+
+    await loadCityOptions(provinceId);
+  },
+);
+
+const selectedCountryName = computed(() => {
+  const selected = countryOptions.value.find((option) => option.value === location.countryCode);
+  return selected?.label ?? '';
+});
+
+const selectedProvinceName = computed(() => {
+  const selected = provinceOptions.value.find((option) => option.value === location.provinceId);
+  return selected?.label ?? '';
+});
+
+const selectedCityName = computed(() => {
+  const selected = cityOptions.value.find((option) => option.value === location.cityId);
+  return selected?.label ?? '';
 });
 
 watch(
@@ -1093,7 +1237,12 @@ function isInfoValid() {
 }
 
 function isLocationValid() {
-  return Boolean(location.country && location.province && location.city && location.direction);
+  return Boolean(
+    location.countryCode &&
+      location.provinceId !== null &&
+      location.cityId !== null &&
+      location.direction,
+  );
 }
 
 function isConfigValid() {
