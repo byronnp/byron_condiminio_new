@@ -102,7 +102,12 @@
         <q-space />
 
         <div class="toolbar-actions">
-          <q-btn v-if="canSwitchCondominiumContext" flat no-caps class="toolbar-condo-switcher">
+          <q-btn
+            v-if="canSwitchCondominiumContext"
+            flat
+            no-caps
+            class="toolbar-condo-switcher"
+          >
             <div class="toolbar-condo-switcher__content">
               <q-avatar size="28px" class="toolbar-condo-switcher__avatar">
                 <q-icon name="pin_drop" size="15px" />
@@ -116,16 +121,6 @@
 
             <q-menu anchor="bottom right" self="top right" class="toolbar-condo-menu">
               <q-card flat bordered class="toolbar-condo-menu__card">
-                <q-card-section class="toolbar-condo-menu__header">
-                  <div class="toolbar-condo-menu__eyebrow">Contexto de trabajo</div>
-                  <div class="toolbar-condo-menu__title">Cambiar condominio</div>
-                  <div class="toolbar-condo-menu__subtitle">
-                    Selecciona el condominio activo para esta sesión.
-                  </div>
-                </q-card-section>
-
-                <q-separator />
-
                 <q-list class="toolbar-condo-menu__list">
                   <q-item
                     clickable
@@ -175,7 +170,7 @@
                     <q-item-section>
                       <q-item-label class="toolbar-condo-menu__name">{{ condo.name }}</q-item-label>
                       <q-item-label caption>
-                        {{ condo.city }} · {{ condo.units }} unidades
+                        {{ condominiumOptionMeta(condo) }}
                       </q-item-label>
                     </q-item-section>
                     <q-item-section side>
@@ -288,12 +283,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { useRoute, useRouter } from 'vue-router';
 import { useSessionStore } from '@/stores/session.store';
 import { useAuthMenu } from '@/composables/auth/useAuthMenu';
-
+import {
+  fetchCondominiumOptions,
+  type CondominiumOptionItem,
+} from '@/services/condominiums.service';
 const $q = useQuasar();
 const route = useRoute();
 const router = useRouter();
@@ -301,6 +299,8 @@ const session = useSessionStore();
 const { loadAuthMenu } = useAuthMenu();
 const leftDrawerOpen = ref(true);
 const drawerMini = ref(false);
+const isLoadingCondominiums = ref(false);
+const condominiumsLoadError = ref('');
 const drawerContentStyle = {
   background: 'linear-gradient(180deg, #07162d 0%, #0b1e3b 42%, #071225 100%)',
   color: '#fff',
@@ -309,7 +309,7 @@ const drawerContentStyle = {
 const visibleMenuSections = computed(() => session.menuSections);
 const isDrawerMini = computed(() => drawerMini.value && !$q.screen.lt.md);
 const canSwitchCondominiumContext = computed(
-  () => session.isSenior || session.condoOptions.length > 1,
+  () => session.condoOptions.length > 0,
 );
 
 const pageTitle = computed(() => {
@@ -345,7 +345,7 @@ const activeCondominiumMeta = computed(() => {
     return 'Sin detalle disponible';
   }
 
-  return `${active.city ?? 'Sin ciudad'} · ${active.units ?? 0} unidades`;
+  return condominiumOptionMeta(active);
 });
 
 const planTitle = computed(() => (session.isSenior ? 'Plan Enterprise' : 'Plan Condominio'));
@@ -386,9 +386,72 @@ const userInitials = computed(() => {
     .slice(0, 2);
 });
 
+function mapCondominiumOption(condominium: CondominiumOptionItem) {
+  return {
+    id: String(condominium.id),
+    name: condominium.name,
+    city: '',
+    units: 0,
+    active: true,
+  };
+}
+
+function condominiumOptionMeta(condominium: { city: string; units: number }) {
+  if (condominium.city && condominium.units > 0) {
+    return `${condominium.city} · ${condominium.units} unidades`;
+  }
+
+  if (condominium.city) {
+    return condominium.city;
+  }
+
+  if (condominium.units > 0) {
+    return `${condominium.units} unidades`;
+  }
+
+  return 'Condominio disponible';
+}
+
 onMounted(() => {
   void loadAuthMenu(session.accessToken);
+  window.addEventListener('condominiums:changed', handleCondominiumsChanged);
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener('condominiums:changed', handleCondominiumsChanged);
+});
+
+watch(
+  () => session.accessToken,
+  (token) => {
+    if (token) {
+      void loadCondominiumOptions();
+    }
+  },
+  { immediate: true },
+);
+
+async function loadCondominiumOptions() {
+  if (!session.accessToken) {
+    return;
+  }
+
+  isLoadingCondominiums.value = true;
+  condominiumsLoadError.value = '';
+
+  try {
+    const condominiums = await fetchCondominiumOptions(session.accessToken);
+    session.setAvailableCondominiums(condominiums.map(mapCondominiumOption));
+  } catch (error) {
+    condominiumsLoadError.value = error instanceof Error ? error.message : 'Intenta nuevamente.';
+  } finally {
+    isLoadingCondominiums.value = false;
+  }
+}
+
+function handleCondominiumsChanged() {
+  void loadCondominiumOptions();
+}
 
 function toggleLeftDrawer() {
   if ($q.screen.lt.md) {
@@ -904,34 +967,6 @@ function handleSignOut() {
   overflow: hidden;
 }
 
-.toolbar-condo-menu__header {
-  display: grid;
-  gap: 3px;
-  padding-bottom: 12px;
-  padding-top: 12px;
-}
-
-.toolbar-condo-menu__eyebrow {
-  color: var(--app-primary);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.toolbar-condo-menu__title {
-  color: var(--app-text);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.toolbar-condo-menu__subtitle {
-  color: var(--app-text-muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
 .toolbar-condo-menu__list {
   display: grid;
   gap: 4px;
@@ -945,6 +980,15 @@ function handleSignOut() {
 
 .toolbar-condo-menu__item--active {
   background: rgba(37, 99, 235, 0.08);
+}
+
+.toolbar-condo-menu__state {
+  border-radius: 12px;
+  min-height: 62px;
+}
+
+.toolbar-condo-menu__state--error {
+  background: rgba(239, 68, 68, 0.05);
 }
 
 .toolbar-condo-menu__avatar {

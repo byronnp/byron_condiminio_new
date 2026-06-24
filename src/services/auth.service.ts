@@ -205,8 +205,10 @@ function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
     ...dataUserRecord,
     ...userRecord,
   };
-  const resolvedName: string = typeof user.name === 'string' && user.name.trim() ? user.name : fallbackEmail;
-  const resolvedEmail: string = typeof user.email === 'string' && user.email.trim() ? user.email : fallbackEmail;
+  const resolvedName: string =
+    typeof user.name === 'string' && user.name.trim() ? user.name : fallbackEmail;
+  const resolvedEmail: string =
+    typeof user.email === 'string' && user.email.trim() ? user.email : fallbackEmail;
   const roles = Array.isArray(user.roles)
     ? user.roles
     : Array.isArray(record.roles)
@@ -215,9 +217,7 @@ function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
         ? dataRecord.roles
         : [];
   const resolvedRole: string =
-    typeof user.role === 'string'
-      ? user.role
-      : (extractRoleFromRoles(roles) ?? 'admin');
+    typeof user.role === 'string' ? user.role : (extractRoleFromRoles(roles) ?? 'admin');
 
   return {
     name: resolvedName,

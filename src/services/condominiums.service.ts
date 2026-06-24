@@ -58,6 +58,11 @@ export interface CondominiumListItem {
   image: string;
 }
 
+export interface CondominiumOptionItem {
+  id: number;
+  name: string;
+}
+
 export interface CondominiumFeatureItem {
   id: number;
   code?: string | null;
@@ -233,6 +238,21 @@ function normalizeCondominiumListItem(item: unknown): CondominiumListItem | null
   };
 }
 
+function normalizeCondominiumOptionItem(item: unknown): CondominiumOptionItem | null {
+  if (!isRecord(item)) {
+    return null;
+  }
+
+  const id = toNumber(item.id ?? item.key);
+  const name = toText(item.name ?? item.value);
+
+  if (id === null || !name) {
+    return null;
+  }
+
+  return { id, name };
+}
+
 function normalizeCondominiumDetail(payload: unknown): CondominiumDetail | null {
   const record = extractFirstRecord(payload);
   if (!record) {
@@ -255,7 +275,8 @@ function normalizeCondominiumDetail(payload: unknown): CondominiumDetail | null 
     type: pickFirstText(typeRecord ?? record, ['name']) || pickFirstText(record, ['type']),
     description: pickFirstText(record, ['description']) || '',
     status: pickFirstText(record, ['status']) || 'Activo',
-    countryCode: pickFirstText(record, ['country_code']) || pickFirstText(countryRecord ?? record, ['code']),
+    countryCode:
+      pickFirstText(record, ['country_code']) || pickFirstText(countryRecord ?? record, ['code']),
     provinceId: toNumber(record.province_id),
     cityId: toNumber(record.city_id),
     direction: pickFirstText(record, ['direction', 'address']) || '',
@@ -266,7 +287,9 @@ function normalizeCondominiumDetail(payload: unknown): CondominiumDetail | null 
     towers: String(pickFirstNumber(record, ['towers_count', 'towers'])),
     houses: String(pickFirstNumber(record, ['houses_count', 'houses'])),
     characteristics: Array.isArray(record.features)
-      ? record.features.map(normalizeFeatureItem).filter((item): item is CondominiumFeatureItem => item !== null)
+      ? record.features
+          .map(normalizeFeatureItem)
+          .filter((item): item is CondominiumFeatureItem => item !== null)
       : [],
     logoUrl: pickFirstText(record, ['logo_url', 'logo_path']) || '',
   };
@@ -392,9 +415,7 @@ async function submitCondominiumRequest(
   if (!response.ok) {
     const responseData = isRecord(body?.data) ? body.data : null;
     const message =
-      (responseData &&
-        typeof responseData.message === 'string' &&
-        responseData.message) ||
+      (responseData && typeof responseData.message === 'string' && responseData.message) ||
       (typeof body?.message === 'string' && body.message) ||
       `No fue posible guardar el condominio (${response.status})`;
 
@@ -403,7 +424,8 @@ async function submitCondominiumRequest(
 
   return {
     success: body?.success !== false,
-    message: typeof body?.message === 'string' ? body.message : 'Condominio guardado correctamente.',
+    message:
+      typeof body?.message === 'string' ? body.message : 'Condominio guardado correctamente.',
     data: body?.data ?? null,
   };
 }
@@ -465,7 +487,8 @@ export async function deleteCondominium(
 
   return {
     success: body?.success !== false,
-    message: typeof body?.message === 'string' ? body.message : 'Condominio eliminado correctamente.',
+    message:
+      typeof body?.message === 'string' ? body.message : 'Condominio eliminado correctamente.',
     data: body?.data ?? null,
   };
 }
@@ -515,5 +538,40 @@ export async function fetchCondominiums(token: string | null): Promise<Condomini
   return items
     .map(normalizeCondominiumListItem)
     .filter((item): item is CondominiumListItem => item !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function fetchCondominiumOptions(
+  token: string | null,
+  search = '',
+): Promise<CondominiumOptionItem[]> {
+  const url = new URL('/api/condominiums/options', apiHost);
+  const normalizedSearch = search.trim();
+
+  if (normalizedSearch) {
+    url.searchParams.set('search', normalizedSearch);
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (handleUnauthorizedResponse(response, token)) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error(`No fue posible cargar las opciones de condominios (${response.status})`);
+  }
+
+  const payload = (await response.json()) as ApiListResponse;
+  const items = extractListItems(payload);
+
+  return items
+    .map(normalizeCondominiumOptionItem)
+    .filter((item): item is CondominiumOptionItem => item !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
 }

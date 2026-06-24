@@ -321,6 +321,24 @@ export const useSessionStore = defineStore('session', () => {
     persist();
   }
 
+  function setAvailableCondominiums(condominiums: CondoOption[]) {
+    const availableCondominiums = condominiums.filter((condo) => condo.active);
+    const availableIds = availableCondominiums.map((condo) => condo.id);
+    const currentCondoIsAvailable =
+      state.value.activeCondoId === null || availableIds.includes(state.value.activeCondoId);
+    const activeCondoId = currentCondoIsAvailable
+      ? state.value.activeCondoId
+      : (availableCondominiums[0]?.id ?? null);
+
+    state.value = {
+      ...state.value,
+      availableCondominiums,
+      allowedCondoIds: availableIds,
+      activeCondoId,
+    };
+    persist();
+  }
+
   function setActiveCondo(condoId: string) {
     const canUseCondo =
       allowedCondominiums.value.some((condo) => condo.id === condoId) ||
@@ -364,6 +382,7 @@ export const useSessionStore = defineStore('session', () => {
     signInDemo,
     signInFromApi,
     setMenuSections,
+    setAvailableCondominiums,
     setActiveCondo,
     signOut,
   };

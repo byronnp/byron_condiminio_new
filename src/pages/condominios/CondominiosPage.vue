@@ -403,6 +403,7 @@ async function confirmDeleteCondominium() {
     deleteConfirmOpen.value = false;
     pendingDeleteRow.value = null;
     await loadCondominiums();
+    window.dispatchEvent(new Event('condominiums:changed'));
   } catch (error) {
     loadError.value =
       error instanceof Error ? error.message : 'No fue posible eliminar el condominio.';

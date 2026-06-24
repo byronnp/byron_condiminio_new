@@ -1645,6 +1645,7 @@ async function submitCondominium() {
       });
       await router.push('/condominios');
     } else {
+      window.dispatchEvent(new Event('condominiums:changed'));
       createdDialogOpen.value = true;
     }
     return true;
