@@ -1,4 +1,5 @@
 import type { CondoOption, SessionUser, UserRole } from '@/stores/session.store';
+import { handleUnauthorizedResponse } from '@/services/auth-redirect';
 
 export interface LoginCredentials {
   email: string;
@@ -43,6 +44,8 @@ export interface AuthSessionPayload {
   allowedCondominiums: CondoOption[];
   activeCondoId: string | null;
 }
+
+type HydratedSession = Omit<AuthSessionPayload, 'accessToken' | 'refreshToken'>;
 
 const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
 
@@ -234,18 +237,26 @@ function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
   };
 }
 
-async function fetchCondominiumsForSenior(token: string | null) {
+async function fetchCondominiumsForSenior(token: string | null): Promise<CondoOption[] | null> {
   if (!token) {
     return [];
   }
 
   try {
-    const { response, data } = await requestJson<Record<string, unknown>>('/api/condominiums', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const { response, data, unauthorized } = await requestJson<Record<string, unknown>>(
+      '/api/condominiums',
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       },
-    });
+      token,
+    );
+
+    if (unauthorized) {
+      return null;
+    }
 
     if (!response.ok || !data) {
       return [];
@@ -269,7 +280,8 @@ async function parseJsonResponse<T>(response: Response): Promise<T | null> {
 async function requestJson<T>(
   path: string,
   init?: RequestInit,
-): Promise<{ response: Response; data: T | null }> {
+  accessToken?: string | null,
+): Promise<{ response: Response; data: T | null; unauthorized: boolean }> {
   const response = await fetch(buildApiUrl(path), {
     headers: {
       Accept: 'application/json',
@@ -278,9 +290,12 @@ async function requestJson<T>(
     ...init,
   });
 
+  const unauthorized = handleUnauthorizedResponse(response, accessToken ?? null);
+
   return {
     response,
     data: await parseJsonResponse<T>(response),
+    unauthorized,
   };
 }
 
@@ -288,18 +303,26 @@ async function hydrateUserSession(
   token: string | null,
   fallbackEmail: string,
   initialPayload: Partial<LoginResponseShape> | null,
-) {
+): Promise<HydratedSession | null> {
   const userFromPayload = resolveUser(initialPayload, fallbackEmail);
   const payloadCondominiums = extractCondominiums(userFromPayload.condominiums);
 
   if (token) {
     try {
-      const { response, data } = await requestJson<Record<string, unknown>>('/api/auth/me', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const { response, data, unauthorized } = await requestJson<Record<string, unknown>>(
+        '/api/auth/me',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+        token,
+      );
+
+      if (unauthorized) {
+        return null;
+      }
 
       if (response.ok && data && typeof data === 'object') {
         const meUser = resolveUser(data, fallbackEmail);
@@ -313,6 +336,9 @@ async function hydrateUserSession(
         );
         const seniorCondominiums =
           userRole === 'senior' ? await fetchCondominiumsForSenior(token) : [];
+        if (seniorCondominiums === null) {
+          return null;
+        }
         const allowedCondominiums = extractCondominiums(seniorCondominiums, meCondominiums);
 
         return {
@@ -374,6 +400,9 @@ export async function login(credentials: LoginCredentials): Promise<AuthSessionP
     extractToken(data?.data, ['refresh_token', 'refreshToken']);
 
   const session = await hydrateUserSession(accessToken, credentials.email.trim(), data);
+  if (!session) {
+    throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+  }
 
   return {
     ...session,

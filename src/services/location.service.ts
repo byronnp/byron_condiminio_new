@@ -1,3 +1,5 @@
+import { handleUnauthorizedResponse } from '@/services/auth-redirect';
+
 interface ApiListResponse {
   success?: unknown;
   message?: unknown;
@@ -95,6 +97,10 @@ async function requestLocationItems<T>(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+
+  if (handleUnauthorizedResponse(response, token)) {
+    return [];
+  }
 
   if (!response.ok) {
     throw new Error(`No fue posible cargar la ubicación (${response.status})`);

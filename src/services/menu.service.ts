@@ -3,6 +3,7 @@ import {
   type NavigationItem,
   type NavigationSection,
 } from '@/config/navigation';
+import { handleUnauthorizedResponse } from '@/services/auth-redirect';
 
 interface MenuResponsePayload {
   success?: unknown;
@@ -211,6 +212,10 @@ export async function fetchAuthMenu(accessToken: string | null) {
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
   });
+
+  if (handleUnauthorizedResponse(response, accessToken)) {
+    return [];
+  }
 
   if (!response.ok) {
     throw new Error(`No fue posible cargar el menú (${response.status})`);

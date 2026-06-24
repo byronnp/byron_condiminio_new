@@ -45,6 +45,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'condominios/:id/editar',
+        name: 'condominios-editar',
+        component: () => import('@/pages/condominios/EditarCondominioPage.vue'),
+        meta: {
+          title: 'Editar condominio',
+          subtitle: 'Actualización de información del condominio',
+        },
+      },
+      {
         path: 'administradores',
         name: 'administradores',
         component: () => import('@/pages/administradores/AdministradoresPage.vue'),

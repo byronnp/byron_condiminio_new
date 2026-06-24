@@ -6,6 +6,7 @@ This is a Quasar + Vue 3 + TypeScript SPA for multi-condominium administration.
 - `src/pages/`: full screens grouped by domain, e.g. `src/pages/condominios/`
 - `src/pages/[modulo]/components/`: module-only dialogs and local UI
 - `src/components/shared/`: reusable shells and UI primitives, including `AppListPageShell.vue`
+- `src/components/general/`: global alerts, confirmations, and reusable dialog surfaces used across modules
 - `src/layouts/`: `AuthLayout.vue` for public access and `MainLayout.vue` for authenticated views
 - `src/composables/`: reactive logic grouped by module
 - `src/services/`: API and data access
@@ -16,13 +17,13 @@ This is a Quasar + Vue 3 + TypeScript SPA for multi-condominium administration.
 List screens should follow the shared shell pattern: header, search, status filter, CTA, stats cards, table controls, table, and pagination.
 
 ## UI Design Guidelines
-Use the current `NuevoCondominioPage.vue` implementation as a reference for future form-heavy screens and new module screens.
+Use the current condominium wizard implementation as a reference for future form-heavy screens and new module screens.
 
 - Prefer a clean `page-shell` structure with a concise header, subtle actions, and clear section hierarchy.
 - New pages should use the full width provided by `MainLayout`: set the page shell to `width: 100%`, avoid local side padding, and use only top spacing such as `padding: 16px 0 0` on desktop and `padding: 12px 0 0` on mobile.
 - For multi-step forms, use compact custom steps with progressive connectors; avoid full-width progress bars when the step navigation already communicates progress.
 - Keep form content grouped by intent using light panels, subtle borders, moderate radii, and small icon-led headers.
-- Separate functional sections clearly, as in the condominium creation flow: base data, location, configuration, administrator, and review.
+- Separate functional sections clearly, as in the condominium wizard flow: base data, location, configuration, and review.
 - Use executive summary side panels only when they help the user review or validate a long workflow.
 - Preserve restrained spacing, dense Quasar controls, and low-contrast surfaces instead of decorative or marketing-style layouts.
 - On mobile, reduce visual noise: compact headers, one-column forms, horizontally scrollable step navigation when needed, and fewer always-visible actions.
@@ -72,3 +73,8 @@ Backend documentation: `http://localhost:8001/api/documentation`
   - provinces from `GET /api/countries/{country}/provinces`
   - cities from `GET /api/provinces/{province}/cities`
 - When saving the condominium, the location payload must use `country_code`, `province_id`, and `city_id`.
+- Creation and editing must reuse the shared condominium wizard component in `src/pages/condominios/components/`.
+- The administrator step appears only in creation; edit mode must not show or require administrator fields.
+- Quasar notifications used in this flow rely on the `Notify` plugin being enabled in `quasar.config.ts`.
+- Global confirmation and alert dialogs must come from `src/components/general/` instead of `window.confirm`, ad hoc banners, or duplicated modal code.
+- Use the general confirmation dialog for destructive actions such as deleting condominiums and similar cross-module operations.

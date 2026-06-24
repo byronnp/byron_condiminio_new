@@ -5,9 +5,9 @@
       show-if-above
       bordered
       dark
-      :width="292"
+      :width="280"
       :mini="isDrawerMini"
-      :mini-width="82"
+      :mini-width="76"
       class="main-layout__drawer text-white"
       :class="{ 'main-layout__drawer--mini': isDrawerMini }"
       :content-style="drawerContentStyle"
@@ -101,170 +101,179 @@
 
         <q-space />
 
-        <q-btn v-if="canSwitchCondominiumContext" flat no-caps class="toolbar-condo-switcher">
-          <div class="toolbar-condo-switcher__content">
-            <span class="toolbar-condo-switcher__eyebrow">Contexto</span>
-            <span class="toolbar-condo-switcher__name">{{ activeCondominiumName }}</span>
-            <span class="toolbar-condo-switcher__meta">
+        <div class="toolbar-actions">
+          <q-btn v-if="canSwitchCondominiumContext" flat no-caps class="toolbar-condo-switcher">
+            <div class="toolbar-condo-switcher__content">
+              <q-avatar size="28px" class="toolbar-condo-switcher__avatar">
+                <q-icon name="pin_drop" size="15px" />
+              </q-avatar>
+              <span class="toolbar-condo-switcher__name">{{ activeCondominiumName }}</span>
+            </div>
+            <q-icon name="expand_more" size="18px" class="toolbar-condo-switcher__chevron" />
+            <q-tooltip class="toolbar-condo-switcher__tooltip">
               {{ activeCondominiumMeta }}
-            </span>
-          </div>
-          <q-icon name="expand_more" size="18px" class="toolbar-condo-switcher__chevron" />
+            </q-tooltip>
 
-          <q-menu anchor="bottom right" self="top right" class="toolbar-condo-menu">
-            <q-card flat bordered class="toolbar-condo-menu__card">
-              <q-card-section class="toolbar-condo-menu__header">
-                <div class="toolbar-condo-menu__eyebrow">Contexto de trabajo</div>
-                <div class="toolbar-condo-menu__title">Cambiar condominio</div>
-                <div class="toolbar-condo-menu__subtitle">
-                  Selecciona el condominio activo para esta sesión.
-                </div>
-              </q-card-section>
+            <q-menu anchor="bottom right" self="top right" class="toolbar-condo-menu">
+              <q-card flat bordered class="toolbar-condo-menu__card">
+                <q-card-section class="toolbar-condo-menu__header">
+                  <div class="toolbar-condo-menu__eyebrow">Contexto de trabajo</div>
+                  <div class="toolbar-condo-menu__title">Cambiar condominio</div>
+                  <div class="toolbar-condo-menu__subtitle">
+                    Selecciona el condominio activo para esta sesión.
+                  </div>
+                </q-card-section>
 
-              <q-separator />
+                <q-separator />
 
-              <q-list class="toolbar-condo-menu__list">
-                <q-item
-                  clickable
-                  v-close-popup
-                  :active="session.activeCondoId === null"
-                  active-class="toolbar-condo-menu__item--active"
-                  class="toolbar-condo-menu__item"
-                  @click="setActiveCondoContext('__global__')"
-                >
+                <q-list class="toolbar-condo-menu__list">
+                  <q-item
+                    clickable
+                    v-close-popup
+                    :active="session.activeCondoId === null"
+                    active-class="toolbar-condo-menu__item--active"
+                    class="toolbar-condo-menu__item"
+                    @click="setActiveCondoContext('__global__')"
+                  >
+                    <q-item-section avatar>
+                      <q-avatar size="32px" class="toolbar-condo-menu__avatar">
+                        <q-icon name="public" size="16px" />
+                      </q-avatar>
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label class="toolbar-condo-menu__name">Vista global</q-item-label>
+                      <q-item-label caption>Todos los condominios</q-item-label>
+                    </q-item-section>
+                    <q-item-section side>
+                      <q-icon
+                        v-if="session.activeCondoId === null"
+                        name="check"
+                        size="16px"
+                        color="primary"
+                      />
+                    </q-item-section>
+                  </q-item>
+
+                  <q-item
+                    v-for="condo in session.condoOptions"
+                    :key="condo.id"
+                    clickable
+                    v-close-popup
+                    :active="session.activeCondoId === condo.id"
+                    active-class="toolbar-condo-menu__item--active"
+                    class="toolbar-condo-menu__item"
+                    @click="setActiveCondoContext(condo.id)"
+                  >
+                    <q-item-section avatar>
+                      <q-avatar
+                        size="32px"
+                        class="toolbar-condo-menu__avatar toolbar-condo-menu__avatar--condo"
+                      >
+                        <q-icon name="apartment" size="16px" />
+                      </q-avatar>
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label class="toolbar-condo-menu__name">{{ condo.name }}</q-item-label>
+                      <q-item-label caption>
+                        {{ condo.city }} · {{ condo.units }} unidades
+                      </q-item-label>
+                    </q-item-section>
+                    <q-item-section side>
+                      <q-icon
+                        v-if="session.activeCondoId === condo.id"
+                        name="check"
+                        size="16px"
+                        color="primary"
+                      />
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-card>
+            </q-menu>
+          </q-btn>
+
+          <q-chip v-else square class="toolbar-chip toolbar-chip--solid">
+            <q-icon name="pin_drop" size="16px" class="q-mr-xs" />
+            {{ activeCondominiumName }}
+          </q-chip>
+
+          <q-btn flat round dense class="toolbar-user" aria-label="Abrir menú de usuario">
+            <q-avatar size="34px" class="toolbar-user__avatar">
+              <span>{{ userInitials }}</span>
+            </q-avatar>
+
+            <q-menu
+              anchor="bottom right"
+              self="top right"
+              class="toolbar-user-menu"
+              content-class="toolbar-user-menu__popup"
+            >
+              <q-card flat bordered class="toolbar-user-menu__card">
+                <q-card-section class="toolbar-user-menu__header">
+                  <q-avatar size="44px" class="toolbar-user-menu__avatar">
+                    <span>{{ userInitials }}</span>
+                  </q-avatar>
+                  <div class="toolbar-user-menu__copy">
+                    <div class="toolbar-user-menu__name">{{ userDisplayName }}</div>
+                    <div class="toolbar-user-menu__role">{{ userRoleLabel }}</div>
+                    <div class="toolbar-user-menu__email">{{ session.user?.email }}</div>
+                  </div>
+                </q-card-section>
+
+                <q-separator />
+
+                <q-list class="toolbar-user-menu__list">
+                  <q-item
+                    clickable
+                    v-close-popup
+                    @click="handleSignOut"
+                    class="toolbar-user-menu__item"
+                  >
+                    <q-item-section avatar>
+                      <q-icon name="logout" color="negative" />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label class="toolbar-user-menu__logout">Cerrar sesión</q-item-label>
+                      <q-item-label caption>Cerrar la sesión activa</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-card>
+            </q-menu>
+          </q-btn>
+
+          <q-btn
+            flat
+            round
+            dense
+            icon="notifications_none"
+            aria-label="Notificaciones"
+            class="toolbar-action toolbar-action--notifications"
+          >
+            <q-badge color="negative" floating rounded>3</q-badge>
+          </q-btn>
+
+          <q-btn flat round dense icon="more_vert" aria-label="Más opciones" class="toolbar-more">
+            <q-menu
+              anchor="bottom right"
+              self="top right"
+              class="toolbar-more-menu"
+              content-class="toolbar-more-menu__popup"
+            >
+              <q-list class="toolbar-more-menu__list">
+                <q-item clickable v-close-popup>
                   <q-item-section avatar>
-                    <q-avatar size="32px" class="toolbar-condo-menu__avatar">
-                      <q-icon name="public" size="16px" />
-                    </q-avatar>
+                    <q-icon name="help_outline" />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label class="toolbar-condo-menu__name">Vista global</q-item-label>
-                    <q-item-label caption>Todos los condominios</q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-icon
-                      v-if="session.activeCondoId === null"
-                      name="check"
-                      size="16px"
-                      color="primary"
-                    />
-                  </q-item-section>
-                </q-item>
-
-                <q-item
-                  v-for="condo in session.condoOptions"
-                  :key="condo.id"
-                  clickable
-                  v-close-popup
-                  :active="session.activeCondoId === condo.id"
-                  active-class="toolbar-condo-menu__item--active"
-                  class="toolbar-condo-menu__item"
-                  @click="setActiveCondoContext(condo.id)"
-                >
-                  <q-item-section avatar>
-                    <q-avatar
-                      size="32px"
-                      class="toolbar-condo-menu__avatar toolbar-condo-menu__avatar--condo"
-                    >
-                      <q-icon name="apartment" size="16px" />
-                    </q-avatar>
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="toolbar-condo-menu__name">{{ condo.name }}</q-item-label>
-                    <q-item-label caption>
-                      {{ condo.city }} · {{ condo.units }} unidades
-                    </q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-icon
-                      v-if="session.activeCondoId === condo.id"
-                      name="check"
-                      size="16px"
-                      color="primary"
-                    />
+                    <q-item-label>Ayuda</q-item-label>
+                    <q-item-label caption>Documentación y soporte</q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
-            </q-card>
-          </q-menu>
-        </q-btn>
-
-        <q-chip v-else square class="toolbar-chip toolbar-chip--solid">
-          <q-icon name="pin_drop" size="16px" class="q-mr-xs" />
-          {{ activeCondominiumName }}
-        </q-chip>
-
-        <q-btn flat round dense icon="notifications_none" class="toolbar-action">
-          <q-badge color="negative" floating rounded>3</q-badge>
-        </q-btn>
-
-        <q-btn flat round dense icon="account_circle" class="toolbar-action">
-          <q-menu anchor="bottom right" self="top right">
-            <q-list style="min-width: 240px">
-              <q-item>
-                <q-item-section>
-                  <q-item-label class="text-weight-bold">{{ session.user?.name }}</q-item-label>
-                  <q-item-label caption>
-                    {{ session.isSenior ? 'Administrador senior' : 'Administrador de condominio' }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-              <q-separator />
-              <q-item clickable v-close-popup @click="handleSignOut">
-                <q-item-section avatar>
-                  <q-icon name="logout" />
-                </q-item-section>
-                <q-item-section>Cerrar sesión</q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-        </q-btn>
-
-        <q-btn
-          flat
-          round
-          dense
-          icon="more_vert"
-          aria-label="Más opciones"
-          class="toolbar-more"
-        >
-          <q-menu anchor="bottom right" self="top right" class="toolbar-more-menu">
-            <q-list class="toolbar-more-menu__list">
-              <q-item>
-                <q-item-section>
-                  <q-item-label class="text-weight-bold">{{ session.user?.name }}</q-item-label>
-                  <q-item-label caption>
-                    {{ session.isSenior ? 'Administrador senior' : 'Administrador de condominio' }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
-              <q-item clickable v-close-popup>
-                <q-item-section avatar>
-                  <q-icon name="notifications_none" />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>Notificaciones</q-item-label>
-                  <q-item-label caption>3 pendientes</q-item-label>
-                </q-item-section>
-                <q-item-section side>
-                  <q-badge color="negative" rounded>3</q-badge>
-                </q-item-section>
-              </q-item>
-
-              <q-separator />
-
-              <q-item clickable v-close-popup @click="handleSignOut">
-                <q-item-section avatar>
-                  <q-icon name="logout" />
-                </q-item-section>
-                <q-item-section>Cerrar sesión</q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-        </q-btn>
+            </q-menu>
+          </q-btn>
+        </div>
       </q-toolbar>
     </q-header>
 
@@ -358,6 +367,24 @@ const planProgress = computed(() =>
 const planProgressLabel = computed(() =>
   session.isSenior ? 'Acceso global' : 'Acceso restringido al condominio asignado',
 );
+const userDisplayName = computed(() => session.user?.name ?? 'Usuario');
+const userRoleLabel = computed(() =>
+  session.isSenior ? 'Administrador senior' : 'Administrador de condominio',
+);
+const userInitials = computed(() => {
+  const name = userDisplayName.value.trim();
+  if (!name) {
+    return 'U';
+  }
+
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+    .slice(0, 2);
+});
 
 onMounted(() => {
   void loadAuthMenu(session.accessToken);
@@ -395,7 +422,36 @@ function handleMenuItemClick(item: { to?: string }) {
 }
 
 function isMenuItemActive(item: { to?: string }) {
-  return typeof item.to === 'string' && route.path === item.to;
+  if (typeof item.to !== 'string') {
+    return false;
+  }
+
+  const targetPath = normalizeRoutePath(item.to);
+  const currentPath = normalizeRoutePath(route.path);
+
+  if (!targetPath || !currentPath) {
+    return false;
+  }
+
+  if (currentPath === targetPath) {
+    return true;
+  }
+
+  return currentPath.startsWith(`${targetPath}/`);
+}
+
+function normalizeRoutePath(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  if (!trimmed.startsWith('/')) {
+    return `/${trimmed.replace(/^\/+/, '')}`;
+  }
+
+  return trimmed.replace(/\/+$/, '') || '/';
 }
 
 function setActiveCondoContext(value: string) {
@@ -433,7 +489,7 @@ function handleSignOut() {
   align-items: center;
   display: flex;
   gap: 12px;
-  padding: 12px 12px 16px;
+  padding: 8px 10px 12px;
 }
 
 .main-layout__drawer--mini .drawer-brand {
@@ -447,9 +503,9 @@ function handleSignOut() {
   border-radius: 16px;
   color: #fff;
   display: inline-flex;
-  height: 44px;
+  height: 38px;
   justify-content: center;
-  width: 44px;
+  width: 38px;
 }
 
 .drawer-brand__copy {
@@ -457,19 +513,19 @@ function handleSignOut() {
 }
 
 .drawer-brand__title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .drawer-brand__subtitle {
   color: rgba(226, 232, 240, 0.72);
-  font-size: 12px;
+  font-size: 11px;
   margin-top: 2px;
 }
 
 .drawer-scroll {
-  height: calc(100vh - 314px);
+  height: calc(100vh - 268px);
 }
 
 .main-layout__drawer--mini .drawer-scroll {
@@ -482,15 +538,15 @@ function handleSignOut() {
 
 .drawer-section__label {
   color: rgba(148, 163, 184, 0.9);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
-  margin: 18px 10px 10px;
+  margin: 12px 10px 6px;
 }
 
 .drawer-nav {
   display: grid;
-  gap: 6px;
+  gap: 3px;
   padding: 0 4px;
 }
 
@@ -502,7 +558,7 @@ function handleSignOut() {
 .drawer-nav__item {
   border-radius: 14px;
   color: rgba(226, 232, 240, 0.84);
-  min-height: 46px;
+  min-height: 40px;
   padding: 0 12px;
 }
 
@@ -548,7 +604,7 @@ function handleSignOut() {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   color: #fff;
-  margin-top: 14px;
+  margin-top: 10px;
   overflow: hidden;
 }
 
@@ -575,13 +631,13 @@ function handleSignOut() {
 }
 
 .drawer-plan__title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
 .drawer-plan__subtitle {
   color: rgba(226, 232, 240, 0.7);
-  font-size: 12px;
+  font-size: 11px;
   margin-top: 2px;
 }
 
@@ -593,7 +649,7 @@ function handleSignOut() {
 
 .drawer-plan__metric {
   color: #fff;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -621,8 +677,16 @@ function handleSignOut() {
 
 .main-toolbar {
   gap: 12px;
-  min-height: 72px;
-  padding: 0 24px;
+  min-height: 68px;
+  padding: 0 18px;
+}
+
+.toolbar-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .main-toolbar__menu {
@@ -668,6 +732,113 @@ function handleSignOut() {
   border-color: transparent;
 }
 
+.toolbar-user {
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
+  color: var(--app-text);
+  display: inline-flex;
+  height: 38px;
+  order: 10;
+  justify-content: center;
+  min-height: 38px;
+  overflow: hidden;
+  padding: 2px;
+  text-align: left;
+  width: 38px;
+}
+
+.toolbar-user :deep(.q-btn__content) {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.toolbar-user__avatar {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.toolbar-user-menu__card {
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  border: 0;
+  min-width: 270px;
+  overflow: hidden;
+}
+
+.toolbar-user-menu__popup {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.toolbar-user-menu__header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.toolbar-user-menu__avatar {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.toolbar-user-menu__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toolbar-user-menu__name {
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.toolbar-user-menu__role {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toolbar-user-menu__email {
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-user-menu__list {
+  padding: 8px;
+}
+
+.toolbar-user-menu__item {
+  border-radius: 12px;
+  min-height: 50px;
+}
+
+.toolbar-user-menu__logout {
+  color: var(--app-text);
+  font-weight: 800;
+}
+
 .toolbar-condo-switcher {
   align-items: center;
   background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
@@ -676,54 +847,50 @@ function handleSignOut() {
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
   color: var(--app-text);
   display: inline-flex;
-  gap: 12px;
-  min-height: 48px;
-  padding: 7px 11px 7px 13px;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 10px;
   text-align: left;
-  width: 268px;
+  width: 184px;
 }
 
 .toolbar-condo-switcher :deep(.q-btn__content) {
   align-items: center;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: space-between;
   width: 100%;
 }
 
 .toolbar-condo-switcher__content {
-  display: grid;
+  align-items: center;
+  display: flex;
+  gap: 8px;
   min-width: 0;
 }
 
 .toolbar-condo-switcher__eyebrow {
-  color: var(--app-text-muted);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
-  text-transform: uppercase;
+  display: none;
+}
+
+.toolbar-condo-switcher__avatar {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--app-primary);
+  flex-shrink: 0;
 }
 
 .toolbar-condo-switcher__name {
   color: var(--app-text);
   font-size: 12px;
   font-weight: 800;
-  line-height: 1.15;
-  margin-top: 2px;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .toolbar-condo-switcher__meta {
-  color: var(--app-text-muted);
-  font-size: 10px;
-  line-height: 1.2;
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .toolbar-condo-switcher__chevron {
@@ -792,18 +959,30 @@ function handleSignOut() {
 .toolbar-action {
   color: var(--app-text);
   height: 38px;
+  order: 8;
   width: 38px;
+}
+
+.toolbar-action--notifications {
+  position: relative;
+  order: 7;
 }
 
 .toolbar-more {
   color: var(--app-text);
   display: none;
   height: 38px;
+  order: 9;
   width: 38px;
 }
 
 .toolbar-more-menu__list {
   min-width: 250px;
+}
+
+.toolbar-more-menu__popup {
+  border-radius: 22px;
+  overflow: hidden;
 }
 
 .page-fade-slide-enter-active,
@@ -825,7 +1004,7 @@ function handleSignOut() {
 
 @media (max-width: 1023px) {
   .main-toolbar {
-    gap: 10px;
+    gap: 8px;
     padding: 0 14px;
   }
 
@@ -833,8 +1012,13 @@ function handleSignOut() {
     flex: 1 1 160px;
   }
 
+  .toolbar-user {
+    width: 38px;
+    order: 10;
+  }
+
   .toolbar-condo-switcher {
-    width: 230px;
+    width: 176px;
   }
 }
 
@@ -870,9 +1054,23 @@ function handleSignOut() {
     order: 2;
   }
 
+  .toolbar-actions {
+    flex: 1 0 100%;
+    justify-content: flex-end;
+    order: 4;
+    width: 100%;
+  }
+
   .toolbar-title__greeting {
     font-size: 15px;
     line-height: 1.15;
+  }
+
+  .toolbar-user {
+    min-height: 38px;
+    order: 10;
+    padding: 2px;
+    width: 38px;
   }
 
   .toolbar-title__subtitle {
@@ -883,30 +1081,20 @@ function handleSignOut() {
     border-color: rgba(37, 99, 235, 0.14);
     border-radius: 13px;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-    flex: 1 0 100%;
-    min-height: 46px;
+    flex: 0 1 auto;
+    min-height: 44px;
     order: 5;
-    padding: 7px 10px 7px 12px;
-    width: 100%;
+    padding: 7px 10px;
+    width: min(100%, 220px);
   }
 
   .toolbar-condo-switcher :deep(.q-btn__content) {
     gap: 8px;
   }
 
-  .toolbar-condo-switcher__eyebrow {
-    font-size: 8px;
-    letter-spacing: 0.06em;
-  }
-
   .toolbar-condo-switcher__name {
     font-size: 12px;
     line-height: 1.2;
-  }
-
-  .toolbar-condo-switcher__meta {
-    font-size: 9px;
-    max-width: calc(100vw - 68px);
   }
 
   .toolbar-chip {
@@ -918,7 +1106,17 @@ function handleSignOut() {
   }
 
   .toolbar-action {
-    display: none;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.07);
+    display: inline-flex;
+    flex: 0 0 36px;
+    height: 36px;
+    order: 3;
+    width: 36px;
+  }
+
+  .toolbar-action--notifications {
+    order: 3;
   }
 
   .toolbar-more {
@@ -938,6 +1136,10 @@ function handleSignOut() {
   .toolbar-more-menu__list {
     min-width: min(270px, calc(100vw - 24px));
   }
+
+  .toolbar-more-menu__popup {
+    border-radius: 22px;
+  }
 }
 
 @media (max-width: 420px) {
@@ -947,10 +1149,6 @@ function handleSignOut() {
 
   .toolbar-title__greeting {
     font-size: 14px;
-  }
-
-  .toolbar-condo-switcher__meta {
-    display: none;
   }
 }
 </style>
