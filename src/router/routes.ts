@@ -72,6 +72,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'administradores/:id/editar',
+        name: 'administradores-editar',
+        component: () => import('@/pages/administradores/EditarAdministradorPage.vue'),
+        meta: {
+          title: 'Editar administrador',
+          subtitle: 'Actualización de información y alcance',
+        },
+      },
+      {
         path: 'unidades',
         name: 'unidades',
         component: () => import('@/pages/unidades/UnidadesPage.vue'),

@@ -1,5 +1,5 @@
 <template>
-  <AdministradorWizardForm mode="create" />
+  <AdministradorWizardForm mode="edit" />
 </template>
 
 <script setup lang="ts">
