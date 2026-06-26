@@ -7,16 +7,46 @@
           <p class="page-header__subtitle">{{ pageSubtitle }}</p>
         </div>
 
-        <q-btn flat no-caps label="Volver" icon="arrow_back" @click="goBack" />
+        <q-btn
+          flat
+          no-caps
+          label="Volver"
+          icon="arrow_back"
+          aria-label="Volver al listado de administradores"
+          @click="goBack"
+        />
       </header>
 
+      <q-banner v-if="initialLoadError" rounded class="initial-load-error" role="alert">
+        <template #avatar>
+          <q-icon name="error_outline" color="negative" />
+        </template>
+        <div class="initial-load-error__content">
+          <span>{{ initialLoadError }}</span>
+          <q-btn
+            flat
+            dense
+            no-caps
+            label="Reintentar"
+            :loading="isLoadingAdministrator"
+            @click="loadAdministratorForEdit"
+          />
+        </div>
+      </q-banner>
+
       <q-card flat bordered class="wizard-frame">
+        <q-inner-loading :showing="isLoadingAdministrator">
+          <q-spinner color="primary" size="34px" />
+        </q-inner-loading>
+
         <div class="wizard-steps">
           <template v-for="(step, index) in steps" :key="step.key">
             <button
               type="button"
               class="wizard-step"
               :aria-pressed="activeStep === step.key"
+              :aria-current="activeStep === step.key ? 'step' : undefined"
+              :aria-label="`Paso ${index + 1}: ${step.label}`"
               :class="{
                 'wizard-step--active': activeStep === step.key,
                 'wizard-step--done': stepIndex(step.key) < activeStepIndex,
@@ -280,7 +310,7 @@
                     </div>
 
                     <div class="review-grid q-mt-md">
-                      <q-banner v-if="submitError" rounded class="submit-error-banner">
+                      <q-banner v-if="submitError" rounded class="submit-error-banner" role="alert">
                         <template #avatar>
                           <q-icon name="error_outline" color="negative" />
                         </template>
@@ -347,7 +377,14 @@
             </transition>
 
             <div class="wizard-footer">
-              <q-btn flat no-caps label="Cancelar" class="footer-btn" @click="goBack" />
+              <q-btn
+                flat
+                no-caps
+                label="Cancelar"
+                class="footer-btn"
+                aria-label="Cancelar y volver al listado de administradores"
+                @click="goBack"
+              />
               <div class="wizard-footer__actions">
                 <q-btn
                   flat
@@ -355,7 +392,7 @@
                   label="Anterior"
                   icon="arrow_back"
                   class="footer-btn"
-                  :disable="activeStepIndex === 0"
+                  :disable="activeStepIndex === 0 || isLoadingAdministrator"
                   @click="previousStep"
                 />
                 <q-btn
@@ -366,7 +403,7 @@
                   :label="primaryActionLabel"
                   :icon="activeStep === 'review' ? 'check' : 'arrow_forward'"
                   :loading="isSubmitting"
-                  :disable="isSubmitting"
+                  :disable="isSubmitting || isLoadingAdministrator || Boolean(initialLoadError)"
                   @click="handlePrimaryAction"
                 />
               </div>
@@ -420,6 +457,17 @@
         </div>
       </q-card>
     </div>
+
+    <AdministradorCreatedDialog
+      v-if="!isEditMode"
+      v-model="createdDialogOpen"
+      :administrator-name="fullName || 'Nuevo administrador'"
+      :administrator-email="normalizedEmail || 'correo registrado'"
+      :administrator-type="administratorTypeLabel"
+      :administrator-scope="scopeLabel"
+      @create-another="prepareAnotherAdministrator"
+      @go-to-administrators="goBack"
+    />
   </q-page>
 </template>
 
@@ -430,7 +478,9 @@ import { useRoute, useRouter } from 'vue-router';
 
 import {
   createAdministrator,
+  fetchAdministratorById,
   updateAdministrator,
+  type AdministratorDetail,
   type SaveAdministratorPayload,
 } from '@/services/administrators.service';
 import {
@@ -438,6 +488,7 @@ import {
   type CondominiumOptionItem,
 } from '@/services/condominiums.service';
 import { useSessionStore } from '@/stores/session.store';
+import AdministradorCreatedDialog from './AdministradorCreatedDialog.vue';
 
 type StepKey = 'personal' | 'assignment' | 'review';
 type AdministratorType = 'senior' | 'condominium_admin';
@@ -480,6 +531,9 @@ const isLoadingCondominiums = ref(false);
 const condominiumsLoadError = ref('');
 const isSubmitting = ref(false);
 const submitError = ref('');
+const isLoadingAdministrator = ref(false);
+const initialLoadError = ref('');
+const createdDialogOpen = ref(false);
 
 const steps = [
   {
@@ -518,16 +572,7 @@ const administratorTypeOptions = [
   },
 ] as const;
 
-const form = ref<AdministratorForm>({
-  firstName: '',
-  lastName: '',
-  documentType: null,
-  documentNumber: '',
-  email: '',
-  phone: '',
-  type: null,
-  condominiumId: null,
-});
+const form = ref<AdministratorForm>(createEmptyAdministratorForm());
 
 const activeStepIndex = computed(() => steps.findIndex((step) => step.key === activeStep.value));
 const isEditMode = computed(() => props.mode === 'edit');
@@ -586,6 +631,9 @@ const documentSummary = computed(() => {
 
 onMounted(() => {
   void loadCondominiums();
+  if (isEditMode.value) {
+    void loadAdministratorForEdit();
+  }
 });
 
 function stepIndex(step: StepKey) {
@@ -682,14 +730,17 @@ async function submitAdministrator() {
     }
 
     window.dispatchEvent(new Event('administrators:changed'));
-    Notify.create({
-      type: 'positive',
-      message: isEditMode.value
-        ? result.message || 'Administrador actualizado correctamente.'
-        : result.message || 'Administrador creado. La invitación fue enviada por correo.',
-      position: 'top-right',
-    });
-    await router.push({ name: 'administradores' });
+
+    if (isEditMode.value) {
+      Notify.create({
+        type: 'positive',
+        message: result.message || 'Administrador actualizado correctamente.',
+        position: 'top-right',
+      });
+      await router.push({ name: 'administradores' });
+    } else {
+      createdDialogOpen.value = true;
+    }
   } catch (error) {
     const message =
       error instanceof Error
@@ -706,6 +757,60 @@ async function submitAdministrator() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+async function loadAdministratorForEdit() {
+  const id = administratorId.value;
+  if (!isEditMode.value) {
+    return;
+  }
+
+  if (id === null) {
+    initialLoadError.value = 'El identificador del administrador no es válido.';
+    return;
+  }
+
+  isLoadingAdministrator.value = true;
+  initialLoadError.value = '';
+
+  try {
+    const detail = await fetchAdministratorById(id, session.accessToken);
+    if (!detail) {
+      throw new Error('No se encontró la información del administrador.');
+    }
+
+    applyAdministratorDetail(detail);
+  } catch (error) {
+    initialLoadError.value =
+      error instanceof Error ? error.message : 'No fue posible cargar el administrador.';
+  } finally {
+    isLoadingAdministrator.value = false;
+  }
+}
+
+function applyAdministratorDetail(detail: AdministratorDetail) {
+  form.value = {
+    firstName: detail.firstName,
+    lastName: detail.lastName,
+    documentType: normalizeFormDocumentType(detail.documentType),
+    documentNumber: detail.documentNumber,
+    email: detail.email,
+    phone: detail.phone,
+    type: detail.type,
+    condominiumId: detail.type === 'condominium_admin' ? detail.condominiumId : null,
+  };
+}
+
+function normalizeFormDocumentType(value: string): DocumentType {
+  return value === 'cedula' ? 'cedula' : 'passport';
+}
+
+function prepareAnotherAdministrator() {
+  form.value = createEmptyAdministratorForm();
+  activeStep.value = 'personal';
+  submitError.value = '';
+  createdDialogOpen.value = false;
+  applyCondominiumFromQuery();
 }
 
 function isReviewPayloadReady() {
@@ -830,6 +935,19 @@ function documentNumberRule(value: unknown) {
 function goBack() {
   void router.push({ name: 'administradores' });
 }
+
+function createEmptyAdministratorForm(): AdministratorForm {
+  return {
+    firstName: '',
+    lastName: '',
+    documentType: null,
+    documentNumber: '',
+    email: '',
+    phone: '',
+    type: null,
+    condominiumId: null,
+  };
+}
 </script>
 
 <style scoped>
@@ -869,6 +987,7 @@ function goBack() {
 .wizard-frame {
   border-radius: 18px;
   overflow: hidden;
+  position: relative;
 }
 
 .wizard-steps {
@@ -1047,7 +1166,8 @@ function goBack() {
 .administrator-type:hover,
 .administrator-type:focus-visible {
   border-color: rgba(37, 99, 235, 0.35);
-  outline: none;
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+  outline-offset: 2px;
 }
 
 .administrator-type--selected {
@@ -1110,6 +1230,20 @@ function goBack() {
   font-size: 12px;
 }
 
+.initial-load-error {
+  background: rgba(254, 242, 242, 0.96);
+  border: 1px solid rgba(239, 68, 68, 0.14);
+  color: var(--app-text);
+}
+
+.initial-load-error__content {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  width: 100%;
+}
+
 .submit-error-banner {
   background: rgba(254, 242, 242, 0.96);
   border: 1px solid rgba(239, 68, 68, 0.14);
@@ -1169,6 +1303,7 @@ function goBack() {
 .summary-meta strong {
   color: var(--app-text);
   text-align: right;
+  word-break: break-word;
 }
 
 .invitation-confirmation {
@@ -1325,9 +1460,40 @@ function goBack() {
     padding: 14px;
   }
 
+  .step-panel,
+  .field-group,
+  .review-card,
+  .summary-card,
+  .summary-note {
+    border-radius: 14px;
+    padding: 14px;
+  }
+
   .form-grid,
   .administrator-type-grid {
     grid-template-columns: 1fr;
+  }
+
+  .administrator-type {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: auto;
+  }
+
+  .administrator-type__check {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  .review-card__list div,
+  .summary-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .review-card__list strong,
+  .summary-meta strong {
+    text-align: left;
   }
 
   .wizard-footer,

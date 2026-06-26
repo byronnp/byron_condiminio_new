@@ -68,6 +68,23 @@ Backend documentation: `http://localhost:8001/api/documentation`
 - Senior users can see all condominiums and switch context.
 - Condominium admins only see their assigned condominium.
 - Preserve the established list-page shell and visual rhythm when adding new list screens.
+- The administrators module must follow the visual and structural pattern established by the condominiums module.
+- Administrator list screens must use `AppListPageShell` with header, search, status filter, CTA, stats cards, table, actions, and pagination.
+- Administrator creation and editing must reuse `src/pages/administradores/components/AdministradorWizardForm.vue`.
+- Administrator forms must not include photo upload, username, temporary password, or manual credential generation. The backend API sends the email invitation.
+- Administrators can be either `senior` or `condominium_admin`.
+  - `senior` administrators have global scope and do not require `condominium_id`.
+  - `condominium_admin` administrators require a selected condominium and only access that condominium.
+- Administrator creation currently posts JSON to `POST /api/administrators`.
+- Administrator editing loads from `GET /api/administrators/{id}` and saves to `PUT /api/administrators/{id}`.
+- Administrator listing loads from `GET /api/administrators`.
+- Administrator list actions are integrated through the administrators service:
+  - resend invitation: `POST /api/administrators/{id}/resend-invitation`
+  - suspend: `POST /api/administrators/{id}/suspend`
+  - reactivate: `POST /api/administrators/{id}/reactivate`
+  - delete: `DELETE /api/administrators/{id}`
+- Keep administrator API access centralized in `src/services/administrators.service.ts`; adjust endpoint names there if backend documentation differs.
+- After administrator create, update, or list action, refresh the list from the backend instead of mutating table rows locally.
 - In `NuevoCondominioPage.vue`, the location step must load data from the backend instead of hardcoded lists:
   - countries from `GET /api/countries`
   - provinces from `GET /api/countries/{country}/provinces`

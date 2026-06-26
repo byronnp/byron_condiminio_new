@@ -44,6 +44,18 @@ export interface AdministratorListItem {
   initials: string;
 }
 
+export interface AdministratorDetail {
+  id: number;
+  firstName: string;
+  lastName: string;
+  documentType: string;
+  documentNumber: string;
+  email: string;
+  phone: string;
+  type: AdministratorType;
+  condominiumId: number | null;
+}
+
 const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
 
 function buildApiUrl(path: string) {
@@ -93,6 +105,25 @@ function buildFullName(record: Record<string, unknown>) {
   return [firstName, lastName].filter(Boolean).join(' ').trim();
 }
 
+function splitName(name: string) {
+  const parts = name
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 1) {
+    return {
+      firstName: parts[0] ?? '',
+      lastName: '',
+    };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(' '),
+    lastName: parts.at(-1) ?? '',
+  };
+}
+
 function buildInitials(name: string, email: string) {
   const source = name || email;
   const parts = source
@@ -118,7 +149,16 @@ function normalizeAdministratorType(record: Record<string, unknown>) {
   return 'Administrador de condominio' as const;
 }
 
+function normalizeAdministratorPayloadType(record: Record<string, unknown>): AdministratorType {
+  return normalizeAdministratorType(record) === 'Senior' ? 'senior' : 'condominium_admin';
+}
+
 function normalizeAdministratorStatus(record: Record<string, unknown>) {
+  const accessEnabled = record.is_access_enabled ?? record.isAccessEnabled ?? record.access_enabled;
+  if (accessEnabled === false) {
+    return 'Suspendido' as const;
+  }
+
   const rawStatus = pickFirstText(record, ['status', 'state'])
     .toLowerCase()
     .normalize('NFD')
@@ -174,6 +214,75 @@ function normalizeAdministratorListItem(item: unknown): AdministratorListItem | 
   };
 }
 
+function extractFirstRecord(payload: unknown) {
+  if (isRecord(payload) && isRecord(payload.data)) {
+    return payload.data;
+  }
+
+  if (isRecord(payload)) {
+    return payload;
+  }
+
+  return null;
+}
+
+function normalizeDocumentType(value: unknown) {
+  const numericValue = toNumber(value);
+  if (numericValue === 1) {
+    return 'cedula';
+  }
+
+  if (numericValue === 2) {
+    return 'passport';
+  }
+
+  const text = toText(value).toLowerCase();
+  return ['cedula', 'cédula', 'dni', 'id_card'].includes(text) ? 'cedula' : 'passport';
+}
+
+function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | null {
+  const record = extractFirstRecord(payload);
+  if (!record) {
+    return null;
+  }
+
+  const id = toNumber(record.id ?? record.user_id ?? record.administrator_id);
+  const directFirstName = pickFirstText(record, ['first_name', 'firstName', 'names']);
+  const directLastName = pickFirstText(record, ['last_name', 'lastName', 'surnames']);
+  const fallbackName = splitName(buildFullName(record));
+  const firstName = directFirstName || fallbackName.firstName;
+  const lastName = directLastName || fallbackName.lastName;
+  const email = pickFirstText(record, ['email', 'mail']);
+
+  if (id === null || !firstName || !email) {
+    return null;
+  }
+
+  const condominium = isRecord(record.condominium) ? record.condominium : null;
+  const condominiumId = toNumber(
+    record.condominium_id ?? record.condominiumId ?? record.condo_id ?? condominium?.id,
+  );
+
+  return {
+    id,
+    firstName,
+    lastName,
+    documentType: normalizeDocumentType(
+      record.document_type_id ?? record.documentTypeId ?? record.document_type ?? record.documentType,
+    ),
+    documentNumber: pickFirstText(record, [
+      'document_number',
+      'documentNumber',
+      'id_number',
+      'identification',
+    ]),
+    email,
+    phone: pickFirstText(record, ['phone', 'phone_number', 'mobile']),
+    type: normalizeAdministratorPayloadType(record),
+    condominiumId,
+  };
+}
+
 function extractListItems(payload: unknown): unknown[] {
   if (Array.isArray(payload)) {
     return payload;
@@ -203,16 +312,30 @@ function extractListItems(payload: unknown): unknown[] {
 }
 
 function buildAdministratorBody(payload: SaveAdministratorPayload) {
+  const condominiumIds =
+    payload.type === 'condominium_admin' && payload.condominiumId !== null
+      ? [payload.condominiumId]
+      : [];
+
   return {
+    name: [payload.firstName.trim(), payload.lastName.trim()].filter(Boolean).join(' '),
     first_name: payload.firstName.trim(),
     last_name: payload.lastName.trim(),
-    document_type: payload.documentType,
+    country: 'EC',
+    document_type_id: payload.documentType === 'cedula' ? 1 : 2,
     document_number: payload.documentNumber.trim(),
     email: payload.email.trim().toLowerCase(),
     phone: payload.phone.trim(),
-    type: payload.type,
-    condominium_id: payload.type === 'condominium_admin' ? payload.condominiumId : null,
+    is_access_enabled: false,
+    condominium_ids: condominiumIds,
   };
+}
+
+function buildAdministratorUpdateBody(payload: SaveAdministratorPayload) {
+  const updateBody = buildAdministratorBody(payload);
+  delete (updateBody as Partial<typeof updateBody>).condominium_ids;
+  delete (updateBody as Partial<typeof updateBody>).is_access_enabled;
+  return updateBody;
 }
 
 async function submitAdministratorRequest(
@@ -228,7 +351,9 @@ async function submitAdministratorRequest(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(buildAdministratorBody(payload)),
+    body: JSON.stringify(
+      method === 'POST' ? buildAdministratorBody(payload) : buildAdministratorUpdateBody(payload),
+    ),
   });
 
   if (handleUnauthorizedResponse(response, token)) {
@@ -258,6 +383,53 @@ async function submitAdministratorRequest(
     success: body?.success !== false,
     message:
       typeof body?.message === 'string' ? body.message : 'Administrador guardado correctamente.',
+    data: body?.data ?? null,
+  };
+}
+
+async function submitAdministratorActionRequest(
+  path: string,
+  method: 'POST' | 'PATCH' | 'DELETE',
+  token: string | null,
+  fallbackMessage: string,
+  requestBody?: Record<string, unknown>,
+): Promise<SaveAdministratorResult> {
+  const response = await fetch(buildApiUrl(path), {
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(requestBody ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...(requestBody ? { body: JSON.stringify(requestBody) } : {}),
+  });
+
+  if (handleUnauthorizedResponse(response, token)) {
+    return {
+      success: false,
+      message: 'Sesión expirada.',
+      data: null,
+    };
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const body = contentType.includes('application/json')
+    ? ((await response.json()) as ApiMutationResponse)
+    : null;
+
+  if (!response.ok) {
+    const responseData = isRecord(body?.data) ? body.data : null;
+    const message =
+      (responseData && typeof responseData.message === 'string' && responseData.message) ||
+      (typeof body?.message === 'string' && body.message) ||
+      `${fallbackMessage} (${response.status})`;
+
+    throw new Error(message);
+  }
+
+  return {
+    success: body?.success !== false,
+    message: typeof body?.message === 'string' ? body.message : fallbackMessage,
     data: body?.data ?? null,
   };
 }
@@ -304,4 +476,79 @@ export async function fetchAdministrators(token: string | null): Promise<Adminis
   return items
     .map(normalizeAdministratorListItem)
     .filter((item): item is AdministratorListItem => item !== null);
+}
+
+export async function fetchAdministratorById(
+  id: number,
+  token: string | null,
+): Promise<AdministratorDetail | null> {
+  const response = await fetch(buildApiUrl(`/api/administrators/${encodeURIComponent(String(id))}`), {
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (handleUnauthorizedResponse(response, token)) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`No fue posible cargar el administrador (${response.status})`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  return normalizeAdministratorDetail(payload);
+}
+
+export async function resendAdministratorInvitation(
+  id: number,
+  token: string | null,
+): Promise<SaveAdministratorResult> {
+  void id;
+  void token;
+  return Promise.reject(new Error('El contrato Swagger no expone una ruta para reenviar invitaciones.'));
+}
+
+async function updateAdministratorStatus(
+  id: number,
+  isAccessEnabled: boolean,
+  token: string | null,
+  fallbackMessage: string,
+): Promise<SaveAdministratorResult> {
+  return submitAdministratorActionRequest(
+    `/api/administrators/${encodeURIComponent(String(id))}/status`,
+    'PATCH',
+    token,
+    fallbackMessage,
+    {
+      is_access_enabled: isAccessEnabled,
+    },
+  );
+}
+
+export async function suspendAdministrator(
+  id: number,
+  token: string | null,
+): Promise<SaveAdministratorResult> {
+  return updateAdministratorStatus(id, false, token, 'Administrador suspendido correctamente.');
+}
+
+export async function reactivateAdministrator(
+  id: number,
+  token: string | null,
+): Promise<SaveAdministratorResult> {
+  return updateAdministratorStatus(id, true, token, 'Administrador reactivado correctamente.');
+}
+
+export async function deleteAdministrator(
+  id: number,
+  token: string | null,
+): Promise<SaveAdministratorResult> {
+  return submitAdministratorActionRequest(
+    `/api/administrators/${encodeURIComponent(String(id))}`,
+    'DELETE',
+    token,
+    'Administrador eliminado correctamente.',
+  );
 }

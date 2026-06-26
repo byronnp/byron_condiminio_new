@@ -13,6 +13,9 @@
       :sort-options="sortOptions"
       action-label="Nuevo administrador"
       action-icon="person_add"
+      :filters-label="filtersButtonLabel"
+      :filters-expanded="advancedFiltersOpen"
+      @filters-click="toggleAdvancedFilters"
       @cta-click="goToNewAdministrator"
     >
       <template #stats>
@@ -31,6 +34,86 @@
       </template>
 
       <template #table>
+        <div
+          v-if="advancedFiltersOpen"
+          class="advanced-filters q-mb-md"
+          role="region"
+          aria-label="Filtros avanzados de administradores"
+        >
+          <div class="advanced-filters__header">
+            <div>
+              <div class="advanced-filters__title">Filtros avanzados</div>
+              <div class="advanced-filters__hint">
+                Refina el listado por tipo de administrador y condominio asignado.
+              </div>
+            </div>
+
+            <q-btn
+              flat
+              dense
+              no-caps
+              icon="restart_alt"
+              label="Limpiar filtros"
+              :disable="!hasAdvancedFilters"
+              @click="clearAdvancedFilters"
+            />
+          </div>
+
+          <div class="advanced-filters__controls">
+            <q-select
+              v-model="typeFilter"
+              dense
+              outlined
+              emit-value
+              map-options
+              label="Tipo de administrador"
+              :options="typeFilterOptions"
+              class="advanced-filters__field"
+            >
+              <template #prepend>
+                <q-icon name="admin_panel_settings" />
+              </template>
+            </q-select>
+
+            <q-select
+              v-model="condominiumFilter"
+              dense
+              outlined
+              emit-value
+              map-options
+              use-input
+              input-debounce="150"
+              label="Condominio / alcance"
+              :options="filteredCondominiumFilterOptions"
+              class="advanced-filters__field"
+              @filter="filterCondominiumOptions"
+            >
+              <template #prepend>
+                <q-icon name="apartment" />
+              </template>
+              <template #no-option>
+                <q-item>
+                  <q-item-section class="text-grey">
+                    No hay condominios para filtrar
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
+          </div>
+
+          <div class="advanced-filters__summary">
+            <q-chip dense square color="primary" text-color="white" icon="filter_alt">
+              {{ filteredRows.length }} de {{ rows.length }} administradores
+            </q-chip>
+            <q-chip v-if="typeFilter !== 'Todos'" dense outline color="primary">
+              {{ typeFilter }}
+            </q-chip>
+            <q-chip v-if="condominiumFilter !== 'Todos'" dense outline color="primary">
+              {{ condominiumFilter }}
+            </q-chip>
+          </div>
+        </div>
+
         <q-banner v-if="loadError" rounded class="q-mb-md admin-error-banner">
           <template #avatar>
             <q-icon name="error_outline" color="negative" />
@@ -61,10 +144,10 @@
               <div class="empty-state__text">
                 {{
                   loadError
-                    ? 'Revisa la conexion con el backend e intenta nuevamente.'
+                    ? 'Revisa la conexión con el backend e intenta nuevamente.'
                     : hasActiveFilters
                       ? 'No encontramos resultados con los criterios seleccionados.'
-                      : 'Aun no se han registrado administradores en la plataforma.'
+                      : 'Aún no se han registrado administradores en la plataforma.'
                 }}
               </div>
             </div>
@@ -122,6 +205,7 @@
                 dense
                 icon="visibility"
                 class="table-icon"
+                :aria-label="`Ver detalle de ${props.row.name}`"
                 @click="showAdministratorDetail(props.row)"
               >
                 <q-tooltip>Ver detalle</q-tooltip>
@@ -132,11 +216,19 @@
                 dense
                 icon="edit"
                 class="table-icon"
+                :aria-label="`Editar ${props.row.name}`"
                 @click="handleEditAdministrator(props.row)"
               >
                 <q-tooltip>Editar</q-tooltip>
               </q-btn>
-              <q-btn flat round dense icon="more_horiz" class="table-icon">
+              <q-btn
+                flat
+                round
+                dense
+                icon="more_horiz"
+                class="table-icon"
+                :aria-label="`Más acciones para ${props.row.name}`"
+              >
                 <q-tooltip>Más acciones</q-tooltip>
                 <q-menu
                   anchor="bottom right"
@@ -272,6 +364,7 @@
       :title="confirmDialogTitle"
       :message="confirmDialogMessage"
       :confirm-label="confirmDialogLabel"
+      :loading="isProcessingAction"
       cancel-label="Cancelar"
       @confirm="confirmAdministratorAction"
       @cancel="clearPendingAction"
@@ -289,13 +382,18 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Notify } from 'quasar';
 import { useRouter } from 'vue-router';
 
 import AppAlertDialog from '@/components/general/AppAlertDialog.vue';
 import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import {
+  deleteAdministrator,
   fetchAdministrators,
+  reactivateAdministrator,
+  resendAdministratorInvitation,
+  suspendAdministrator,
   type AdministratorListItem,
 } from '@/services/administrators.service';
 import { useSessionStore } from '@/stores/session.store';
@@ -303,6 +401,7 @@ import { useSessionStore } from '@/stores/session.store';
 type AdminRow = AdministratorListItem;
 
 type SortOption = 'recent' | 'oldest' | 'name';
+type TypeFilter = 'Todos' | AdminRow['type'];
 type AdministratorAction = 'suspend' | 'reactivate' | 'delete';
 type DialogTone = 'primary' | 'positive' | 'negative' | 'warning';
 
@@ -310,6 +409,10 @@ const search = ref('');
 const router = useRouter();
 const session = useSessionStore();
 const statusFilter = ref<'Todos' | 'Activo' | 'Pendiente' | 'Suspendido'>('Todos');
+const typeFilter = ref<TypeFilter>('Todos');
+const condominiumFilter = ref('Todos');
+const condominiumFilterSearch = ref('');
+const advancedFiltersOpen = ref(false);
 const sortBy = ref<SortOption>('recent');
 const rowsPerPageOptions = [10, 20, 50] as const;
 const pagination = ref({
@@ -321,6 +424,7 @@ const loadError = ref('');
 const confirmDialogOpen = ref(false);
 const pendingAction = ref<AdministratorAction | null>(null);
 const pendingAdministrator = ref<AdminRow | null>(null);
+const isProcessingAction = ref(false);
 const alertDialogOpen = ref(false);
 const alertDialog = ref<{
   tone: DialogTone;
@@ -380,7 +484,7 @@ const statsCards = computed(() => {
     {
       label: 'Invitaciones pendientes',
       value: String(pending),
-      hint: 'Por completar activacion',
+      hint: 'Por completar activación',
       icon: 'schedule',
     },
   ].map((card, index) => ({
@@ -396,17 +500,70 @@ const statusOptions = [
   { label: 'Suspendidos', value: 'Suspendido' },
 ];
 
+const typeFilterOptions = [
+  { label: 'Tipo: Todos', value: 'Todos' },
+  { label: 'Senior', value: 'Senior' },
+  { label: 'Administrador de condominio', value: 'Administrador de condominio' },
+] as const;
+
 const sortOptions = [
-  { label: 'Mas recientes', value: 'recent' },
-  { label: 'Mas antiguos', value: 'oldest' },
+  { label: 'Más recientes', value: 'recent' },
+  { label: 'Más antiguos', value: 'oldest' },
   { label: 'Nombre A-Z', value: 'name' },
 ] as const;
+
+const condominiumFilterOptions = computed(() => {
+  const scopes = rows.value
+    .filter((row) => row.type === 'Administrador de condominio')
+    .map((row) => row.scope.trim())
+    .filter((scope) => scope && scope !== 'Sin condominio asignado');
+  const uniqueScopes = Array.from(new Set(scopes)).sort((a, b) => a.localeCompare(b));
+
+  return [
+    { label: 'Condominio: Todos', value: 'Todos' },
+    ...uniqueScopes.map((scope) => ({
+      label: scope,
+      value: scope,
+    })),
+  ];
+});
+
+const filteredCondominiumFilterOptions = computed(() => {
+  const query = condominiumFilterSearch.value.trim().toLowerCase();
+  if (!query) {
+    return condominiumFilterOptions.value;
+  }
+
+  return condominiumFilterOptions.value.filter((option) =>
+    option.label.toLowerCase().includes(query),
+  );
+});
+
+const hasAdvancedFilters = computed(
+  () => typeFilter.value !== 'Todos' || condominiumFilter.value !== 'Todos',
+);
+
+const activeFiltersCount = computed(() => {
+  let count = 0;
+  if (search.value.trim()) count += 1;
+  if (statusFilter.value !== 'Todos') count += 1;
+  if (typeFilter.value !== 'Todos') count += 1;
+  if (condominiumFilter.value !== 'Todos') count += 1;
+  return count;
+});
+
+const filtersButtonLabel = computed(() =>
+  activeFiltersCount.value > 0 ? `Filtros (${activeFiltersCount.value})` : 'Filtros',
+);
 
 const filteredRows = computed(() => {
   const query = search.value.trim().toLowerCase();
 
   return rows.value.filter((row) => {
     const matchesStatus = statusFilter.value === 'Todos' || row.status === statusFilter.value;
+    const matchesType = typeFilter.value === 'Todos' || row.type === typeFilter.value;
+    const matchesCondominium =
+      condominiumFilter.value === 'Todos' || row.scope === condominiumFilter.value;
     const matchesQuery =
       !query ||
       row.name.toLowerCase().includes(query) ||
@@ -414,12 +571,16 @@ const filteredRows = computed(() => {
       row.type.toLowerCase().includes(query) ||
       row.scope.toLowerCase().includes(query);
 
-    return matchesStatus && matchesQuery;
+    return matchesStatus && matchesType && matchesCondominium && matchesQuery;
   });
 });
 
 const hasActiveFilters = computed(
-  () => search.value.trim().length > 0 || statusFilter.value !== 'Todos',
+  () =>
+    search.value.trim().length > 0 ||
+    statusFilter.value !== 'Todos' ||
+    typeFilter.value !== 'Todos' ||
+    condominiumFilter.value !== 'Todos',
 );
 
 const confirmDialogTitle = computed(() => {
@@ -497,6 +658,26 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => [search.value, statusFilter.value, typeFilter.value, condominiumFilter.value] as const,
+  () => {
+    pagination.value.page = 1;
+  },
+);
+
+watch(
+  condominiumFilterOptions,
+  (options) => {
+    if (
+      condominiumFilter.value !== 'Todos' &&
+      !options.some((option) => option.value === condominiumFilter.value)
+    ) {
+      condominiumFilter.value = 'Todos';
+    }
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
   void loadAdministrators();
   window.addEventListener('administrators:changed', handleAdministratorsChanged);
@@ -523,6 +704,22 @@ async function loadAdministrators() {
 
 function handleAdministratorsChanged() {
   void loadAdministrators();
+}
+
+function toggleAdvancedFilters() {
+  advancedFiltersOpen.value = !advancedFiltersOpen.value;
+}
+
+function clearAdvancedFilters() {
+  typeFilter.value = 'Todos';
+  condominiumFilter.value = 'Todos';
+  condominiumFilterSearch.value = '';
+}
+
+function filterCondominiumOptions(value: string, update: (callback: () => void) => void) {
+  update(() => {
+    condominiumFilterSearch.value = value;
+  });
 }
 
 function statusTone(status: AdminRow['status']) {
@@ -561,13 +758,32 @@ function handleEditAdministrator(row: AdminRow) {
   });
 }
 
-function resendInvitation(row: AdminRow) {
-  openAlert({
-    tone: 'positive',
-    icon: 'mark_email_read',
-    title: 'Invitación reenviada',
-    message: `Se preparó una nueva invitación para ${row.email}. La integración con el envío real se conectará mediante el servicio de administradores.`,
-  });
+async function resendInvitation(row: AdminRow) {
+  if (isProcessingAction.value) {
+    return;
+  }
+
+  isProcessingAction.value = true;
+
+  try {
+    const result = await resendAdministratorInvitation(row.id, session.accessToken);
+    Notify.create({
+      type: 'positive',
+      message: result.message || `Invitación reenviada a ${row.email}.`,
+      position: 'top-right',
+    });
+    await loadAdministrators();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'No fue posible reenviar la invitación.';
+    Notify.create({
+      type: 'negative',
+      message,
+      position: 'top-right',
+    });
+  } finally {
+    isProcessingAction.value = false;
+  }
 }
 
 function requestAdministratorAction(action: AdministratorAction, row: AdminRow) {
@@ -576,7 +792,7 @@ function requestAdministratorAction(action: AdministratorAction, row: AdminRow) 
   confirmDialogOpen.value = true;
 }
 
-function confirmAdministratorAction() {
+async function confirmAdministratorAction() {
   const action = pendingAction.value;
   const administrator = pendingAdministrator.value;
 
@@ -586,40 +802,68 @@ function confirmAdministratorAction() {
     return;
   }
 
-  if (action === 'delete') {
-    const index = rows.value.findIndex((row) => row.id === administrator.id);
-    if (index >= 0) {
-      rows.value.splice(index, 1);
-    }
-
-    showActionResult(
-      'Administrador eliminado',
-      `${administrator.name} fue eliminado del listado local.`,
-      'delete_sweep',
-    );
-  } else {
-    administrator.status = action === 'suspend' ? 'Suspendido' : 'Activo';
-    showActionResult(
-      action === 'suspend' ? 'Acceso suspendido' : 'Acceso reactivado',
-      `${administrator.name} ahora se encuentra ${administrator.status.toLowerCase()}.`,
-      action === 'suspend' ? 'person_off' : 'how_to_reg',
-    );
+  if (isProcessingAction.value) {
+    return;
   }
 
-  confirmDialogOpen.value = false;
-  clearPendingAction();
+  isProcessingAction.value = true;
+
+  try {
+    const result = await executeAdministratorAction(action, administrator);
+    Notify.create({
+      type: 'positive',
+      message: result.message || buildActionSuccessMessage(action, administrator),
+      position: 'top-right',
+    });
+    confirmDialogOpen.value = false;
+    await loadAdministrators();
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'No fue posible completar la acción sobre el administrador.';
+    Notify.create({
+      type: 'negative',
+      message,
+      position: 'top-right',
+    });
+  } finally {
+    isProcessingAction.value = false;
+    if (!confirmDialogOpen.value) {
+      clearPendingAction();
+    }
+  }
 }
 
-function showActionResult(title: string, message: string, icon: string) {
-  openAlert({
-    tone: 'positive',
-    icon,
-    title,
-    message,
-  });
+function executeAdministratorAction(action: AdministratorAction, administrator: AdminRow) {
+  if (action === 'delete') {
+    return deleteAdministrator(administrator.id, session.accessToken);
+  }
+
+  if (action === 'suspend') {
+    return suspendAdministrator(administrator.id, session.accessToken);
+  }
+
+  return reactivateAdministrator(administrator.id, session.accessToken);
+}
+
+function buildActionSuccessMessage(action: AdministratorAction, administrator: AdminRow) {
+  if (action === 'delete') {
+    return `${administrator.name} fue eliminado correctamente.`;
+  }
+
+  if (action === 'suspend') {
+    return `${administrator.name} fue suspendido correctamente.`;
+  }
+
+  return `${administrator.name} fue reactivado correctamente.`;
 }
 
 function clearPendingAction() {
+  if (isProcessingAction.value) {
+    return;
+  }
+
   pendingAction.value = null;
   pendingAdministrator.value = null;
 }
@@ -676,6 +920,18 @@ function clearPendingAction() {
   border-radius: 16px;
 }
 
+.list-table {
+  max-width: 100%;
+}
+
+.list-table :deep(.q-table__middle) {
+  overflow-x: auto;
+}
+
+.list-table :deep(table) {
+  min-width: 760px;
+}
+
 .list-table :deep(thead tr th) {
   color: #334155;
   font-size: 12px;
@@ -698,6 +954,52 @@ function clearPendingAction() {
   background: rgba(254, 242, 242, 0.96);
   border: 1px solid rgba(239, 68, 68, 0.14);
   color: var(--app-text);
+}
+
+.advanced-filters {
+  background: rgba(248, 250, 252, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 16px;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.advanced-filters__header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.advanced-filters__title {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.advanced-filters__hint {
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+.advanced-filters__controls {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.advanced-filters__field {
+  min-width: 0;
+}
+
+.advanced-filters__summary {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .empty-state {
@@ -871,5 +1173,15 @@ function clearPendingAction() {
 .table-footer__pagination :deep(.q-btn--active) {
   background: var(--app-primary);
   color: #fff;
+}
+
+@media (max-width: 767px) {
+  .advanced-filters__header {
+    flex-direction: column;
+  }
+
+  .advanced-filters__controls {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

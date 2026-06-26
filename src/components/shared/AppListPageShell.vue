@@ -35,6 +35,8 @@
           no-caps
           :icon="filtersIcon"
           :label="filtersLabel"
+          :aria-label="filtersLabel"
+          :aria-expanded="filtersExpanded"
           class="header-action"
           @click="emit('filters-click')"
         />
@@ -119,11 +121,13 @@ const props = withDefaults(
     actionIcon: string;
     filtersLabel?: string;
     filtersIcon?: string;
+    filtersExpanded?: boolean;
   }>(),
   {
     rowsPerPageOptions: () => [10, 20, 50],
     filtersLabel: 'Filtros',
     filtersIcon: 'filter_alt',
+    filtersExpanded: false,
   },
 );
 
