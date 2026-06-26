@@ -75,14 +75,15 @@ Backend documentation: `http://localhost:8001/api/documentation`
 - Administrators can be either `senior` or `condominium_admin`.
   - `senior` administrators have global scope and do not require `condominium_id`.
   - `condominium_admin` administrators require a selected condominium and only access that condominium.
-- Administrator creation currently posts JSON to `POST /api/administrators`.
+- Administrator creation posts JSON to `POST /api/administrators`.
+  - Use `country`, `document_type_id`, `document_number`, `email`, and `condominium_ids`.
+  - Use `condominium_ids: []` for senior administrators and `condominium_ids: [id]` for condominium administrators.
 - Administrator editing loads from `GET /api/administrators/{id}` and saves to `PUT /api/administrators/{id}`.
 - Administrator listing loads from `GET /api/administrators`.
 - Administrator list actions are integrated through the administrators service:
-  - resend invitation: `POST /api/administrators/{id}/resend-invitation`
-  - suspend: `POST /api/administrators/{id}/suspend`
-  - reactivate: `POST /api/administrators/{id}/reactivate`
+  - suspend/reactivate: `PATCH /api/administrators/{id}/status` with `is_access_enabled`
   - delete: `DELETE /api/administrators/{id}`
+- Swagger currently does not expose a resend-invitation endpoint for administrators; do not show that action unless the backend adds a documented route.
 - Keep administrator API access centralized in `src/services/administrators.service.ts`; adjust endpoint names there if backend documentation differs.
 - After administrator create, update, or list action, refresh the list from the backend instead of mutating table rows locally.
 - In `NuevoCondominioPage.vue`, the location step must load data from the backend instead of hardcoded lists:

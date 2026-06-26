@@ -239,28 +239,6 @@
                   <q-card flat bordered class="table-actions-menu__card">
                     <q-list class="table-actions-menu__list">
                       <q-item
-                        v-if="props.row.status === 'Pendiente'"
-                        v-close-popup
-                        clickable
-                        class="table-actions-menu__item"
-                        @click="resendInvitation(props.row)"
-                      >
-                        <q-item-section avatar>
-                          <q-avatar size="32px" class="table-actions-menu__avatar">
-                            <q-icon name="forward_to_inbox" size="16px" />
-                          </q-avatar>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label class="table-actions-menu__name">
-                            Reenviar invitación
-                          </q-item-label>
-                          <q-item-label caption>
-                            Enviar nuevamente el acceso al correo
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
-
-                      <q-item
                         v-if="props.row.status === 'Activo'"
                         v-close-popup
                         clickable
@@ -392,7 +370,6 @@ import {
   deleteAdministrator,
   fetchAdministrators,
   reactivateAdministrator,
-  resendAdministratorInvitation,
   suspendAdministrator,
   type AdministratorListItem,
 } from '@/services/administrators.service';
@@ -756,34 +733,6 @@ function handleEditAdministrator(row: AdminRow) {
       id: String(row.id),
     },
   });
-}
-
-async function resendInvitation(row: AdminRow) {
-  if (isProcessingAction.value) {
-    return;
-  }
-
-  isProcessingAction.value = true;
-
-  try {
-    const result = await resendAdministratorInvitation(row.id, session.accessToken);
-    Notify.create({
-      type: 'positive',
-      message: result.message || `Invitación reenviada a ${row.email}.`,
-      position: 'top-right',
-    });
-    await loadAdministrators();
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'No fue posible reenviar la invitación.';
-    Notify.create({
-      type: 'negative',
-      message,
-      position: 'top-right',
-    });
-  } finally {
-    isProcessingAction.value = false;
-  }
 }
 
 function requestAdministratorAction(action: AdministratorAction, row: AdminRow) {
