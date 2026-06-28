@@ -20,7 +20,7 @@ export type AdministratorStatus = 'pending' | 'active' | 'suspended';
 export interface SaveAdministratorPayload {
   firstName: string;
   lastName: string;
-  documentType: string;
+  documentTypeId: number;
   documentNumber: string;
   email: string;
   phone: string;
@@ -48,7 +48,7 @@ export interface AdministratorDetail {
   id: number;
   firstName: string;
   lastName: string;
-  documentType: string;
+  documentTypeId: number | null;
   documentNumber: string;
   email: string;
   phone: string;
@@ -226,20 +226,6 @@ function extractFirstRecord(payload: unknown) {
   return null;
 }
 
-function normalizeDocumentType(value: unknown) {
-  const numericValue = toNumber(value);
-  if (numericValue === 1) {
-    return 'cedula';
-  }
-
-  if (numericValue === 2) {
-    return 'passport';
-  }
-
-  const text = toText(value).toLowerCase();
-  return ['cedula', 'cédula', 'dni', 'id_card'].includes(text) ? 'cedula' : 'passport';
-}
-
 function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | null {
   const record = extractFirstRecord(payload);
   if (!record) {
@@ -267,7 +253,7 @@ function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | n
     id,
     firstName,
     lastName,
-    documentType: normalizeDocumentType(
+    documentTypeId: toNumber(
       record.document_type_id ?? record.documentTypeId ?? record.document_type ?? record.documentType,
     ),
     documentNumber: pickFirstText(record, [
@@ -322,7 +308,7 @@ function buildAdministratorBody(payload: SaveAdministratorPayload) {
     first_name: payload.firstName.trim(),
     last_name: payload.lastName.trim(),
     country: 'EC',
-    document_type_id: payload.documentType === 'cedula' ? 1 : 2,
+    document_type_id: payload.documentTypeId,
     document_number: payload.documentNumber.trim(),
     email: payload.email.trim().toLowerCase(),
     phone: payload.phone.trim(),

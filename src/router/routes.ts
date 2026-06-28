@@ -1,4 +1,4 @@
-import type { RouteRecordRaw } from 'vue-router';
+﻿import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -32,7 +32,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/condominios/CondominiosPage.vue'),
         meta: {
           title: 'Condominios',
-          subtitle: 'Gestión general de condominios',
+          subtitle: 'GestiÃ³n general de condominios',
         },
       },
       {
@@ -41,7 +41,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/condominios/NuevoCondominioPage.vue'),
         meta: {
           title: 'Nuevo condominio',
-          subtitle: 'Registro y configuración inicial del condominio',
+          subtitle: 'Registro y configuraciÃ³n inicial del condominio',
         },
       },
       {
@@ -50,34 +50,34 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/condominios/EditarCondominioPage.vue'),
         meta: {
           title: 'Editar condominio',
-          subtitle: 'Actualización de información del condominio',
+          subtitle: 'ActualizaciÃ³n de informaciÃ³n del condominio',
         },
       },
       {
-        path: 'administradores',
-        name: 'administradores',
-        component: () => import('@/pages/administradores/AdministradoresPage.vue'),
+        path: 'usuarios',
+        name: 'usuarios',
+        component: () => import('@/pages/usuarios/UsuariosPage.vue'),
         meta: {
-          title: 'Administradores',
-          subtitle: 'Administración de usuarios senior',
+          title: 'Usuarios',
+          subtitle: 'Administración unificada de usuarios del sistema',
         },
       },
       {
-        path: 'administradores/nuevo',
-        name: 'administradores-nuevo',
-        component: () => import('@/pages/administradores/NuevoAdministradorPage.vue'),
+        path: 'usuarios/nuevo',
+        name: 'usuarios-nuevo',
+        component: () => import('@/pages/usuarios/NuevoUsuarioPage.vue'),
         meta: {
-          title: 'Nuevo administrador',
-          subtitle: 'Registro y permisos de acceso',
+          title: 'Nuevo usuario',
+          subtitle: 'Registro, rol, permisos y alcance',
         },
       },
       {
-        path: 'administradores/:id/editar',
-        name: 'administradores-editar',
-        component: () => import('@/pages/administradores/EditarAdministradorPage.vue'),
+        path: 'usuarios/:id/editar',
+        name: 'usuarios-editar',
+        component: () => import('@/pages/usuarios/EditarUsuarioPage.vue'),
         meta: {
-          title: 'Editar administrador',
-          subtitle: 'Actualización de información y alcance',
+          title: 'Editar usuario',
+          subtitle: 'Actualización de información, rol y permisos',
         },
       },
       {
@@ -86,7 +86,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/unidades/UnidadesPage.vue'),
         meta: {
           title: 'Unidades',
-          subtitle: 'Gestión de unidades',
+          subtitle: 'GestiÃ³n de unidades',
           requiresCondoContext: true,
         },
       },
@@ -106,7 +106,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/propietarios/PropietariosPage.vue'),
         meta: {
           title: 'Propietarios',
-          subtitle: 'Administración de propietarios',
+          subtitle: 'AdministraciÃ³n de propietarios',
           requiresCondoContext: true,
         },
       },
@@ -126,7 +126,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/pagos/PagosPage.vue'),
         meta: {
           title: 'Pagos y cobros',
-          subtitle: 'Pagos, deudas y recaudación',
+          subtitle: 'Pagos, deudas y recaudaciÃ³n',
           requiresCondoContext: true,
         },
       },
@@ -146,7 +146,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/mantenimiento/MantenimientoPage.vue'),
         meta: {
           title: 'Mantenimientos',
-          subtitle: 'Órdenes y seguimiento',
+          subtitle: 'Ã“rdenes y seguimiento',
           requiresCondoContext: true,
         },
       },
@@ -176,7 +176,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/reportes/ReportesPage.vue'),
         meta: {
           title: 'Reportes',
-          subtitle: 'Indicadores y métricas',
+          subtitle: 'Indicadores y mÃ©tricas',
           requiresCondoContext: true,
         },
       },
@@ -185,8 +185,8 @@ const routes: RouteRecordRaw[] = [
         name: 'configuracion',
         component: () => import('@/pages/configuracion/ConfiguracionPage.vue'),
         meta: {
-          title: 'Configuración',
-          subtitle: 'Parámetros del sistema',
+          title: 'ConfiguraciÃ³n',
+          subtitle: 'ParÃ¡metros del sistema',
           requiresCondoContext: true,
         },
       },
@@ -199,3 +199,4 @@ const routes: RouteRecordRaw[] = [
 ];
 
 export default routes;
+

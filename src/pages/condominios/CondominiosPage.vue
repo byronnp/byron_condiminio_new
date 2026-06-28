@@ -446,7 +446,7 @@ function goToEditCondominium(row: CondoRow) {
 
 function goToNewAdministrator(row: CondoRow) {
   void router.push({
-    path: '/administradores/nuevo',
+    path: '/usuarios/nuevo',
     query: {
       condominioId: String(row.id),
       condominio: row.name,

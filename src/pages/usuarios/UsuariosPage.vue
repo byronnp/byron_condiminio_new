@@ -1,22 +1,22 @@
-<template>
-  <q-page class="administradores-page">
+﻿<template>
+  <q-page class="usuarios-page">
     <AppListPageShell
       v-model:search="search"
       v-model:status="statusFilter"
       v-model:rowsPerPage="pagination.rowsPerPage"
       v-model:sortBy="sortBy"
-      title="Administradores"
-      subtitle="Gestiona las cuentas senior, sus permisos y el alcance por condominio."
-      search-placeholder="Buscar administrador..."
+      title="Usuarios"
+      subtitle="Administra todos los usuarios del sistema según tus permisos."
+      search-placeholder="Buscar usuario..."
       :status-options="statusOptions"
       :rows-per-page-options="rowsPerPageOptions"
       :sort-options="sortOptions"
-      action-label="Nuevo administrador"
+      action-label="Nuevo usuario"
       action-icon="person_add"
       :filters-label="filtersButtonLabel"
       :filters-expanded="advancedFiltersOpen"
       @filters-click="toggleAdvancedFilters"
-      @cta-click="goToNewAdministrator"
+      @cta-click="goToNewUser"
     >
       <template #stats>
         <q-card v-for="card in statsCards" :key="card.label" flat bordered class="stat-card">
@@ -38,14 +38,12 @@
           v-if="advancedFiltersOpen"
           class="advanced-filters q-mb-md"
           role="region"
-          aria-label="Filtros avanzados de administradores"
+          aria-label="Filtros avanzados de usuarios"
         >
           <div class="advanced-filters__header">
             <div>
               <div class="advanced-filters__title">Filtros avanzados</div>
-              <div class="advanced-filters__hint">
-                Refina el listado por tipo de administrador y condominio asignado.
-              </div>
+              <div class="advanced-filters__hint">Refina el listado por rol y condominio.</div>
             </div>
 
             <q-btn
@@ -66,7 +64,7 @@
               outlined
               emit-value
               map-options
-              label="Tipo de administrador"
+              label="Rol"
               :options="typeFilterOptions"
               class="advanced-filters__field"
             >
@@ -76,6 +74,7 @@
             </q-select>
 
             <q-select
+              v-if="session.isSenior"
               v-model="condominiumFilter"
               dense
               outlined
@@ -83,7 +82,7 @@
               map-options
               use-input
               input-debounce="150"
-              label="Condominio / alcance"
+              label="Condominio"
               :options="filteredCondominiumFilterOptions"
               class="advanced-filters__field"
               @filter="filterCondominiumOptions"
@@ -103,7 +102,7 @@
 
           <div class="advanced-filters__summary">
             <q-chip dense square color="primary" text-color="white" icon="filter_alt">
-              {{ filteredRows.length }} de {{ rows.length }} administradores
+              {{ filteredRows.length }} de {{ rows.length }} usuarios
             </q-chip>
             <q-chip v-if="typeFilter !== 'Todos'" dense outline color="primary">
               {{ typeFilter }}
@@ -140,14 +139,14 @@
           <template #no-data>
             <div class="empty-state">
               <q-icon name="manage_accounts" size="36px" />
-              <div class="empty-state__title">No hay administradores para mostrar</div>
+              <div class="empty-state__title">No hay usuarios para mostrar</div>
               <div class="empty-state__text">
                 {{
                   loadError
                     ? 'Revisa la conexión con el backend e intenta nuevamente.'
                     : hasActiveFilters
                       ? 'No encontramos resultados con los criterios seleccionados.'
-                      : 'Aún no se han registrado administradores en la plataforma.'
+                      : 'Aún no se han registrado usuarios en la plataforma.'
                 }}
               </div>
             </div>
@@ -206,7 +205,7 @@
                 icon="visibility"
                 class="table-icon"
                 :aria-label="`Ver detalle de ${props.row.name}`"
-                @click="showAdministratorDetail(props.row)"
+                @click="showUserDetail(props.row)"
               >
                 <q-tooltip>Ver detalle</q-tooltip>
               </q-btn>
@@ -217,7 +216,7 @@
                 icon="edit"
                 class="table-icon"
                 :aria-label="`Editar ${props.row.name}`"
-                @click="handleEditAdministrator(props.row)"
+                @click="handleEditUser(props.row)"
               >
                 <q-tooltip>Editar</q-tooltip>
               </q-btn>
@@ -243,7 +242,7 @@
                         v-close-popup
                         clickable
                         class="table-actions-menu__item"
-                        @click="requestAdministratorAction('suspend', props.row)"
+                        @click="requestUserAction('suspend', props.row)"
                       >
                         <q-item-section avatar>
                           <q-avatar
@@ -266,7 +265,7 @@
                         v-close-popup
                         clickable
                         class="table-actions-menu__item"
-                        @click="requestAdministratorAction('reactivate', props.row)"
+                        @click="requestUserAction('reactivate', props.row)"
                       >
                         <q-item-section avatar>
                           <q-avatar
@@ -290,7 +289,7 @@
                         v-close-popup
                         clickable
                         class="table-actions-menu__item table-actions-menu__item--danger"
-                        @click="requestAdministratorAction('delete', props.row)"
+                        @click="requestUserAction('delete', props.row)"
                       >
                         <q-item-section avatar>
                           <q-avatar
@@ -304,7 +303,7 @@
                           <q-item-label
                             class="table-actions-menu__name table-actions-menu__name--danger"
                           >
-                            Eliminar administrador
+                            Eliminar usuario
                           </q-item-label>
                           <q-item-label caption>
                             Eliminar esta cuenta de forma permanente
@@ -344,7 +343,7 @@
       :confirm-label="confirmDialogLabel"
       :loading="isProcessingAction"
       cancel-label="Cancelar"
-      @confirm="confirmAdministratorAction"
+      @confirm="confirmUserAction"
       @cancel="clearPendingAction"
     />
 
@@ -418,9 +417,9 @@ const alertDialog = ref<{
 const rows = ref<AdminRow[]>([]);
 
 const columns = [
-  { name: 'admin', label: 'Administrador', field: 'name', align: 'left' as const },
-  { name: 'type', label: 'Tipo', field: 'type', align: 'left' as const },
-  { name: 'scope', label: 'Alcance', field: 'scope', align: 'left' as const },
+  { name: 'admin', label: 'Nombre', field: 'name', align: 'left' as const },
+  { name: 'type', label: 'Rol', field: 'type', align: 'left' as const },
+  { name: 'scope', label: 'Condominio', field: 'scope', align: 'left' as const },
   { name: 'status', label: 'Estado', field: 'status', align: 'center' as const },
   { name: 'actions', label: 'Acciones', field: 'actions', align: 'right' as const },
 ];
@@ -441,13 +440,13 @@ const statsCards = computed(() => {
 
   return [
     {
-      label: 'Total administradores',
+      label: 'Total usuarios',
       value: String(total),
       hint: 'Todas las cuentas registradas',
       icon: 'manage_accounts',
     },
     {
-      label: 'Administradores senior',
+      label: 'Usuarios senior',
       value: String(senior),
       hint: 'Con acceso global',
       icon: 'public',
@@ -478,7 +477,7 @@ const statusOptions = [
 ];
 
 const typeFilterOptions = [
-  { label: 'Tipo: Todos', value: 'Todos' },
+  { label: 'Rol: Todos', value: 'Todos' },
   { label: 'Senior', value: 'Senior' },
   { label: 'Administrador de condominio', value: 'Administrador de condominio' },
 ] as const;
@@ -561,13 +560,13 @@ const hasActiveFilters = computed(
 );
 
 const confirmDialogTitle = computed(() => {
-  if (pendingAction.value === 'suspend') return 'Suspender administrador';
-  if (pendingAction.value === 'reactivate') return 'Reactivar administrador';
-  return 'Eliminar administrador';
+  if (pendingAction.value === 'suspend') return 'Suspender usuario';
+  if (pendingAction.value === 'reactivate') return 'Reactivar usuario';
+  return 'Eliminar usuario';
 });
 
 const confirmDialogMessage = computed(() => {
-  const name = pendingAdministrator.value?.name ?? 'este administrador';
+  const name = pendingAdministrator.value?.name ?? 'este usuario';
 
   if (pendingAction.value === 'suspend') {
     return `¿Suspender el acceso de "${name}"? No podrá iniciar sesión hasta que su cuenta sea reactivada.`;
@@ -577,7 +576,7 @@ const confirmDialogMessage = computed(() => {
     return `¿Reactivar el acceso de "${name}"? La cuenta volverá a estar disponible inmediatamente.`;
   }
 
-  return `¿Eliminar al administrador "${name}"? Esta acción no se puede deshacer.`;
+  return `¿Eliminar al usuario "${name}"? Esta acción no se puede deshacer.`;
 });
 
 const confirmDialogTone = computed<DialogTone>(() =>
@@ -673,7 +672,7 @@ async function loadAdministrators() {
   } catch (error) {
     rows.value = [];
     loadError.value =
-      error instanceof Error ? error.message : 'No fue posible cargar los administradores.';
+      error instanceof Error ? error.message : 'No fue posible cargar los usuarios.';
   } finally {
     isLoadingRows.value = false;
   }
@@ -705,8 +704,8 @@ function statusTone(status: AdminRow['status']) {
   return 'negative';
 }
 
-function goToNewAdministrator() {
-  void router.push({ name: 'administradores-nuevo' });
+function goToNewUser() {
+  void router.push({ name: 'usuarios-nuevo' });
 }
 
 function openAlert(config: { tone: DialogTone; icon: string; title: string; message: string }) {
@@ -714,7 +713,7 @@ function openAlert(config: { tone: DialogTone; icon: string; title: string; mess
   alertDialogOpen.value = true;
 }
 
-function showAdministratorDetail(row: AdminRow) {
+function showUserDetail(row: AdminRow) {
   const scopeDescription =
     row.type === 'Senior' ? 'acceso global a todos los condominios' : `asignado a ${row.scope}`;
 
@@ -726,22 +725,22 @@ function showAdministratorDetail(row: AdminRow) {
   });
 }
 
-function handleEditAdministrator(row: AdminRow) {
+function handleEditUser(row: AdminRow) {
   void router.push({
-    name: 'administradores-editar',
+    name: 'usuarios-editar',
     params: {
       id: String(row.id),
     },
   });
 }
 
-function requestAdministratorAction(action: AdministratorAction, row: AdminRow) {
+function requestUserAction(action: AdministratorAction, row: AdminRow) {
   pendingAction.value = action;
   pendingAdministrator.value = row;
   confirmDialogOpen.value = true;
 }
 
-async function confirmAdministratorAction() {
+async function confirmUserAction() {
   const action = pendingAction.value;
   const administrator = pendingAdministrator.value;
 
@@ -770,7 +769,7 @@ async function confirmAdministratorAction() {
     const message =
       error instanceof Error
         ? error.message
-        : 'No fue posible completar la acción sobre el administrador.';
+        : 'No fue posible completar la acción sobre el usuario.';
     Notify.create({
       type: 'negative',
       message,
@@ -819,7 +818,7 @@ function clearPendingAction() {
 </script>
 
 <style scoped>
-.administradores-page {
+.usuarios-page {
   min-height: 100%;
 }
 
@@ -1134,3 +1133,6 @@ function clearPendingAction() {
   }
 }
 </style>
+
+
+

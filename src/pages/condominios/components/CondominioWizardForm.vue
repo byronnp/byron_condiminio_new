@@ -26,37 +26,7 @@
           <q-spinner color="primary" size="32px" />
         </q-inner-loading>
 
-        <div class="wizard-steps">
-          <template v-for="(step, index) in steps" :key="step.name">
-            <button
-              type="button"
-              class="wizard-step"
-              :aria-pressed="activeStep === step.name"
-              :class="{
-                'wizard-step--active': activeStep === step.name,
-                'wizard-step--done': stepIndexByName[step.name] < currentStepIndex,
-              }"
-              @click="activeStep = step.name"
-            >
-              <span class="wizard-step__number">
-                <q-icon
-                  v-if="stepIndexByName[step.name] < currentStepIndex"
-                  name="check"
-                  size="14px"
-                />
-                <span v-else>{{ index + 1 }}</span>
-              </span>
-              <span class="wizard-step__label">{{ step.label }}</span>
-            </button>
-
-            <span
-              v-if="index < steps.length - 1"
-              class="wizard-step-connector"
-              :class="{ 'wizard-step-connector--active': index < currentStepIndex }"
-              aria-hidden="true"
-            />
-          </template>
-        </div>
+        <AppStepper :steps="steps" :current-step="activeStep" @select="selectStep" />
 
         <q-separator class="wizard-divider" />
 
@@ -890,8 +860,9 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { Notify } from 'quasar';
 import { useRoute, useRouter } from 'vue-router';
+import AppStepper from '@/components/shared/AppStepper.vue';
 import { buildCondominiumPayload } from '@/composables/condominios/condominio-payload';
-import { fetchCatalogItems } from '@/services/catalog.service';
+import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
 import {
   createCondominium,
   fetchCondominiumById,
@@ -953,6 +924,8 @@ type AdministratorForm = {
 type StepDefinition = {
   name: StepName;
   label: string;
+  description?: string;
+  icon?: string;
 };
 
 const router = useRouter();
@@ -1024,21 +997,24 @@ const administrator = reactive<AdministratorForm>({
 });
 
 const fallbackTypeOptions = ['Residencial', 'Mixto', 'Comercial'];
-const typeOptions = ref<string[]>([...fallbackTypeOptions]);
-const typeOptionsLoading = ref(false);
 const statusRadioOptions = [
   { label: 'Activo', value: 'Activo' },
   { label: 'Inactivo', value: 'Inactivo' },
 ];
-const fallbackCharacteristicOptions = [
+type CharacteristicOption = {
+  id: number;
+  value: string;
+  label: string;
+  icon: string;
+};
+const fallbackCharacteristicOptions: CharacteristicOption[] = [
   { id: 1, value: 'Piscina', label: 'Piscina', icon: 'pool' },
   { id: 2, value: 'Gimnasio', label: 'Gimnasio', icon: 'fitness_center' },
   { id: 3, value: 'Areas comunes', label: 'Áreas comunes', icon: 'deck' },
   { id: 4, value: 'Salon comunal', label: 'Salón comunal', icon: 'event_seat' },
   { id: 5, value: 'Seguridad 24/7', label: 'Seguridad 24/7', icon: 'shield' },
   { id: 6, value: 'Parqueadero', label: 'Parqueadero', icon: 'local_parking' },
-] as const;
-type CharacteristicOption = (typeof fallbackCharacteristicOptions)[number];
+];
 const featureIconMap: Record<string, string> = {
   piscina: 'pool',
   piscina_climatizada: 'pool',
@@ -1065,12 +1041,43 @@ const provinceOptions = ref<{ label: string; value: number }[]>([]);
 const provinceOptionsLoading = ref(false);
 const cityOptions = ref<{ label: string; value: number }[]>([]);
 const cityOptionsLoading = ref(false);
-const characteristicOptions = ref<CharacteristicOption[]>([...fallbackCharacteristicOptions]);
-const characteristicOptionsLoading = ref(false);
 const currencyOptions = ['USD', 'EUR', 'MXN'];
 const fallbackDocumentTypeOptions = ['Cédula', 'RUC', 'Pasaporte'];
-const documentTypeOptions = ref<string[]>([...fallbackDocumentTypeOptions]);
-const documentTypeOptionsLoading = ref(false);
+const {
+  options: typeOptions,
+  loading: typeOptionsLoading,
+  loadOptions: loadTypeOptions,
+} = useCatalogOptions<string>('condominium_types', {
+  fallback: fallbackTypeOptions,
+  mapItem: (item) => item.name.trim() || item.code.trim() || null,
+});
+const {
+  options: characteristicOptions,
+  loadOptions: loadCharacteristicOptions,
+} = useCatalogOptions<CharacteristicOption>('condominium_features', {
+  fallback: fallbackCharacteristicOptions,
+  mapItem: (item) => {
+    const label = item.name.trim() || item.code.trim();
+    if (!label) {
+      return null;
+    }
+
+    return {
+      id: item.id,
+      value: label,
+      label,
+      icon: featureIconForLabel(label),
+    };
+  },
+});
+const {
+  options: documentTypeOptions,
+  loading: documentTypeOptionsLoading,
+  loadOptions: loadDocumentTypeOptions,
+} = useCatalogOptions<string>('document_types', {
+  fallback: fallbackDocumentTypeOptions,
+  mapItem: (item) => item.name.trim() || item.code.trim() || null,
+});
 
 const adminFullName = computed(
   () => `${administrator.name} ${administrator.lastName}`.trim() || 'Administrador principal',
@@ -1103,25 +1110,6 @@ let logoObjectUrl: string | null = null;
 let provinceLoadToken = 0;
 let cityLoadToken = 0;
 
-async function loadCatalogOptions(
-  code: string,
-  target: { value: string[] },
-  fallback: string[],
-  loading: { value: boolean },
-) {
-  loading.value = true;
-
-  try {
-    const items = await fetchCatalogItems(code);
-    const options = items.map((item) => item.name).filter(Boolean);
-    target.value = options.length > 0 ? options : [...fallback];
-  } catch {
-    target.value = [...fallback];
-  } finally {
-    loading.value = false;
-  }
-}
-
 async function loadCountryOptions() {
   countryOptionsLoading.value = true;
 
@@ -1151,36 +1139,6 @@ function normalizeFeatureLabel(value: string) {
 function featureIconForLabel(label: string) {
   const key = normalizeFeatureLabel(label);
   return featureIconMap[key] ?? 'check_circle';
-}
-
-async function loadCharacteristicOptions() {
-  characteristicOptionsLoading.value = true;
-
-  try {
-    const items = await fetchCatalogItems('condominium_features');
-    const options = items
-      .map((item) => {
-        const label = item.name.trim();
-        const id = Number(item.id);
-        if (!label) {
-          return null;
-        }
-
-        return {
-          id: Number.isFinite(id) ? id : 0,
-          value: label,
-          label,
-          icon: featureIconForLabel(label),
-        } as CharacteristicOption;
-      })
-      .filter((item): item is CharacteristicOption => item !== null);
-
-    characteristicOptions.value = options.length > 0 ? options : [...fallbackCharacteristicOptions];
-  } catch {
-    characteristicOptions.value = [...fallbackCharacteristicOptions];
-  } finally {
-    characteristicOptionsLoading.value = false;
-  }
 }
 
 async function loadProvinceOptions(countryCode: string) {
@@ -1306,18 +1264,8 @@ async function loadCondominiumForEdit() {
 }
 
 onMounted(() => {
-  void loadCatalogOptions(
-    'condominium_types',
-    typeOptions,
-    fallbackTypeOptions,
-    typeOptionsLoading,
-  );
-  void loadCatalogOptions(
-    'document_types',
-    documentTypeOptions,
-    fallbackDocumentTypeOptions,
-    documentTypeOptionsLoading,
-  );
+  void loadTypeOptions();
+  void loadDocumentTypeOptions();
   void loadCharacteristicOptions();
   void loadCountryOptions();
   void loadCondominiumForEdit();
@@ -1494,6 +1442,10 @@ function nextStep() {
   }
 
   activeStep.value = steps.value[currentStepIndex.value + 1]?.name ?? 'review';
+}
+
+function selectStep(step: string | number) {
+  activeStep.value = step as StepName;
 }
 
 function requiredRule(value: unknown) {
@@ -1728,103 +1680,6 @@ function goToCondominio() {
   background: rgba(255, 255, 255, 0.92);
   border-radius: 20px;
   overflow: hidden;
-}
-
-.wizard-steps {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-width: max-content;
-  padding: 14px 16px 0;
-}
-
-.wizard-step {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
-  color: var(--app-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  gap: 10px;
-  min-height: 38px;
-  width: auto;
-  padding: 0 11px;
-  position: relative;
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
-}
-
-.wizard-step:hover {
-  border-color: rgba(37, 99, 235, 0.16);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
-  transform: translateY(-1px);
-}
-
-.wizard-step--active {
-  border-color: rgba(37, 99, 235, 0.22);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-  color: var(--app-primary);
-}
-
-.wizard-step--done {
-  background: rgba(37, 99, 235, 0.04);
-}
-
-.wizard-step__number {
-  align-items: center;
-  background: rgba(37, 99, 235, 0.1);
-  border-radius: 999px;
-  color: var(--app-primary);
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 800;
-  height: 22px;
-  justify-content: center;
-  width: 22px;
-}
-
-.wizard-step__label {
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.15;
-}
-
-.wizard-step--done .wizard-step__number {
-  background: var(--app-primary);
-  color: #fff;
-}
-
-.wizard-step--done .wizard-step__label {
-  color: var(--app-text);
-}
-
-.wizard-step-connector {
-  background: rgba(148, 163, 184, 0.28);
-  border-radius: 999px;
-  flex: 0 0 24px;
-  height: 3px;
-  min-width: 24px;
-  overflow: hidden;
-  position: relative;
-}
-
-.wizard-step-connector::before {
-  background: var(--app-primary);
-  border-radius: inherit;
-  content: '';
-  inset: 0;
-  position: absolute;
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 0.22s ease;
-}
-
-.wizard-step-connector--active::before {
-  transform: scaleX(1);
 }
 
 .wizard-divider {
@@ -2995,36 +2850,6 @@ function goToCondominio() {
   .page-header {
     align-items: start;
     flex-direction: column;
-  }
-
-  .wizard-steps {
-    flex-wrap: nowrap;
-    max-width: 100%;
-    overflow-x: auto;
-    padding: 12px 14px 0;
-    scrollbar-width: none;
-  }
-
-  .wizard-steps::-webkit-scrollbar {
-    display: none;
-  }
-
-  .wizard-step {
-    flex: 0 0 auto;
-    min-height: 38px;
-    padding: 0 10px;
-  }
-
-  .wizard-step__label {
-    max-width: 108px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .wizard-step-connector {
-    flex: 0 0 22px;
-    min-width: 22px;
   }
 
   .step-grid,

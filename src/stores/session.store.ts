@@ -324,11 +324,12 @@ export const useSessionStore = defineStore('session', () => {
   function setAvailableCondominiums(condominiums: CondoOption[]) {
     const availableCondominiums = condominiums.filter((condo) => condo.active);
     const availableIds = availableCondominiums.map((condo) => condo.id);
+    const currentCondoId = state.value.activeCondoId;
     const currentCondoIsAvailable =
-      state.value.activeCondoId === null || availableIds.includes(state.value.activeCondoId);
-    const activeCondoId = currentCondoIsAvailable
-      ? state.value.activeCondoId
-      : (availableCondominiums[0]?.id ?? null);
+      typeof currentCondoId === 'string' && availableIds.includes(currentCondoId);
+    const activeCondoId = isSenior.value
+      ? (currentCondoIsAvailable ? currentCondoId : null)
+      : (currentCondoIsAvailable ? currentCondoId : (availableCondominiums[0]?.id ?? null));
 
     state.value = {
       ...state.value,

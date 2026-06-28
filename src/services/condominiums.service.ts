@@ -155,16 +155,57 @@ function buildLocationLabel(record: Record<string, unknown>) {
   return city || province || 'Sin ubicación';
 }
 
-function buildPrincipalLabel(record: Record<string, unknown>) {
-  return (
+function buildPersonLabel(record: Record<string, unknown>) {
+  const nestedAdmin = isRecord(record.administrator)
+    ? record.administrator
+    : isRecord(record.admin)
+      ? record.admin
+      : isRecord(record.manager)
+        ? record.manager
+        : null;
+
+  const fullName =
     pickFirstText(record, [
       'principal',
       'principal_name',
       'admin_name',
       'administrator_name',
       'manager_name',
-    ]) || 'Sin administrador'
-  );
+      'admin_full_name',
+      'administrator_full_name',
+      'manager_full_name',
+      'principal_full_name',
+    ]) ||
+    pickFirstText(nestedAdmin ?? {}, [
+      'name',
+      'full_name',
+      'fullName',
+      'principal',
+      'principal_name',
+      'administrator_name',
+      'manager_name',
+    ]);
+
+  if (fullName) {
+    return fullName;
+  }
+
+  const firstName = pickFirstText(record, [
+    'admin_first_name',
+    'administrator_first_name',
+    'manager_first_name',
+  ]);
+  const lastName = pickFirstText(record, [
+    'admin_last_name',
+    'administrator_last_name',
+    'manager_last_name',
+  ]);
+
+  return [firstName, lastName].filter(Boolean).join(' ').trim();
+}
+
+function buildPrincipalLabel(record: Record<string, unknown>) {
+  return buildPersonLabel(record) || 'Sin administrador';
 }
 
 function buildStatusLabel(record: Record<string, unknown>) {

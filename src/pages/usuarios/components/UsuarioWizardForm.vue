@@ -1,5 +1,5 @@
-<template>
-  <q-page class="new-admin-page">
+﻿<template>
+  <q-page class="new-user-page">
     <div class="page-shell">
       <header class="page-header">
         <div>
@@ -12,7 +12,7 @@
           no-caps
           label="Volver"
           icon="arrow_back"
-          aria-label="Volver al listado de administradores"
+          aria-label="Volver al listado de usuarios"
           @click="goBack"
         />
       </header>
@@ -39,35 +39,7 @@
           <q-spinner color="primary" size="34px" />
         </q-inner-loading>
 
-        <div class="wizard-steps">
-          <template v-for="(step, index) in steps" :key="step.key">
-            <button
-              type="button"
-              class="wizard-step"
-              :aria-pressed="activeStep === step.key"
-              :aria-current="activeStep === step.key ? 'step' : undefined"
-              :aria-label="`Paso ${index + 1}: ${step.label}`"
-              :class="{
-                'wizard-step--active': activeStep === step.key,
-                'wizard-step--done': stepIndex(step.key) < activeStepIndex,
-              }"
-              @click="goToStep(step.key)"
-            >
-              <span class="wizard-step__number">
-                <q-icon v-if="stepIndex(step.key) < activeStepIndex" name="check" size="14px" />
-                <span v-else>{{ index + 1 }}</span>
-              </span>
-              <span class="wizard-step__label">{{ step.label }}</span>
-            </button>
-
-            <span
-              v-if="index < steps.length - 1"
-              class="wizard-step-connector"
-              :class="{ 'wizard-step-connector--active': index < activeStepIndex }"
-              aria-hidden="true"
-            />
-          </template>
-        </div>
+        <AppStepper :steps="steps" :current-step="activeStep" @select="handleStepSelect" />
 
         <q-separator class="wizard-divider" />
 
@@ -88,7 +60,7 @@
                         <div>
                           <div class="field-group__title">Identificación</div>
                           <div class="field-group__hint">
-                            Datos necesarios para identificar al administrador.
+                            Datos necesarios para identificar al usuario.
                           </div>
                         </div>
                       </div>
@@ -120,7 +92,10 @@
                           map-options
                           hide-bottom-space
                           label="Tipo de identificación *"
+                          option-label="label"
+                          option-value="value"
                           :options="documentTypeOptions"
+                          :loading="documentTypeOptionsLoading"
                           :rules="[requiredRule]"
                         />
                         <q-input
@@ -297,7 +272,7 @@
                     </div>
 
                     <div v-else class="type-placeholder q-mt-md">
-                      Selecciona el tipo de administrador para continuar.
+                      Selecciona el tipo de usuario para continuar.
                     </div>
                   </div>
                 </q-form>
@@ -382,7 +357,7 @@
                 no-caps
                 label="Cancelar"
                 class="footer-btn"
-                aria-label="Cancelar y volver al listado de administradores"
+                aria-label="Cancelar y volver al listado de usuarios"
                 @click="goBack"
               />
               <div class="wizard-footer__actions">
@@ -415,7 +390,7 @@
               <div class="summary-card__header">
                 <div class="summary-avatar">{{ administratorInitials }}</div>
                 <div>
-                  <div class="summary-title">Resumen del administrador</div>
+                  <div class="summary-title">Resumen del usuario</div>
                   <div class="summary-subtitle">La información se actualiza automáticamente</div>
                 </div>
               </div>
@@ -448,7 +423,7 @@
               <div>
                 <div class="summary-note__title">Acceso seguro</div>
                 <div class="summary-note__text">
-                  No se generan credenciales manuales. El administrador definirá su contraseña desde
+                  No se generan credenciales manuales. El usuario definirá su contraseña desde
                   el correo de invitación.
                 </div>
               </div>
@@ -458,16 +433,6 @@
       </q-card>
     </div>
 
-    <AdministradorCreatedDialog
-      v-if="!isEditMode"
-      v-model="createdDialogOpen"
-      :administrator-name="fullName || 'Nuevo administrador'"
-      :administrator-email="normalizedEmail || 'correo registrado'"
-      :administrator-type="administratorTypeLabel"
-      :administrator-scope="scopeLabel"
-      @create-another="prepareAnotherAdministrator"
-      @go-to-administrators="goBack"
-    />
   </q-page>
 </template>
 
@@ -476,6 +441,9 @@ import { computed, onMounted, ref } from 'vue';
 import { Notify, type QForm } from 'quasar';
 import { useRoute, useRouter } from 'vue-router';
 
+import AppStepper from '@/components/shared/AppStepper.vue';
+import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
+import { type CatalogItem } from '@/services/catalog.service';
 import {
   createAdministrator,
   fetchAdministratorById,
@@ -488,12 +456,13 @@ import {
   type CondominiumOptionItem,
 } from '@/services/condominiums.service';
 import { useSessionStore } from '@/stores/session.store';
-import AdministradorCreatedDialog from './AdministradorCreatedDialog.vue';
 
 type StepKey = 'personal' | 'assignment' | 'review';
 type AdministratorType = 'senior' | 'condominium_admin';
-type DocumentType = 'cedula' | 'passport';
 type SelectOption<T extends string | number> = { label: string; value: T };
+type DocumentTypeOption = SelectOption<number> & {
+  code: string;
+};
 
 type ValidatableForm = {
   validate: () => Promise<boolean> | boolean;
@@ -502,7 +471,7 @@ type ValidatableForm = {
 type AdministratorForm = {
   firstName: string;
   lastName: string;
-  documentType: DocumentType | null;
+  documentType: number | null;
   documentNumber: string;
   email: string;
   phone: string;
@@ -527,13 +496,20 @@ const assignmentFormRef = ref<ValidatableForm | QForm | null>(null);
 const activeStep = ref<StepKey>('personal');
 const condominiumOptions = ref<SelectOption<number>[]>([]);
 const filteredCondominiumOptions = ref<SelectOption<number>[]>([]);
+const {
+  options: documentTypeOptions,
+  loading: documentTypeOptionsLoading,
+  loadOptions: loadDocumentTypeOptionsBase,
+} = useCatalogOptions<DocumentTypeOption>('document_types', {
+  fallback: [],
+  mapItem: mapDocumentTypeOption,
+});
 const isLoadingCondominiums = ref(false);
 const condominiumsLoadError = ref('');
 const isSubmitting = ref(false);
 const submitError = ref('');
 const isLoadingAdministrator = ref(false);
 const initialLoadError = ref('');
-const createdDialogOpen = ref(false);
 
 const steps = [
   {
@@ -550,22 +526,17 @@ const steps = [
   },
 ] as const;
 
-const documentTypeOptions: SelectOption<DocumentType>[] = [
-  { label: 'Cédula', value: 'cedula' },
-  { label: 'Pasaporte', value: 'passport' },
-];
-
 const administratorTypeOptions = [
   {
     value: 'senior',
-    label: 'Administrador senior',
+    label: 'Usuario senior',
     description: 'Acceso global a la plataforma y a todos los condominios.',
     meta: 'Puede cambiar el contexto activo',
     icon: 'public',
   },
   {
     value: 'condominium_admin',
-    label: 'Administrador de condominio',
+    label: 'Usuario de condominio',
     description: 'Acceso operativo limitado a un único condominio.',
     meta: 'Requiere una asignación',
     icon: 'apartment',
@@ -582,7 +553,7 @@ const administratorId = computed(() => {
   return Number.isInteger(id) && id > 0 ? id : null;
 });
 const pageTitle = computed(() =>
-  isEditMode.value ? 'Editar administrador' : 'Crear nuevo administrador',
+  isEditMode.value ? 'Editar usuario' : 'Crear nuevo usuario',
 );
 const pageSubtitle = computed(() =>
   isEditMode.value
@@ -592,7 +563,7 @@ const pageSubtitle = computed(() =>
 const primaryActionLabel = computed(() =>
   activeStep.value === 'review'
     ? isEditMode.value
-      ? 'Actualizar administrador'
+      ? 'Actualizar usuario'
       : 'Crear y enviar invitación'
     : 'Siguiente',
 );
@@ -606,8 +577,8 @@ const administratorInitials = computed(() => {
   return `${firstInitial}${lastInitial}`.toUpperCase() || 'AD';
 });
 const administratorTypeLabel = computed(() => {
-  if (form.value.type === 'senior') return 'Administrador senior';
-  if (form.value.type === 'condominium_admin') return 'Administrador de condominio';
+  if (form.value.type === 'senior') return 'Usuario senior';
+  if (form.value.type === 'condominium_admin') return 'Usuario de condominio';
   return 'Sin definir';
 });
 const scopeLabel = computed(() => {
@@ -622,14 +593,16 @@ const selectedCondominiumName = computed(() => {
     'Sin asignar'
   );
 });
+const selectedDocumentTypeOption = computed(
+  () => documentTypeOptions.value.find((option) => option.value === form.value.documentType) ?? null,
+);
 const documentSummary = computed(() => {
-  const type = documentTypeOptions.find(
-    (option) => option.value === form.value.documentType,
-  )?.label;
+  const type = selectedDocumentTypeOption.value?.label;
   return [type, form.value.documentNumber.trim()].filter(Boolean).join(' · ') || '-';
 });
 
 onMounted(() => {
+  void loadDocumentTypeOptions();
   void loadCondominiums();
   if (isEditMode.value) {
     void loadAdministratorForEdit();
@@ -649,6 +622,12 @@ async function goToStep(step: StepKey) {
 
   if (targetIndex === activeStepIndex.value + 1 && (await validateStep(activeStep.value))) {
     activeStep.value = step;
+  }
+}
+
+function handleStepSelect(step: string | number) {
+  if (typeof step === 'string') {
+    void goToStep(step as StepKey);
   }
 }
 
@@ -718,7 +697,7 @@ async function submitAdministrator() {
     const result = isEditMode.value
       ? await (async () => {
           if (id === null) {
-            throw new Error('El identificador del administrador no es válido.');
+            throw new Error('El identificador del usuario no es válido.');
           }
 
           return updateAdministrator(id, payload, session.accessToken);
@@ -734,20 +713,25 @@ async function submitAdministrator() {
     if (isEditMode.value) {
       Notify.create({
         type: 'positive',
-        message: result.message || 'Administrador actualizado correctamente.',
+        message: result.message || 'Usuario actualizado correctamente.',
         position: 'top-right',
       });
-      await router.push({ name: 'administradores' });
+      await router.push({ name: 'usuarios' });
     } else {
-      createdDialogOpen.value = true;
+      Notify.create({
+        type: 'positive',
+        message: result.message || 'Usuario creado correctamente.',
+        position: 'top-right',
+      });
+      await router.push({ name: 'usuarios' });
     }
   } catch (error) {
     const message =
       error instanceof Error
         ? error.message
         : isEditMode.value
-          ? 'No fue posible actualizar el administrador.'
-          : 'No fue posible crear el administrador.';
+          ? 'No fue posible actualizar el usuario.'
+          : 'No fue posible crear el usuario.';
     submitError.value = message;
     Notify.create({
       type: 'negative',
@@ -766,7 +750,7 @@ async function loadAdministratorForEdit() {
   }
 
   if (id === null) {
-    initialLoadError.value = 'El identificador del administrador no es válido.';
+    initialLoadError.value = 'El identificador del usuario no es válido.';
     return;
   }
 
@@ -776,13 +760,13 @@ async function loadAdministratorForEdit() {
   try {
     const detail = await fetchAdministratorById(id, session.accessToken);
     if (!detail) {
-      throw new Error('No se encontró la información del administrador.');
+      throw new Error('No se encontró la información del usuario.');
     }
 
     applyAdministratorDetail(detail);
   } catch (error) {
     initialLoadError.value =
-      error instanceof Error ? error.message : 'No fue posible cargar el administrador.';
+      error instanceof Error ? error.message : 'No fue posible cargar el usuario.';
   } finally {
     isLoadingAdministrator.value = false;
   }
@@ -792,25 +776,13 @@ function applyAdministratorDetail(detail: AdministratorDetail) {
   form.value = {
     firstName: detail.firstName,
     lastName: detail.lastName,
-    documentType: normalizeFormDocumentType(detail.documentType),
+    documentType: detail.documentTypeId,
     documentNumber: detail.documentNumber,
     email: detail.email,
     phone: detail.phone,
     type: detail.type,
     condominiumId: detail.type === 'condominium_admin' ? detail.condominiumId : null,
   };
-}
-
-function normalizeFormDocumentType(value: string): DocumentType {
-  return value === 'cedula' ? 'cedula' : 'passport';
-}
-
-function prepareAnotherAdministrator() {
-  form.value = createEmptyAdministratorForm();
-  activeStep.value = 'personal';
-  submitError.value = '';
-  createdDialogOpen.value = false;
-  applyCondominiumFromQuery();
 }
 
 function isReviewPayloadReady() {
@@ -828,13 +800,13 @@ function isReviewPayloadReady() {
 
 function buildAdministratorPayload(): SaveAdministratorPayload {
   if (!form.value.documentType || !form.value.type) {
-    throw new Error('La información del administrador está incompleta.');
+    throw new Error('La información del usuario está incompleta.');
   }
 
   return {
     firstName: form.value.firstName,
     lastName: form.value.lastName,
-    documentType: form.value.documentType,
+    documentTypeId: form.value.documentType,
     documentNumber: form.value.documentNumber,
     email: form.value.email,
     phone: form.value.phone,
@@ -926,14 +898,14 @@ function phoneRule(value: unknown) {
 function documentNumberRule(value: unknown) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) return true;
-  if (form.value.documentType === 'cedula') {
+  if (selectedDocumentTypeOption.value?.code === 'cedula') {
     return /^\d{8,13}$/.test(text) || 'La cédula debe contener entre 8 y 13 dígitos';
   }
   return /^[a-zA-Z0-9-]{5,20}$/.test(text) || 'Ingresa un pasaporte válido';
 }
 
 function goBack() {
-  void router.push({ name: 'administradores' });
+  void router.push({ name: 'usuarios' });
 }
 
 function createEmptyAdministratorForm(): AdministratorForm {
@@ -948,10 +920,30 @@ function createEmptyAdministratorForm(): AdministratorForm {
     condominiumId: null,
   };
 }
+
+async function loadDocumentTypeOptions() {
+  await loadDocumentTypeOptionsBase();
+}
+
+function mapDocumentTypeOption(item: CatalogItem): DocumentTypeOption {
+  return {
+    label: item.name.trim() || item.code.trim(),
+    value: item.id,
+    code: normalizeCatalogText(item.code || item.name),
+  };
+}
+
+function normalizeCatalogText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
 </script>
 
 <style scoped>
-.new-admin-page {
+.new-user-page {
   min-height: 100%;
   padding: 16px 0 0;
 }
@@ -984,80 +976,8 @@ function createEmptyAdministratorForm(): AdministratorForm {
   margin-top: 4px;
 }
 
-.wizard-frame {
-  border-radius: 18px;
-  overflow: hidden;
-  position: relative;
-}
-
-.wizard-steps {
-  align-items: center;
-  display: flex;
-  gap: 6px;
-  max-width: max-content;
-  padding: 16px 18px 8px;
-}
-
-.wizard-step {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 12px;
-  color: var(--app-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  gap: 9px;
-  min-height: 38px;
-  padding: 0 10px;
-  white-space: nowrap;
-}
-
-.wizard-step--active {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--app-primary);
-}
-
-.wizard-step--done {
-  color: var(--app-primary);
-}
-
-.wizard-step__number {
-  align-items: center;
-  background: #fff;
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: 11px;
-  font-weight: 800;
-  height: 24px;
-  justify-content: center;
-  width: 24px;
-}
-
-.wizard-step--active .wizard-step__number {
-  background: var(--app-primary);
-  color: #fff;
-}
-
-.wizard-step__label {
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.wizard-step-connector {
-  background: rgba(148, 163, 184, 0.3);
-  border-radius: 999px;
-  flex: 0 0 38px;
-  height: 2px;
-}
-
-.wizard-step-connector--active {
-  background: var(--app-primary);
-}
-
 .wizard-divider {
-  margin: 8px 18px 0;
-  opacity: 0.45;
+  margin-top: 16px;
 }
 
 .wizard-layout {
@@ -1425,31 +1345,12 @@ function createEmptyAdministratorForm(): AdministratorForm {
 }
 
 @media (max-width: 720px) {
-  .new-admin-page {
+  .new-user-page {
     padding: 12px 0 0;
   }
 
   .page-header {
     flex-direction: column;
-  }
-
-  .wizard-steps {
-    max-width: 100%;
-    overflow-x: auto;
-    padding: 12px 14px 6px;
-    scrollbar-width: none;
-  }
-
-  .wizard-steps::-webkit-scrollbar {
-    display: none;
-  }
-
-  .wizard-step {
-    flex: 0 0 auto;
-  }
-
-  .wizard-step-connector {
-    flex-basis: 24px;
   }
 
   .wizard-divider {
@@ -1508,3 +1409,5 @@ function createEmptyAdministratorForm(): AdministratorForm {
   }
 }
 </style>
+
+

@@ -309,7 +309,7 @@ const drawerContentStyle = {
 const visibleMenuSections = computed(() => session.menuSections);
 const isDrawerMini = computed(() => drawerMini.value && !$q.screen.lt.md);
 const canSwitchCondominiumContext = computed(
-  () => session.condoOptions.length > 0,
+  () => session.isSenior && session.condoOptions.length > 0,
 );
 
 const pageTitle = computed(() => {

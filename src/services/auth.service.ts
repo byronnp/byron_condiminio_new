@@ -16,6 +16,8 @@ interface ApiUser {
   email?: string;
   role?: string;
   roles?: unknown[];
+  is_platform_admin?: boolean | undefined;
+  isPlatformAdmin?: boolean | undefined;
   condominium?: unknown;
   condominiums?: unknown[];
   activeCondominium?: unknown;
@@ -30,6 +32,8 @@ interface LoginResponseShape {
   refreshToken?: string;
   user?: unknown;
   data?: unknown;
+  is_platform_admin?: unknown;
+  isPlatformAdmin?: unknown;
   condominiums?: unknown[];
   condominium?: unknown;
   activeCondominium?: unknown;
@@ -81,6 +85,18 @@ function normalizeRole(role: string | undefined): UserRole {
     normalizedKey.includes('superadministrador')
     ? 'senior'
     : 'admin';
+}
+
+function resolveUserRole(user: ApiUser): UserRole {
+  if (typeof user.is_platform_admin === 'boolean') {
+    return user.is_platform_admin ? 'senior' : 'admin';
+  }
+
+  if (typeof user.isPlatformAdmin === 'boolean') {
+    return user.isPlatformAdmin ? 'senior' : 'admin';
+  }
+
+  return normalizeRole(user.role);
 }
 
 function normalizeCondominium(item: unknown): CondoOption | null {
@@ -163,7 +179,12 @@ function extractRoleFromRoles(source: unknown) {
   return null;
 }
 
-function extractActiveCondoId(user: ApiUser, condominiums: CondoOption[], fallback: string | null) {
+function extractActiveCondoId(
+  user: ApiUser,
+  condominiums: CondoOption[],
+  fallback: string | null,
+  allowDefaultFirstCondo = true,
+) {
   const candidates = [
     user.activeCondominium,
     user.active_condominium,
@@ -178,7 +199,7 @@ function extractActiveCondoId(user: ApiUser, condominiums: CondoOption[], fallba
     }
   }
 
-  return condominiums[0]?.id ?? null;
+  return allowDefaultFirstCondo ? (condominiums[0]?.id ?? null) : null;
 }
 
 function extractToken(payload: unknown, keys: string[]) {
@@ -218,11 +239,22 @@ function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
         : [];
   const resolvedRole: string =
     typeof user.role === 'string' ? user.role : (extractRoleFromRoles(roles) ?? 'admin');
+  const platformAdminValue = user.is_platform_admin ?? record.is_platform_admin ?? dataRecord.is_platform_admin;
+  const platformAdminCamelValue =
+    user.isPlatformAdmin ?? record.isPlatformAdmin ?? dataRecord.isPlatformAdmin;
 
   return {
     name: resolvedName,
     email: resolvedEmail,
     role: resolvedRole,
+    is_platform_admin:
+      typeof platformAdminValue === 'boolean'
+        ? platformAdminValue
+        : (typeof platformAdminCamelValue === 'boolean' ? platformAdminCamelValue : undefined),
+    isPlatformAdmin:
+      typeof platformAdminCamelValue === 'boolean'
+        ? platformAdminCamelValue
+        : (typeof platformAdminValue === 'boolean' ? platformAdminValue : undefined),
     roles,
     condominium: user.condominium ?? record.condominium ?? dataRecord.condominium ?? null,
     condominiums: [
@@ -326,7 +358,7 @@ async function hydrateUserSession(
 
       if (response.ok && data && typeof data === 'object') {
         const meUser = resolveUser(data, fallbackEmail);
-        const userRole = normalizeRole(meUser.role);
+        const userRole = resolveUserRole(meUser);
         const meCondominiums = extractCondominiums(
           meUser.condominium,
           meUser.activeCondominium,
@@ -349,9 +381,9 @@ async function hydrateUserSession(
           },
           allowedCondominiums,
           activeCondoId:
-            userRole === 'senior' && !meUser.activeCondominium && !meUser.active_condominium
+            userRole === 'senior'
               ? null
-              : extractActiveCondoId(meUser, allowedCondominiums, null),
+              : extractActiveCondoId(meUser, allowedCondominiums, null, true),
         };
       }
     } catch {
@@ -364,10 +396,12 @@ async function hydrateUserSession(
     user: {
       name: userFromPayload.name ?? fallbackEmail,
       email: userFromPayload.email ?? fallbackEmail,
-      role: normalizeRole(userFromPayload.role),
+      role: resolveUserRole(userFromPayload),
     },
     allowedCondominiums: normalizedCondominiums,
-    activeCondoId: extractActiveCondoId(userFromPayload, normalizedCondominiums, null),
+    activeCondoId: resolveUserRole(userFromPayload) === 'senior'
+      ? null
+      : extractActiveCondoId(userFromPayload, normalizedCondominiums, null, true),
   };
 }
 

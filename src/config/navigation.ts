@@ -28,9 +28,9 @@ export const defaultNavigationSections: NavigationSection[] = [
       { label: 'Resumen general', icon: 'home', to: '/dashboard' },
       { label: 'Condominios', icon: 'apartment', to: '/condominios' },
       {
-        label: 'Administradores',
+        label: 'Usuarios',
         icon: 'manage_accounts',
-        to: '/administradores',
+        to: '/usuarios',
       },
       { label: 'Unidades', icon: 'domain', to: '/unidades' },
       { label: 'Propietarios', icon: 'groups', to: '/propietarios' },
@@ -60,7 +60,7 @@ export const defaultNavigationSections: NavigationSection[] = [
 const navigationPathByKey: Record<string, string> = {
   'resumen-general': '/dashboard',
   condominios: '/condominios',
-  administradores: '/administradores',
+  usuarios: '/usuarios',
   unidades: '/unidades',
   propietarios: '/propietarios',
   residentes: '/residentes',
