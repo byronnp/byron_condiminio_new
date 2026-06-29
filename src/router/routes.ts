@@ -11,8 +11,22 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: 'login',
+        alias: '/login',
         name: 'login',
         component: () => import('@/pages/auth/LoginPage.vue'),
+        meta: { public: true },
+      },
+    ],
+  },
+  {
+    path: '/activar-acceso',
+    component: () => import('@/layouts/AuthLayout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'activate-access',
+        component: () => import('@/pages/auth/ActivateAccessPage.vue'),
+        meta: { public: true },
       },
     ],
   },

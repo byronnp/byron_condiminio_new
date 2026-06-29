@@ -41,6 +41,30 @@ interface LoginResponseShape {
   roles?: unknown[];
 }
 
+export interface ActivateAccessPayload {
+  token: string;
+  password: string;
+  passwordConfirmation: string;
+}
+
+export interface AuthServiceFieldErrors {
+  token?: string;
+  password?: string;
+  passwordConfirmation?: string;
+}
+
+export class AuthServiceError extends Error {
+  fieldErrors: AuthServiceFieldErrors;
+  status: number;
+
+  constructor(message: string, status: number, fieldErrors: AuthServiceFieldErrors = {}) {
+    super(message);
+    this.name = 'AuthServiceError';
+    this.status = status;
+    this.fieldErrors = fieldErrors;
+  }
+}
+
 export interface AuthSessionPayload {
   user: SessionUser;
   accessToken: string | null;
@@ -215,6 +239,89 @@ function extractToken(payload: unknown, keys: string[]) {
   }
 
   return null;
+}
+
+function firstTextValue(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text: string | null = firstTextValue(item);
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractServiceFieldErrors(payload: unknown): AuthServiceFieldErrors {
+  if (!isRecord(payload)) {
+    return {};
+  }
+
+  const rawErrors = isRecord(payload.errors)
+    ? payload.errors
+    : (isRecord(payload.field_errors) ? payload.field_errors : null);
+  if (!rawErrors) {
+    return {};
+  }
+
+  const fieldErrors: AuthServiceFieldErrors = {};
+  const entries = Object.entries(rawErrors);
+
+  for (const [key, value] of entries) {
+    const message = firstTextValue(value);
+    if (!message) {
+      continue;
+    }
+
+    if (key === 'password_confirmation' || key === 'passwordConfirmation') {
+      fieldErrors.passwordConfirmation = message;
+      continue;
+    }
+
+    if (key === 'password') {
+      fieldErrors.password = message;
+      continue;
+    }
+
+    if (key === 'token') {
+      fieldErrors.token = message;
+      continue;
+    }
+  }
+
+  return fieldErrors;
+}
+
+function extractServiceErrorMessage(payload: unknown) {
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  return firstTextValue(payload.message) ?? firstTextValue(payload.error);
+}
+
+function mapActivateAccessFallbackMessage(status: number) {
+  switch (status) {
+    case 400:
+    case 401:
+    case 403:
+    case 404:
+      return 'El enlace de activación no es válido.';
+    case 409:
+      return 'Esta invitación ya fue utilizada.';
+    case 410:
+      return 'El enlace de activación expiró. Solicita una nueva invitación.';
+    case 422:
+      return 'Revisa los campos marcados.';
+    default:
+      return 'No fue posible activar tu acceso. Intenta nuevamente.';
+  }
 }
 
 function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
@@ -443,4 +550,24 @@ export async function login(credentials: LoginCredentials): Promise<AuthSessionP
     accessToken,
     refreshToken,
   };
+}
+
+export async function activateAccess(payload: ActivateAccessPayload): Promise<void> {
+  const { response, data } = await requestJson<Record<string, unknown>>('/api/auth/activate-access', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      token: payload.token,
+      password: payload.password,
+      password_confirmation: payload.passwordConfirmation,
+    }),
+  });
+
+  if (!response.ok) {
+    const fieldErrors = extractServiceFieldErrors(data);
+    const message = extractServiceErrorMessage(data) ?? mapActivateAccessFallbackMessage(response.status);
+    throw new AuthServiceError(message, response.status, fieldErrors);
+  }
 }

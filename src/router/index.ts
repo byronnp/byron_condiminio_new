@@ -37,15 +37,16 @@ export default defineRouter((/* { store, ssrContext } */) => {
 
   Router.beforeEach((to) => {
     const session = useSessionStore();
+    const isPublicRoute = Boolean(to.matched.some((record) => record.meta.public));
     const isLoginRoute = to.name === 'login';
     const isAuthenticated = session.isAuthenticated;
 
-    if (!isAuthenticated && !isLoginRoute) {
-      return { name: 'login', query: { redirect: to.fullPath } };
-    }
-
     if (isAuthenticated && isLoginRoute) {
       return { name: 'dashboard' };
+    }
+
+    if (!isAuthenticated && !isPublicRoute) {
+      return { name: 'login', query: { redirect: to.fullPath } };
     }
 
     if (to.meta.requiresCondoContext) {

@@ -141,6 +141,10 @@
               </div>
             </q-banner>
 
+            <q-banner v-if="activationMessage" class="auth-form__success" dense rounded>
+              {{ activationMessage }}
+            </q-banner>
+
             <q-banner v-if="errorMessage" class="auth-form__error" dense rounded>
               {{ errorMessage }}
             </q-banner>
@@ -175,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useAuthLogin } from '@/composables/auth/useAuthLogin';
@@ -221,6 +225,16 @@ const features = [
     subtitle: 'Información protegida y acceso administrado.',
   },
 ];
+
+const activationMessage = computed(() => {
+  const activated = Array.isArray(route.query.activated)
+    ? route.query.activated[0]
+    : route.query.activated;
+
+  return activated === 'true'
+    ? 'Tu acceso fue activado correctamente. Ya puedes iniciar sesión.'
+    : '';
+});
 
 async function handleSubmitLogin() {
   await submitLogin({
@@ -541,6 +555,13 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   border: 1px solid rgba(220, 38, 38, 0.18);
   border-radius: 14px;
   color: #b91c1c;
+}
+
+.auth-form__success {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  border-radius: 14px;
+  color: #166534;
 }
 
 .auth-form__submit {
