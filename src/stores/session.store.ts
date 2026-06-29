@@ -70,6 +70,58 @@ function cloneMenuSections(sections: NavigationSection[]) {
   }));
 }
 
+function getRoleFromUser(user: SessionUser | null): UserRole | null {
+  return user?.role ?? null;
+}
+
+function resolvePrimaryCondoId(
+  role: UserRole | null,
+  activeCondoId: string | null,
+  allowedCondoIds: string[],
+  availableCondominiums: CondoOption[],
+) {
+  const allowedOptions = availableCondominiums.filter(
+    (condo) => allowedCondoIds.includes(condo.id) && condo.active,
+  );
+  const availableOptions = availableCondominiums.filter((condo) => condo.active);
+  const preferredCondo =
+    activeCondoId && availableOptions.some((condo) => condo.id === activeCondoId)
+      ? activeCondoId
+      : null;
+
+  if (role === 'senior') {
+    return preferredCondo;
+  }
+
+  return (
+    preferredCondo ??
+    allowedOptions[0]?.id ??
+    availableOptions[0]?.id ??
+    null
+  );
+}
+
+function normalizeSessionState(state: SessionState): SessionState {
+  const role = getRoleFromUser(state.user);
+  const availableCondominiums = state.availableCondominiums.filter(isValidCondoOption);
+  const allowedCondoIds = state.allowedCondoIds.filter((value) => typeof value === 'string');
+  const activeCondoId = resolvePrimaryCondoId(
+    role,
+    state.activeCondoId,
+    allowedCondoIds,
+    availableCondominiums,
+  );
+
+  return {
+    ...state,
+    activeCondoId,
+    allowedCondoIds: role === 'senior'
+      ? availableCondominiums.map((condo) => condo.id)
+      : allowedCondoIds,
+    availableCondominiums,
+  };
+}
+
 function isValidCondoOption(value: unknown): value is CondoOption {
   return Boolean(
     value &&
@@ -111,7 +163,7 @@ function readSessionFromStorage(raw: string | null): SessionState | null {
           }))
       : defaultNavigationSections;
 
-    return {
+    return normalizeSessionState({
       user:
         parsed.user && typeof parsed.user.name === 'string' && typeof parsed.user.email === 'string'
           ? {
@@ -129,7 +181,7 @@ function readSessionFromStorage(raw: string | null): SessionState | null {
       accessToken: typeof parsed.accessToken === 'string' ? parsed.accessToken : null,
       refreshToken: typeof parsed.refreshToken === 'string' ? parsed.refreshToken : null,
       persistMode: parsed.persistMode === 'session' ? 'session' : 'local',
-    };
+    });
   } catch {
     return null;
   }
@@ -241,7 +293,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   function setSessionState(nextState: SessionState) {
-    state.value = nextState;
+    state.value = normalizeSessionState(nextState);
     persist();
   }
 
@@ -329,7 +381,7 @@ export const useSessionStore = defineStore('session', () => {
       typeof currentCondoId === 'string' && availableIds.includes(currentCondoId);
     const activeCondoId = isSenior.value
       ? (currentCondoIsAvailable ? currentCondoId : null)
-      : (currentCondoIsAvailable ? currentCondoId : (availableCondominiums[0]?.id ?? null));
+      : (currentCondoIsAvailable ? currentCondoId : (state.value.allowedCondoIds[0] ?? availableCondominiums[0]?.id ?? null));
 
     state.value = {
       ...state.value,
@@ -341,6 +393,13 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   function setActiveCondo(condoId: string) {
+    if (!isSenior.value) {
+      const currentCondoId = state.value.activeCondoId;
+      if (currentCondoId && currentCondoId !== condoId) {
+        return;
+      }
+    }
+
     const canUseCondo =
       allowedCondominiums.value.some((condo) => condo.id === condoId) ||
       condoOptions.value.some((condo) => condo.id === condoId);

@@ -170,14 +170,14 @@
                   class="wizard-form"
                 >
                   <div class="step-panel">
-                    <div class="section-title">Tipo y asignación</div>
+                    <div class="section-title">Roles permitidos y asignación</div>
                     <div class="section-subtitle">
-                      El tipo seleccionado determina automáticamente el alcance de la cuenta.
+                      El condominio define los roles disponibles y el alcance de la cuenta.
                     </div>
 
                     <div class="administrator-type-grid q-mt-md">
                       <button
-                        v-for="option in administratorTypeOptions"
+                        v-for="option in availableAdministratorTypeOptions"
                         :key="option.value"
                         type="button"
                         class="administrator-type"
@@ -191,11 +191,15 @@
                           <q-icon :name="option.icon" size="24px" />
                         </span>
                         <span class="administrator-type__content">
-                          <span class="administrator-type__title">{{ option.label }}</span>
-                          <span class="administrator-type__description">
-                            {{ option.description }}
+                          <span class="administrator-type__title">
+                            {{ getAdministratorTypeLabel(option.value) }}
                           </span>
-                          <span class="administrator-type__meta">{{ option.meta }}</span>
+                          <span class="administrator-type__description">
+                            {{ getAdministratorTypeDescription(option.value) }}
+                          </span>
+                          <span class="administrator-type__meta">
+                            {{ getAdministratorTypeMeta(option.value) }}
+                          </span>
                         </span>
                         <q-icon
                           :name="
@@ -209,12 +213,23 @@
                       </button>
                     </div>
 
+                    <div v-if="isLoadingCondominiumRoles" class="load-error q-mt-md">
+                      <q-spinner size="18px" color="primary" />
+                      <span>Cargando roles del condominio...</span>
+                    </div>
+
+                    <div v-else-if="condominiumRolesLoadError" class="load-error q-mt-md">
+                      <q-icon name="error_outline" size="18px" />
+                      <span>{{ condominiumRolesLoadError }}</span>
+                      <q-btn flat dense no-caps label="Reintentar" @click="refreshCondominiumRoles" />
+                    </div>
+
                     <div v-if="form.type === 'senior'" class="scope-panel q-mt-md">
                       <div class="scope-panel__icon">
                         <q-icon name="public" size="21px" />
                       </div>
                       <div>
-                        <div class="scope-panel__title">Acceso global</div>
+                        <div class="scope-panel__title">Rol con acceso global</div>
                         <div class="scope-panel__text">
                           Podrá consultar todos los condominios y cambiar el contexto activo desde
                           el encabezado de la plataforma.
@@ -226,12 +241,63 @@
                       <div class="field-group__header">
                         <q-icon name="apartment" size="18px" />
                         <div>
-                          <div class="field-group__title">Condominio asignado</div>
+                          <div class="field-group__title">Condominio y rol asignado</div>
                           <div class="field-group__hint">
-                            La cuenta tendrá acceso únicamente al condominio seleccionado.
+                            Selecciona el condominio para cargar sus roles disponibles.
                           </div>
                         </div>
                       </div>
+
+                      <q-select
+                        v-model="form.selectedRoleId"
+                        class="q-mt-md"
+                        dense
+                        outlined
+                        emit-value
+                        map-options
+                        hide-bottom-space
+                        label="Rol del condominio *"
+                        option-label="name"
+                        option-value="id"
+                        :options="condominiumRoleOptions"
+                        :loading="isLoadingCondominiumRoles"
+                        :disable="isLoadingCondominiumRoles || condominiumRoleOptions.length === 0"
+                        :rules="[requiredRule]"
+                      >
+                        <template #prepend>
+                          <q-icon name="admin_panel_settings" />
+                        </template>
+                        <template #option="scope">
+                          <q-item v-bind="scope.itemProps">
+                            <q-item-section>
+                              <q-item-label>{{ scope.opt.name }}</q-item-label>
+                              <q-item-label class="text-caption text-grey-7" lines="2">
+                                {{
+                                  scope.opt.description ||
+                                  'Rol disponible para el condominio seleccionado.'
+                                }}
+                              </q-item-label>
+                            </q-item-section>
+                            <q-item-section side>
+                              <q-badge
+                                v-if="normalizeAdministratorTypeCode(scope.opt.code)"
+                                color="primary"
+                                outline
+                                class="text-uppercase"
+                              >
+                                {{ getRoleScopeLabel(scope.opt.code) }}
+                              </q-badge>
+                            </q-item-section>
+                          </q-item>
+                        </template>
+                        <template #no-option>
+                          <q-item>
+                            <q-item-section class="text-grey">
+                              No hay roles activos para este condominio
+                            </q-item-section>
+                          </q-item>
+                        </template>
+                      </q-select>
 
                       <q-select
                         v-model="form.condominiumId"
@@ -248,7 +314,11 @@
                         option-value="value"
                         :options="filteredCondominiumOptions"
                         :loading="isLoadingCondominiums"
-                        :disable="isLoadingCondominiums || condominiumOptions.length === 0"
+                        :disable="
+                          isLoadingCondominiums ||
+                          condominiumOptions.length === 0 ||
+                          isCondominiumAdminFixed
+                        "
                         :rules="[requiredRule]"
                         @filter="filterCondominiums"
                       >
@@ -268,6 +338,12 @@
                         <q-icon name="error_outline" size="18px" />
                         <span>{{ condominiumsLoadError }}</span>
                         <q-btn flat dense no-caps label="Reintentar" @click="loadCondominiums" />
+                      </div>
+
+                      <div v-if="condominiumRolesLoadError" class="load-error q-mt-sm">
+                        <q-icon name="error_outline" size="18px" />
+                        <span>{{ condominiumRolesLoadError }}</span>
+                        <q-btn flat dense no-caps label="Reintentar" @click="refreshCondominiumRoles" />
                       </div>
                     </div>
 
@@ -329,6 +405,10 @@
                           <div>
                             <span>Condominio</span>
                             <strong>{{ selectedCondominiumName }}</strong>
+                          </div>
+                          <div v-if="form.type === 'condominium_admin'">
+                            <span>Rol</span>
+                            <strong>{{ selectedCondominiumRole?.name || '-' }}</strong>
                           </div>
                         </div>
                       </div>
@@ -412,6 +492,10 @@
                 <span>Condominio</span>
                 <strong>{{ selectedCondominiumName }}</strong>
               </div>
+              <div class="summary-meta" v-if="form.type === 'condominium_admin'">
+                <span>Rol</span>
+                <strong>{{ selectedCondominiumRole?.name || 'Sin definir' }}</strong>
+              </div>
               <div class="summary-meta">
                 <span>Estado inicial</span>
                 <q-badge color="warning" rounded>Pendiente</q-badge>
@@ -437,7 +521,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Notify, type QForm } from 'quasar';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -455,6 +539,10 @@ import {
   fetchCondominiumOptions,
   type CondominiumOptionItem,
 } from '@/services/condominiums.service';
+import {
+  fetchCondominiumRoles,
+  type CondominiumRoleItem,
+} from '@/services/condominium-roles.service';
 import { useSessionStore } from '@/stores/session.store';
 
 type StepKey = 'personal' | 'assignment' | 'review';
@@ -476,6 +564,7 @@ type AdministratorForm = {
   email: string;
   phone: string;
   type: AdministratorType | null;
+  selectedRoleId: number | null;
   condominiumId: number | null;
 };
 
@@ -496,6 +585,7 @@ const assignmentFormRef = ref<ValidatableForm | QForm | null>(null);
 const activeStep = ref<StepKey>('personal');
 const condominiumOptions = ref<SelectOption<number>[]>([]);
 const filteredCondominiumOptions = ref<SelectOption<number>[]>([]);
+const condominiumRoleOptions = ref<CondominiumRoleItem[]>([]);
 const {
   options: documentTypeOptions,
   loading: documentTypeOptionsLoading,
@@ -506,6 +596,8 @@ const {
 });
 const isLoadingCondominiums = ref(false);
 const condominiumsLoadError = ref('');
+const isLoadingCondominiumRoles = ref(false);
+const condominiumRolesLoadError = ref('');
 const isSubmitting = ref(false);
 const submitError = ref('');
 const isLoadingAdministrator = ref(false);
@@ -542,6 +634,33 @@ const administratorTypeOptions = [
     icon: 'apartment',
   },
 ] as const;
+const availableAdministratorTypeOptions = computed(() => {
+  const availableCodes = condominiumRoleOptions.value.length > 0
+    ? condominiumRoleOptions.value
+        .map((role) => normalizeAdministratorTypeCode(role.code))
+        .filter((value): value is AdministratorType => value !== null)
+    : (session.isSenior
+      ? (['senior', 'condominium_admin'] as AdministratorType[])
+      : (['condominium_admin'] as AdministratorType[]));
+
+  const uniqueCodes = [...new Set(availableCodes)];
+  const options = administratorTypeOptions.filter((option) => uniqueCodes.includes(option.value));
+
+  if (options.length > 0) {
+    return options;
+  }
+
+  return session.isSenior
+    ? administratorTypeOptions
+    : administratorTypeOptions.filter((option) => option.value === 'condominium_admin');
+});
+const isCondominiumAdminFixed = computed(() => !session.isSenior);
+const defaultCondominiumId = computed(() => {
+  const rawId = activeSessionCondominium.value?.id;
+  const id = typeof rawId === 'string' ? Number(rawId) : NaN;
+  return Number.isInteger(id) ? id : null;
+});
+const defaultCondominiumLabel = computed(() => activeSessionCondominium.value?.name ?? '');
 
 const form = ref<AdministratorForm>(createEmptyAdministratorForm());
 
@@ -552,6 +671,7 @@ const administratorId = computed(() => {
   const id = typeof rawId === 'string' ? Number(rawId) : NaN;
   return Number.isInteger(id) && id > 0 ? id : null;
 });
+const activeSessionCondominium = computed(() => session.activeCondominium);
 const pageTitle = computed(() =>
   isEditMode.value ? 'Editar usuario' : 'Crear nuevo usuario',
 );
@@ -590,6 +710,7 @@ const selectedCondominiumName = computed(() => {
   if (form.value.type === 'senior') return 'No aplica';
   return (
     condominiumOptions.value.find((option) => option.value === form.value.condominiumId)?.label ??
+    defaultCondominiumLabel.value ??
     'Sin asignar'
   );
 });
@@ -600,6 +721,37 @@ const documentSummary = computed(() => {
   const type = selectedDocumentTypeOption.value?.label;
   return [type, form.value.documentNumber.trim()].filter(Boolean).join(' · ') || '-';
 });
+const selectedCondominiumIdForRoles = computed(() => {
+  const condominiumId = form.value.condominiumId ?? defaultCondominiumId.value;
+  return Number.isInteger(condominiumId ?? NaN) ? condominiumId : null;
+});
+const selectedCondominiumRole = computed(
+  () => condominiumRoleOptions.value.find((role) => role.id === form.value.selectedRoleId) ?? null,
+);
+const roleLabelsByType = computed(() => {
+  const labels = new Map<AdministratorType, string>();
+
+  for (const role of condominiumRoleOptions.value) {
+    const type = normalizeAdministratorTypeCode(role.code);
+    if (type && !labels.has(type)) {
+      labels.set(type, role.name);
+    }
+  }
+
+  return labels;
+});
+const roleDescriptionsByType = computed(() => {
+  const descriptions = new Map<AdministratorType, string>();
+
+  for (const role of condominiumRoleOptions.value) {
+    const type = normalizeAdministratorTypeCode(role.code);
+    if (type && role.description && !descriptions.has(type)) {
+      descriptions.set(type, role.description);
+    }
+  }
+
+  return descriptions;
+});
 
 onMounted(() => {
   void loadDocumentTypeOptions();
@@ -608,6 +760,14 @@ onMounted(() => {
     void loadAdministratorForEdit();
   }
 });
+
+watch(
+  selectedCondominiumIdForRoles,
+  (condominiumId) => {
+    void loadCondominiumRolesForCondominium(condominiumId);
+  },
+  { immediate: true },
+);
 
 function stepIndex(step: StepKey) {
   return steps.findIndex((item) => item.key === step);
@@ -653,15 +813,20 @@ async function validateStep(step: StepKey) {
       return true;
     }
 
-    return Boolean(await assignmentFormRef.value?.validate()) && form.value.condominiumId !== null;
+    return (
+      Boolean(await assignmentFormRef.value?.validate()) &&
+      form.value.condominiumId !== null &&
+      form.value.selectedRoleId !== null
+    );
   }
 
   return Boolean(
     form.value.firstName.trim() &&
-    form.value.lastName.trim() &&
-    normalizedEmail.value &&
-    form.value.type &&
-    (form.value.type === 'senior' || form.value.condominiumId !== null),
+      form.value.lastName.trim() &&
+      normalizedEmail.value &&
+      form.value.type &&
+      (form.value.type === 'senior' ||
+        (form.value.condominiumId !== null && form.value.selectedRoleId !== null)),
   );
 }
 
@@ -781,6 +946,7 @@ function applyAdministratorDetail(detail: AdministratorDetail) {
     email: detail.email,
     phone: detail.phone,
     type: detail.type,
+    selectedRoleId: null,
     condominiumId: detail.type === 'condominium_admin' ? detail.condominiumId : null,
   };
 }
@@ -794,7 +960,8 @@ function isReviewPayloadReady() {
       normalizedEmail.value &&
       form.value.phone.trim() &&
       form.value.type &&
-      (form.value.type === 'senior' || form.value.condominiumId !== null),
+      (form.value.type === 'senior' ||
+        (form.value.condominiumId !== null && form.value.selectedRoleId !== null)),
   );
 }
 
@@ -819,7 +986,11 @@ function selectAdministratorType(type: AdministratorType) {
   form.value.type = type;
   if (type === 'senior') {
     form.value.condominiumId = null;
+    form.value.selectedRoleId = null;
+    return;
   }
+
+  applyDefaultCondominiumAssignment();
 }
 
 async function loadCondominiums() {
@@ -831,6 +1002,7 @@ async function loadCondominiums() {
     condominiumOptions.value = items.map(mapCondominiumOption);
     filteredCondominiumOptions.value = [...condominiumOptions.value];
     applyCondominiumFromQuery();
+    applyDefaultCondominiumAssignment();
   } catch (error) {
     condominiumOptions.value = [];
     filteredCondominiumOptions.value = [];
@@ -864,6 +1036,108 @@ function applyCondominiumFromQuery() {
   ) {
     form.value.type = 'condominium_admin';
     form.value.condominiumId = condominiumId;
+  }
+}
+
+async function loadCondominiumRolesForCondominium(condominiumId: number | null) {
+  condominiumRolesLoadError.value = '';
+
+  if (condominiumId === null) {
+    condominiumRoleOptions.value = [];
+    form.value.selectedRoleId = null;
+    return;
+  }
+
+  isLoadingCondominiumRoles.value = true;
+
+  try {
+    const roles = await fetchCondominiumRoles(condominiumId, session.accessToken);
+    condominiumRoleOptions.value = roles;
+
+    const hasSelectedRole = roles.some((role) => role.id === form.value.selectedRoleId);
+    if (!hasSelectedRole) {
+      form.value.selectedRoleId = roles[0]?.id ?? null;
+    }
+  } catch (error) {
+    condominiumRoleOptions.value = [];
+    form.value.selectedRoleId = null;
+    condominiumRolesLoadError.value =
+      error instanceof Error ? error.message : 'No fue posible cargar los roles del condominio.';
+  } finally {
+    isLoadingCondominiumRoles.value = false;
+  }
+}
+
+function refreshCondominiumRoles() {
+  void loadCondominiumRolesForCondominium(selectedCondominiumIdForRoles.value);
+}
+
+function getAdministratorTypeLabel(type: AdministratorType) {
+  return roleLabelsByType.value.get(type) ?? (type === 'senior' ? 'Usuario senior' : 'Usuario de condominio');
+}
+
+function getAdministratorTypeDescription(type: AdministratorType) {
+  const backendDescription = roleDescriptionsByType.value.get(type);
+  if (backendDescription) {
+    return backendDescription;
+  }
+
+  return type === 'senior'
+    ? 'Acceso global a la plataforma y a todos los condominios.'
+    : 'Acceso operativo limitado a un único condominio.';
+}
+
+function getAdministratorTypeMeta(type: AdministratorType) {
+  if (type === 'senior') {
+    return 'Puede cambiar el contexto activo';
+  }
+
+  return selectedCondominiumName.value !== 'Sin asignar'
+    ? `Asignado a ${selectedCondominiumName.value}`
+    : 'Requiere una asignación';
+}
+
+function getRoleScopeLabel(code: string) {
+  const type = normalizeAdministratorTypeCode(code);
+
+  if (type === 'senior') {
+    return 'Global';
+  }
+
+  if (type === 'condominium_admin') {
+    return 'Condominio';
+  }
+
+  return code;
+}
+
+function applyDefaultCondominiumAssignment() {
+  if (isEditMode.value) {
+    return;
+  }
+
+  const defaultId = defaultCondominiumId.value;
+  if (defaultId === null) {
+    return;
+  }
+
+  const hasMatchingOption = condominiumOptions.value.some((option) => option.value === defaultId);
+  if (!hasMatchingOption) {
+    return;
+  }
+
+  if (!session.isSenior) {
+    form.value.type = 'condominium_admin';
+    form.value.condominiumId = defaultId;
+    return;
+  }
+
+  if (form.value.type === 'condominium_admin' && form.value.condominiumId === null) {
+    form.value.condominiumId = defaultId;
+  }
+
+  if (form.value.type === 'condominium_admin' && form.value.selectedRoleId === null) {
+    form.value.selectedRoleId = condominiumRoleOptions.value[0]?.id ?? null;
   }
 }
 
@@ -908,6 +1182,40 @@ function goBack() {
   void router.push({ name: 'usuarios' });
 }
 
+function normalizeAdministratorTypeCode(value: string): AdministratorType | null {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (
+    normalized === 'senior' ||
+    normalized === 'super_admin' ||
+    normalized === 'global_admin' ||
+    normalized.includes('senior') ||
+    normalized.includes('super_admin') ||
+    normalized.includes('global_admin')
+  ) {
+    return 'senior';
+  }
+
+  if (
+    normalized === 'condominium_admin' ||
+    normalized === 'condominio_admin' ||
+    normalized === 'administrator' ||
+    normalized === 'admin' ||
+    normalized.includes('condominium_admin') ||
+    normalized.includes('condominio_admin')
+  ) {
+    return 'condominium_admin';
+  }
+
+  return null;
+}
+
 function createEmptyAdministratorForm(): AdministratorForm {
   return {
     firstName: '',
@@ -917,6 +1225,7 @@ function createEmptyAdministratorForm(): AdministratorForm {
     email: '',
     phone: '',
     type: null,
+    selectedRoleId: null,
     condominiumId: null,
   };
 }

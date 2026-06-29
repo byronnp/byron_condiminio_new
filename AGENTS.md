@@ -67,6 +67,8 @@ Backend documentation: `http://localhost:8001/api/documentation`
 
 - Senior users can see all condominiums and switch context.
 - Condominium admins only see their assigned condominium.
+- The `/me` payload exposes `is_platform_admin`; use it as the source of truth for senior vs. condominium admin when normalizing session state and layout behavior.
+- In `MainLayout.vue`, show the condominium context switcher only for senior users. Condominium admins must remain fixed to their assigned condominium and all contextual queries must resolve from the active condominium in session.
 - Preserve the established list-page shell and visual rhythm when adding new list screens.
 - The administrators module must follow the visual and structural pattern established by the condominiums module.
 - Administrator list screens must use `AppListPageShell` with header, search, status filter, CTA, stats cards, table, actions, and pagination.
@@ -78,6 +80,8 @@ Backend documentation: `http://localhost:8001/api/documentation`
 - Administrator creation posts JSON to `POST /api/administrators`.
   - Use `country`, `document_type_id`, `document_number`, `email`, and `condominium_ids`.
   - Use `condominium_ids: []` for senior administrators and `condominium_ids: [id]` for condominium administrators.
+- The documented `POST /api/administrators` contract does not expose `role_id`; do not invent a role assignment field unless the backend documentation adds it.
+- For `NuevoUsuarioPage.vue` / `UsuarioWizardForm.vue`, load condominium roles from `GET /api/condominiums/{condominium}/roles` and keep the role selector bound to the selected condominium. Use the role list for UI context and validation, but keep the administrator payload aligned with the documented API.
 - Administrator editing loads from `GET /api/administrators/{id}` and saves to `PUT /api/administrators/{id}`.
 - Administrator listing loads from `GET /api/administrators`.
 - Administrator list actions are integrated through the administrators service:
@@ -96,3 +100,4 @@ Backend documentation: `http://localhost:8001/api/documentation`
 - Quasar notifications used in this flow rely on the `Notify` plugin being enabled in `quasar.config.ts`.
 - Global confirmation and alert dialogs must come from `src/components/general/` instead of `window.confirm`, ad hoc banners, or duplicated modal code.
 - Use the general confirmation dialog for destructive actions such as deleting condominiums and similar cross-module operations.
+- Public authentication routes such as `/activar-acceso` must use `meta.public = true` and remain accessible without session. The login screen may surface `?activated=true` as a success banner only; do not reintroduce condo selection there.
