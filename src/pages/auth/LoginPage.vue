@@ -129,8 +129,8 @@
             </div>
 
             <div class="auth-form__helper">
-              El inicio de sesión se valida contra el backend y luego se resuelve el rol,
-              el condominio y el contexto de trabajo.
+              El inicio de sesión se valida contra el backend y luego se resuelve el rol, el
+              condominio y el contexto de trabajo.
             </div>
 
             <q-banner class="auth-form__demo">
@@ -183,7 +183,7 @@ import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useAuthLogin } from '@/composables/auth/useAuthLogin';
-import loginHero from '@/referencias/referencia_login_multicondominio.png';
+import loginHero from '@/assets/img/login/login.png';
 
 const email = ref('');
 const password = ref('');
@@ -241,8 +241,7 @@ async function handleSubmitLogin() {
     email: email.value,
     password: password.value,
     rememberMe: rememberMe.value,
-    redirectTo:
-      typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard',
+    redirectTo: typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard',
   });
 }
 
@@ -284,7 +283,12 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 .auth-hero__overlay {
   background:
     linear-gradient(180deg, rgba(10, 23, 58, 0.16), rgba(10, 23, 58, 0.52)),
-    linear-gradient(90deg, rgba(10, 23, 58, 0.85), rgba(10, 23, 58, 0.18) 62%, rgba(10, 23, 58, 0.1));
+    linear-gradient(
+      90deg,
+      rgba(10, 23, 58, 0.85),
+      rgba(10, 23, 58, 0.18) 62%,
+      rgba(10, 23, 58, 0.1)
+    );
   inset: 0;
   position: absolute;
 }
