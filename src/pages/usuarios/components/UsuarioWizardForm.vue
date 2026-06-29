@@ -170,185 +170,136 @@
                   class="wizard-form"
                 >
                   <div class="step-panel">
-                    <div class="section-title">Roles permitidos y asignación</div>
+                    <div class="section-title">Rol y alcance</div>
                     <div class="section-subtitle">
-                      El condominio define los roles disponibles y el alcance de la cuenta.
+                      El usuario se creará dentro del condominio activo seleccionado en el layout.
                     </div>
 
-                    <div class="administrator-type-grid q-mt-md">
-                      <button
-                        v-for="option in availableAdministratorTypeOptions"
-                        :key="option.value"
-                        type="button"
-                        class="administrator-type"
-                        :class="{
-                          'administrator-type--selected': form.type === option.value,
-                        }"
-                        :aria-pressed="form.type === option.value"
-                        @click="selectAdministratorType(option.value)"
-                      >
-                        <span class="administrator-type__icon">
-                          <q-icon :name="option.icon" size="24px" />
-                        </span>
-                        <span class="administrator-type__content">
-                          <span class="administrator-type__title">
-                            {{ getAdministratorTypeLabel(option.value) }}
-                          </span>
-                          <span class="administrator-type__description">
-                            {{ getAdministratorTypeDescription(option.value) }}
-                          </span>
-                          <span class="administrator-type__meta">
-                            {{ getAdministratorTypeMeta(option.value) }}
-                          </span>
-                        </span>
-                        <q-icon
-                          :name="
-                            form.type === option.value
-                              ? 'radio_button_checked'
-                              : 'radio_button_unchecked'
-                          "
-                          class="administrator-type__check"
-                          size="20px"
-                        />
-                      </button>
-                    </div>
-
-                    <div v-if="isLoadingCondominiumRoles" class="load-error q-mt-md">
-                      <q-spinner size="18px" color="primary" />
-                      <span>Cargando roles del condominio...</span>
-                    </div>
-
-                    <div v-else-if="condominiumRolesLoadError" class="load-error q-mt-md">
-                      <q-icon name="error_outline" size="18px" />
-                      <span>{{ condominiumRolesLoadError }}</span>
-                      <q-btn flat dense no-caps label="Reintentar" @click="refreshCondominiumRoles" />
-                    </div>
-
-                    <div v-if="form.type === 'senior'" class="scope-panel q-mt-md">
-                      <div class="scope-panel__icon">
-                        <q-icon name="public" size="21px" />
+                    <div class="assignment-flow q-mt-md">
+                      <div class="assignment-card">
+                        <div class="assignment-card__icon">
+                          <q-icon name="apartment" size="21px" />
+                        </div>
+                        <div class="assignment-card__content">
+                          <div class="assignment-card__eyebrow">Condominio activo</div>
+                          <div class="assignment-card__title">
+                            {{ activeCondominiumName }}
+                          </div>
+                          <div class="assignment-card__text">
+                            {{
+                              activeCondominiumId === null
+                                ? 'Selecciona un condominio desde el layout para cargar roles y crear usuarios.'
+                                : 'Los roles y la invitación se aplicarán dentro de este condominio.'
+                            }}
+                          </div>
+                        </div>
+                        <q-badge
+                          :color="activeCondominiumId === null ? 'warning' : 'primary'"
+                          rounded
+                          class="assignment-card__badge"
+                        >
+                          {{ activeCondominiumId === null ? 'Requerido' : 'Contexto actual' }}
+                        </q-badge>
                       </div>
-                      <div>
-                        <div class="scope-panel__title">Rol con acceso global</div>
-                        <div class="scope-panel__text">
-                          Podrá consultar todos los condominios y cambiar el contexto activo desde
-                          el encabezado de la plataforma.
+
+                      <div class="field-group">
+                        <div class="field-group__header">
+                          <q-icon name="admin_panel_settings" size="18px" />
+                          <div>
+                            <div class="field-group__title">Rol del usuario</div>
+                            <div class="field-group__hint">
+                              Selecciona un rol activo disponible para el condominio actual.
+                            </div>
+                          </div>
+                        </div>
+
+                        <q-select
+                          v-model="form.selectedRoleId"
+                          class="q-mt-md"
+                          dense
+                          outlined
+                          emit-value
+                          map-options
+                          hide-bottom-space
+                          label="Rol dentro del condominio *"
+                          option-label="name"
+                          option-value="id"
+                          :options="condominiumRoleOptions"
+                          :loading="isLoadingCondominiumRoles"
+                          :disable="
+                            activeCondominiumId === null ||
+                            isLoadingCondominiumRoles ||
+                            condominiumRoleOptions.length === 0
+                          "
+                          :rules="[requiredRule]"
+                        >
+                          <template #prepend>
+                            <q-icon name="verified_user" />
+                          </template>
+                          <template #option="scope">
+                            <q-item v-bind="scope.itemProps">
+                              <q-item-section>
+                                <q-item-label>{{ scope.opt.name }}</q-item-label>
+                                <q-item-label class="text-caption text-grey-7" lines="2">
+                                  {{
+                                    scope.opt.description ||
+                                    'Rol disponible para el condominio seleccionado.'
+                                  }}
+                                </q-item-label>
+                              </q-item-section>
+                              <q-item-section side>
+                                <q-badge
+                                  v-if="normalizeAdministratorTypeCode(scope.opt.code)"
+                                  color="primary"
+                                  outline
+                                  class="text-uppercase"
+                                >
+                                  {{ getRoleScopeLabel(scope.opt.code) }}
+                                </q-badge>
+                              </q-item-section>
+                            </q-item>
+                          </template>
+                          <template #no-option>
+                            <q-item>
+                              <q-item-section class="text-grey">
+                                No hay roles activos para este condominio
+                              </q-item-section>
+                            </q-item>
+                          </template>
+                        </q-select>
+
+                        <div v-if="isLoadingCondominiumRoles" class="load-state q-mt-md">
+                          <q-spinner size="18px" color="primary" />
+                          <span>Cargando roles del condominio...</span>
+                        </div>
+
+                        <div v-else-if="condominiumRolesLoadError" class="load-error q-mt-md">
+                          <q-icon name="error_outline" size="18px" />
+                          <span>{{ condominiumRolesLoadError }}</span>
+                          <q-btn
+                            flat
+                            dense
+                            no-caps
+                            label="Reintentar"
+                            @click="refreshCondominiumRoles"
+                          />
                         </div>
                       </div>
-                    </div>
 
-                    <div v-else-if="form.type === 'condominium_admin'" class="field-group q-mt-md">
-                      <div class="field-group__header">
-                        <q-icon name="apartment" size="18px" />
+                      <div class="scope-panel">
+                        <div class="scope-panel__icon">
+                          <q-icon :name="form.type === 'senior' ? 'public' : 'lock_person'" size="21px" />
+                        </div>
                         <div>
-                          <div class="field-group__title">Condominio y rol asignado</div>
-                          <div class="field-group__hint">
-                            Selecciona el condominio para cargar sus roles disponibles.
+                          <div class="scope-panel__title">Alcance resultante</div>
+                          <div class="scope-panel__text">
+                            {{ assignmentScopeDescription }}
+                          </div>
+                          <div v-if="selectedCondominiumRole" class="scope-panel__role">
+                            {{ selectedCondominiumRole.name }}
                           </div>
                         </div>
                       </div>
-
-                      <q-select
-                        v-model="form.selectedRoleId"
-                        class="q-mt-md"
-                        dense
-                        outlined
-                        emit-value
-                        map-options
-                        hide-bottom-space
-                        label="Rol del condominio *"
-                        option-label="name"
-                        option-value="id"
-                        :options="condominiumRoleOptions"
-                        :loading="isLoadingCondominiumRoles"
-                        :disable="isLoadingCondominiumRoles || condominiumRoleOptions.length === 0"
-                        :rules="[requiredRule]"
-                      >
-                        <template #prepend>
-                          <q-icon name="admin_panel_settings" />
-                        </template>
-                        <template #option="scope">
-                          <q-item v-bind="scope.itemProps">
-                            <q-item-section>
-                              <q-item-label>{{ scope.opt.name }}</q-item-label>
-                              <q-item-label class="text-caption text-grey-7" lines="2">
-                                {{
-                                  scope.opt.description ||
-                                  'Rol disponible para el condominio seleccionado.'
-                                }}
-                              </q-item-label>
-                            </q-item-section>
-                            <q-item-section side>
-                              <q-badge
-                                v-if="normalizeAdministratorTypeCode(scope.opt.code)"
-                                color="primary"
-                                outline
-                                class="text-uppercase"
-                              >
-                                {{ getRoleScopeLabel(scope.opt.code) }}
-                              </q-badge>
-                            </q-item-section>
-                          </q-item>
-                        </template>
-                        <template #no-option>
-                          <q-item>
-                            <q-item-section class="text-grey">
-                              No hay roles activos para este condominio
-                            </q-item-section>
-                          </q-item>
-                        </template>
-                      </q-select>
-
-                      <q-select
-                        v-model="form.condominiumId"
-                        class="q-mt-md"
-                        dense
-                        outlined
-                        emit-value
-                        map-options
-                        use-input
-                        input-debounce="150"
-                        hide-bottom-space
-                        label="Seleccionar condominio *"
-                        option-label="label"
-                        option-value="value"
-                        :options="filteredCondominiumOptions"
-                        :loading="isLoadingCondominiums"
-                        :disable="
-                          isLoadingCondominiums ||
-                          condominiumOptions.length === 0 ||
-                          isCondominiumAdminFixed
-                        "
-                        :rules="[requiredRule]"
-                        @filter="filterCondominiums"
-                      >
-                        <template #prepend>
-                          <q-icon name="location_city" />
-                        </template>
-                        <template #no-option>
-                          <q-item>
-                            <q-item-section class="text-grey">
-                              No hay condominios disponibles
-                            </q-item-section>
-                          </q-item>
-                        </template>
-                      </q-select>
-
-                      <div v-if="condominiumsLoadError" class="load-error q-mt-sm">
-                        <q-icon name="error_outline" size="18px" />
-                        <span>{{ condominiumsLoadError }}</span>
-                        <q-btn flat dense no-caps label="Reintentar" @click="loadCondominiums" />
-                      </div>
-
-                      <div v-if="condominiumRolesLoadError" class="load-error q-mt-sm">
-                        <q-icon name="error_outline" size="18px" />
-                        <span>{{ condominiumRolesLoadError }}</span>
-                        <q-btn flat dense no-caps label="Reintentar" @click="refreshCondominiumRoles" />
-                      </div>
-                    </div>
-
-                    <div v-else class="type-placeholder q-mt-md">
-                      Selecciona el tipo de usuario para continuar.
                     </div>
                   </div>
                 </q-form>
@@ -529,20 +480,18 @@ import AppStepper from '@/components/shared/AppStepper.vue';
 import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
 import { type CatalogItem } from '@/services/catalog.service';
 import {
-  createAdministrator,
   fetchAdministratorById,
-  updateAdministrator,
   type AdministratorDetail,
-  type SaveAdministratorPayload,
 } from '@/services/administrators.service';
-import {
-  fetchCondominiumOptions,
-  type CondominiumOptionItem,
-} from '@/services/condominiums.service';
 import {
   fetchCondominiumRoles,
   type CondominiumRoleItem,
 } from '@/services/condominium-roles.service';
+import {
+  createAdministrativeUser,
+  updateAdministrativeUser,
+  type SaveAdministrativeUserPayload,
+} from '@/services/users.service';
 import { useSessionStore } from '@/stores/session.store';
 
 type StepKey = 'personal' | 'assignment' | 'review';
@@ -583,8 +532,6 @@ const session = useSessionStore();
 const personalFormRef = ref<ValidatableForm | QForm | null>(null);
 const assignmentFormRef = ref<ValidatableForm | QForm | null>(null);
 const activeStep = ref<StepKey>('personal');
-const condominiumOptions = ref<SelectOption<number>[]>([]);
-const filteredCondominiumOptions = ref<SelectOption<number>[]>([]);
 const condominiumRoleOptions = ref<CondominiumRoleItem[]>([]);
 const {
   options: documentTypeOptions,
@@ -594,8 +541,6 @@ const {
   fallback: [],
   mapItem: mapDocumentTypeOption,
 });
-const isLoadingCondominiums = ref(false);
-const condominiumsLoadError = ref('');
 const isLoadingCondominiumRoles = ref(false);
 const condominiumRolesLoadError = ref('');
 const isSubmitting = ref(false);
@@ -618,49 +563,14 @@ const steps = [
   },
 ] as const;
 
-const administratorTypeOptions = [
-  {
-    value: 'senior',
-    label: 'Usuario senior',
-    description: 'Acceso global a la plataforma y a todos los condominios.',
-    meta: 'Puede cambiar el contexto activo',
-    icon: 'public',
-  },
-  {
-    value: 'condominium_admin',
-    label: 'Usuario de condominio',
-    description: 'Acceso operativo limitado a un único condominio.',
-    meta: 'Requiere una asignación',
-    icon: 'apartment',
-  },
-] as const;
-const availableAdministratorTypeOptions = computed(() => {
-  const availableCodes = condominiumRoleOptions.value.length > 0
-    ? condominiumRoleOptions.value
-        .map((role) => normalizeAdministratorTypeCode(role.code))
-        .filter((value): value is AdministratorType => value !== null)
-    : (session.isSenior
-      ? (['senior', 'condominium_admin'] as AdministratorType[])
-      : (['condominium_admin'] as AdministratorType[]));
-
-  const uniqueCodes = [...new Set(availableCodes)];
-  const options = administratorTypeOptions.filter((option) => uniqueCodes.includes(option.value));
-
-  if (options.length > 0) {
-    return options;
-  }
-
-  return session.isSenior
-    ? administratorTypeOptions
-    : administratorTypeOptions.filter((option) => option.value === 'condominium_admin');
-});
-const isCondominiumAdminFixed = computed(() => !session.isSenior);
-const defaultCondominiumId = computed(() => {
+const activeCondominiumId = computed(() => {
   const rawId = activeSessionCondominium.value?.id;
   const id = typeof rawId === 'string' ? Number(rawId) : NaN;
   return Number.isInteger(id) ? id : null;
 });
-const defaultCondominiumLabel = computed(() => activeSessionCondominium.value?.name ?? '');
+const activeCondominiumName = computed(
+  () => activeSessionCondominium.value?.name ?? 'Sin condominio seleccionado',
+);
 
 const form = ref<AdministratorForm>(createEmptyAdministratorForm());
 
@@ -708,11 +618,7 @@ const scopeLabel = computed(() => {
 });
 const selectedCondominiumName = computed(() => {
   if (form.value.type === 'senior') return 'No aplica';
-  return (
-    condominiumOptions.value.find((option) => option.value === form.value.condominiumId)?.label ??
-    defaultCondominiumLabel.value ??
-    'Sin asignar'
-  );
+  return activeCondominiumName.value;
 });
 const selectedDocumentTypeOption = computed(
   () => documentTypeOptions.value.find((option) => option.value === form.value.documentType) ?? null,
@@ -722,40 +628,30 @@ const documentSummary = computed(() => {
   return [type, form.value.documentNumber.trim()].filter(Boolean).join(' · ') || '-';
 });
 const selectedCondominiumIdForRoles = computed(() => {
-  const condominiumId = form.value.condominiumId ?? defaultCondominiumId.value;
+  const condominiumId = activeCondominiumId.value;
   return Number.isInteger(condominiumId ?? NaN) ? condominiumId : null;
 });
 const selectedCondominiumRole = computed(
   () => condominiumRoleOptions.value.find((role) => role.id === form.value.selectedRoleId) ?? null,
 );
-const roleLabelsByType = computed(() => {
-  const labels = new Map<AdministratorType, string>();
-
-  for (const role of condominiumRoleOptions.value) {
-    const type = normalizeAdministratorTypeCode(role.code);
-    if (type && !labels.has(type)) {
-      labels.set(type, role.name);
-    }
+const assignmentScopeDescription = computed(() => {
+  if (activeCondominiumId.value === null) {
+    return 'Selecciona un condominio en el layout para habilitar la creación de usuarios.';
   }
 
-  return labels;
-});
-const roleDescriptionsByType = computed(() => {
-  const descriptions = new Map<AdministratorType, string>();
-
-  for (const role of condominiumRoleOptions.value) {
-    const type = normalizeAdministratorTypeCode(role.code);
-    if (type && role.description && !descriptions.has(type)) {
-      descriptions.set(type, role.description);
-    }
+  if (!selectedCondominiumRole.value) {
+    return `Selecciona un rol para definir el alcance dentro de ${activeCondominiumName.value}.`;
   }
 
-  return descriptions;
+  if (form.value.type === 'senior') {
+    return `El rol ${selectedCondominiumRole.value.name} otorga alcance global desde el contexto ${activeCondominiumName.value}.`;
+  }
+
+  return `El usuario tendrá acceso restringido a ${activeCondominiumName.value} con el rol seleccionado.`;
 });
 
 onMounted(() => {
   void loadDocumentTypeOptions();
-  void loadCondominiums();
   if (isEditMode.value) {
     void loadAdministratorForEdit();
   }
@@ -765,6 +661,14 @@ watch(
   selectedCondominiumIdForRoles,
   (condominiumId) => {
     void loadCondominiumRolesForCondominium(condominiumId);
+  },
+  { immediate: true },
+);
+
+watch(
+  selectedCondominiumRole,
+  () => {
+    applySelectedRoleAssignment();
   },
   { immediate: true },
 );
@@ -805,19 +709,11 @@ async function validateStep(step: StepKey) {
   }
 
   if (step === 'assignment') {
-    if (!form.value.type) {
+    if (activeCondominiumId.value === null) {
       return false;
     }
 
-    if (form.value.type === 'senior') {
-      return true;
-    }
-
-    return (
-      Boolean(await assignmentFormRef.value?.validate()) &&
-      form.value.condominiumId !== null &&
-      form.value.selectedRoleId !== null
-    );
+    return Boolean(await assignmentFormRef.value?.validate()) && form.value.selectedRoleId !== null;
   }
 
   return Boolean(
@@ -825,8 +721,8 @@ async function validateStep(step: StepKey) {
       form.value.lastName.trim() &&
       normalizedEmail.value &&
       form.value.type &&
-      (form.value.type === 'senior' ||
-        (form.value.condominiumId !== null && form.value.selectedRoleId !== null)),
+      activeCondominiumId.value !== null &&
+      form.value.selectedRoleId !== null,
   );
 }
 
@@ -865,9 +761,9 @@ async function submitAdministrator() {
             throw new Error('El identificador del usuario no es válido.');
           }
 
-          return updateAdministrator(id, payload, session.accessToken);
+          return updateAdministrativeUser(id, payload, session.accessToken);
         })()
-      : await createAdministrator(payload, session.accessToken);
+      : await createAdministrativeUser(payload, session.accessToken);
 
     if (!result.success) {
       throw new Error(result.message);
@@ -960,13 +856,13 @@ function isReviewPayloadReady() {
       normalizedEmail.value &&
       form.value.phone.trim() &&
       form.value.type &&
-      (form.value.type === 'senior' ||
-        (form.value.condominiumId !== null && form.value.selectedRoleId !== null)),
+      activeCondominiumId.value !== null &&
+      form.value.selectedRoleId !== null,
   );
 }
 
-function buildAdministratorPayload(): SaveAdministratorPayload {
-  if (!form.value.documentType || !form.value.type) {
+function buildAdministratorPayload(): SaveAdministrativeUserPayload {
+  if (!form.value.documentType || !form.value.type || form.value.selectedRoleId === null) {
     throw new Error('La información del usuario está incompleta.');
   }
 
@@ -978,65 +874,9 @@ function buildAdministratorPayload(): SaveAdministratorPayload {
     email: form.value.email,
     phone: form.value.phone,
     type: form.value.type,
-    condominiumId: form.value.type === 'condominium_admin' ? form.value.condominiumId : null,
+    condominiumId: form.value.type === 'condominium_admin' ? activeCondominiumId.value : null,
+    roleId: form.value.selectedRoleId,
   };
-}
-
-function selectAdministratorType(type: AdministratorType) {
-  form.value.type = type;
-  if (type === 'senior') {
-    form.value.condominiumId = null;
-    form.value.selectedRoleId = null;
-    return;
-  }
-
-  applyDefaultCondominiumAssignment();
-}
-
-async function loadCondominiums() {
-  isLoadingCondominiums.value = true;
-  condominiumsLoadError.value = '';
-
-  try {
-    const items = await fetchCondominiumOptions(session.accessToken);
-    condominiumOptions.value = items.map(mapCondominiumOption);
-    filteredCondominiumOptions.value = [...condominiumOptions.value];
-    applyCondominiumFromQuery();
-    applyDefaultCondominiumAssignment();
-  } catch (error) {
-    condominiumOptions.value = [];
-    filteredCondominiumOptions.value = [];
-    condominiumsLoadError.value =
-      error instanceof Error ? error.message : 'No fue posible cargar los condominios.';
-  } finally {
-    isLoadingCondominiums.value = false;
-  }
-}
-
-function mapCondominiumOption(item: CondominiumOptionItem): SelectOption<number> {
-  return {
-    label: item.name,
-    value: item.id,
-  };
-}
-
-function applyCondominiumFromQuery() {
-  if (isEditMode.value) {
-    return;
-  }
-
-  const rawId = Array.isArray(route.query.condominioId)
-    ? route.query.condominioId[0]
-    : route.query.condominioId;
-  const condominiumId = typeof rawId === 'string' ? Number(rawId) : NaN;
-
-  if (
-    Number.isInteger(condominiumId) &&
-    condominiumOptions.value.some((option) => option.value === condominiumId)
-  ) {
-    form.value.type = 'condominium_admin';
-    form.value.condominiumId = condominiumId;
-  }
 }
 
 async function loadCondominiumRolesForCondominium(condominiumId: number | null) {
@@ -1058,9 +898,13 @@ async function loadCondominiumRolesForCondominium(condominiumId: number | null) 
     if (!hasSelectedRole) {
       form.value.selectedRoleId = roles[0]?.id ?? null;
     }
+
+    applySelectedRoleAssignment();
   } catch (error) {
     condominiumRoleOptions.value = [];
     form.value.selectedRoleId = null;
+    form.value.type = null;
+    form.value.condominiumId = activeCondominiumId.value;
     condominiumRolesLoadError.value =
       error instanceof Error ? error.message : 'No fue posible cargar los roles del condominio.';
   } finally {
@@ -1070,31 +914,6 @@ async function loadCondominiumRolesForCondominium(condominiumId: number | null) 
 
 function refreshCondominiumRoles() {
   void loadCondominiumRolesForCondominium(selectedCondominiumIdForRoles.value);
-}
-
-function getAdministratorTypeLabel(type: AdministratorType) {
-  return roleLabelsByType.value.get(type) ?? (type === 'senior' ? 'Usuario senior' : 'Usuario de condominio');
-}
-
-function getAdministratorTypeDescription(type: AdministratorType) {
-  const backendDescription = roleDescriptionsByType.value.get(type);
-  if (backendDescription) {
-    return backendDescription;
-  }
-
-  return type === 'senior'
-    ? 'Acceso global a la plataforma y a todos los condominios.'
-    : 'Acceso operativo limitado a un único condominio.';
-}
-
-function getAdministratorTypeMeta(type: AdministratorType) {
-  if (type === 'senior') {
-    return 'Puede cambiar el contexto activo';
-  }
-
-  return selectedCondominiumName.value !== 'Sin asignar'
-    ? `Asignado a ${selectedCondominiumName.value}`
-    : 'Requiere una asignación';
 }
 
 function getRoleScopeLabel(code: string) {
@@ -1111,43 +930,14 @@ function getRoleScopeLabel(code: string) {
   return code;
 }
 
-function applyDefaultCondominiumAssignment() {
-  if (isEditMode.value) {
-    return;
-  }
+function applySelectedRoleAssignment() {
+  const roleType = selectedCondominiumRole.value
+    ? normalizeAdministratorTypeCode(selectedCondominiumRole.value.code)
+    : null;
 
-  const defaultId = defaultCondominiumId.value;
-  if (defaultId === null) {
-    return;
-  }
-
-  const hasMatchingOption = condominiumOptions.value.some((option) => option.value === defaultId);
-  if (!hasMatchingOption) {
-    return;
-  }
-
-  if (!session.isSenior) {
-    form.value.type = 'condominium_admin';
-    form.value.condominiumId = defaultId;
-    return;
-  }
-
-  if (form.value.type === 'condominium_admin' && form.value.condominiumId === null) {
-    form.value.condominiumId = defaultId;
-  }
-
-  if (form.value.type === 'condominium_admin' && form.value.selectedRoleId === null) {
-    form.value.selectedRoleId = condominiumRoleOptions.value[0]?.id ?? null;
-  }
-}
-
-function filterCondominiums(value: string, update: (callback: () => void) => void) {
-  update(() => {
-    const query = value.trim().toLowerCase();
-    filteredCondominiumOptions.value = query
-      ? condominiumOptions.value.filter((option) => option.label.toLowerCase().includes(query))
-      : [...condominiumOptions.value];
-  });
+  form.value.type = roleType;
+  form.value.condominiumId =
+    roleType === 'condominium_admin' ? activeCondominiumId.value : null;
 }
 
 function requiredRule(value: unknown) {
@@ -1355,6 +1145,7 @@ function normalizeCatalogText(value: string) {
 .invitation-note,
 .scope-panel,
 .load-error,
+.load-state,
 .invitation-confirmation,
 .summary-note {
   align-items: flex-start;
@@ -1371,41 +1162,64 @@ function normalizeCatalogText(value: string) {
   padding: 12px 14px;
 }
 
-.administrator-type-grid {
+.assignment-flow {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.administrator-type {
+.assignment-card {
   align-items: flex-start;
   background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(15, 23, 42, 0.07);
   border-radius: 16px;
-  color: var(--app-text);
-  cursor: pointer;
   display: grid;
   gap: 12px;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 138px;
   padding: 16px;
-  text-align: left;
 }
 
-.administrator-type:hover,
-.administrator-type:focus-visible {
-  border-color: rgba(37, 99, 235, 0.35);
-  outline: 2px solid rgba(37, 99, 235, 0.18);
-  outline-offset: 2px;
+.assignment-card__icon {
+  align-items: center;
+  background: rgba(37, 99, 235, 0.09);
+  border-radius: 13px;
+  color: var(--app-primary);
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
 }
 
-.administrator-type--selected {
-  background: rgba(37, 99, 235, 0.055);
-  border-color: var(--app-primary);
-  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.08);
+.assignment-card__content {
+  min-width: 0;
 }
 
-.administrator-type__icon,
+.assignment-card__eyebrow {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.assignment-card__title {
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 3px;
+}
+
+.assignment-card__text {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.assignment-card__badge {
+  align-self: flex-start;
+  white-space: nowrap;
+}
+
 .scope-panel__icon {
   align-items: center;
   background: rgba(37, 99, 235, 0.09);
@@ -1417,33 +1231,15 @@ function normalizeCatalogText(value: string) {
   width: 42px;
 }
 
-.administrator-type__content {
-  display: grid;
-  gap: 5px;
-}
-
-.administrator-type__title,
 .scope-panel__title {
   font-size: 13px;
   font-weight: 800;
 }
 
-.administrator-type__description,
 .scope-panel__text {
   color: var(--app-text-muted);
   font-size: 12px;
   line-height: 1.45;
-}
-
-.administrator-type__meta {
-  color: var(--app-primary);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.administrator-type__check {
-  color: var(--app-primary);
 }
 
 .scope-panel {
@@ -1453,9 +1249,23 @@ function normalizeCatalogText(value: string) {
   padding: 16px;
 }
 
+.scope-panel__role {
+  color: var(--app-primary);
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+
 .load-error {
   align-items: center;
   color: var(--q-negative);
+  font-size: 12px;
+}
+
+.load-state {
+  align-items: center;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -1477,15 +1287,6 @@ function normalizeCatalogText(value: string) {
   background: rgba(254, 242, 242, 0.96);
   border: 1px solid rgba(239, 68, 68, 0.14);
   color: var(--app-text);
-}
-
-.type-placeholder {
-  border: 1px dashed rgba(148, 163, 184, 0.55);
-  border-radius: 14px;
-  color: var(--app-text-muted);
-  font-size: 12px;
-  padding: 18px;
-  text-align: center;
 }
 
 .review-grid,
@@ -1679,19 +1480,17 @@ function normalizeCatalogText(value: string) {
     padding: 14px;
   }
 
-  .form-grid,
-  .administrator-type-grid {
+  .form-grid {
     grid-template-columns: 1fr;
   }
 
-  .administrator-type {
+  .assignment-card {
     grid-template-columns: auto minmax(0, 1fr);
-    min-height: auto;
   }
 
-  .administrator-type__check {
+  .assignment-card__badge {
     grid-column: 1 / -1;
-    justify-self: end;
+    justify-self: start;
   }
 
   .review-card__list div,

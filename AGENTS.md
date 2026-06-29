@@ -81,7 +81,10 @@ Backend documentation: `http://localhost:8001/api/documentation`
   - Use `country`, `document_type_id`, `document_number`, `email`, and `condominium_ids`.
   - Use `condominium_ids: []` for senior administrators and `condominium_ids: [id]` for condominium administrators.
 - The documented `POST /api/administrators` contract does not expose `role_id`; do not invent a role assignment field unless the backend documentation adds it.
-- For `NuevoUsuarioPage.vue` / `UsuarioWizardForm.vue`, load condominium roles from `GET /api/condominiums/{condominium}/roles` and keep the role selector bound to the selected condominium. Use the role list for UI context and validation, but keep the administrator payload aligned with the documented API.
+- For `NuevoUsuarioPage.vue` / `UsuarioWizardForm.vue`, create administrative users through `POST /api/users`, not `POST /api/administrators`.
+  - Load condominium roles from `GET /api/condominiums/{condominium}/roles`.
+  - Send the selected role through `assignments: [{ condominium_id, role_id }]`.
+  - Use the active condominium selected in the layout as the condominium context for user creation.
 - Administrator editing loads from `GET /api/administrators/{id}` and saves to `PUT /api/administrators/{id}`.
 - Administrator listing loads from `GET /api/administrators`.
 - Administrator list actions are integrated through the administrators service:
