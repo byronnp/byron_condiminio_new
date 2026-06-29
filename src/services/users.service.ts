@@ -17,7 +17,7 @@ export interface SaveAdministrativeUserPayload {
   email: string;
   phone: string;
   type: UserAssignmentType;
-  condominiumId: number | null;
+  condominiumId: number;
   roleId: number;
 }
 
@@ -50,8 +50,7 @@ function buildAdministrativeUserBody(payload: SaveAdministrativeUserPayload) {
     is_access_enabled: false,
     assignments: [
       {
-        condominium_id:
-          payload.type === 'condominium_admin' ? payload.condominiumId : null,
+        condominium_id: payload.condominiumId,
         role_id: payload.roleId,
       },
     ],

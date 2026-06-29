@@ -720,7 +720,6 @@ async function validateStep(step: StepKey) {
     form.value.firstName.trim() &&
       form.value.lastName.trim() &&
       normalizedEmail.value &&
-      form.value.type &&
       activeCondominiumId.value !== null &&
       form.value.selectedRoleId !== null,
   );
@@ -855,14 +854,17 @@ function isReviewPayloadReady() {
       form.value.documentNumber.trim() &&
       normalizedEmail.value &&
       form.value.phone.trim() &&
-      form.value.type &&
       activeCondominiumId.value !== null &&
       form.value.selectedRoleId !== null,
   );
 }
 
 function buildAdministratorPayload(): SaveAdministrativeUserPayload {
-  if (!form.value.documentType || !form.value.type || form.value.selectedRoleId === null) {
+  if (
+    !form.value.documentType ||
+    form.value.selectedRoleId === null ||
+    activeCondominiumId.value === null
+  ) {
     throw new Error('La información del usuario está incompleta.');
   }
 
@@ -873,8 +875,8 @@ function buildAdministratorPayload(): SaveAdministrativeUserPayload {
     documentNumber: form.value.documentNumber,
     email: form.value.email,
     phone: form.value.phone,
-    type: form.value.type,
-    condominiumId: form.value.type === 'condominium_admin' ? activeCondominiumId.value : null,
+    type: form.value.type ?? 'condominium_admin',
+    condominiumId: activeCondominiumId.value,
     roleId: form.value.selectedRoleId,
   };
 }
@@ -935,9 +937,8 @@ function applySelectedRoleAssignment() {
     ? normalizeAdministratorTypeCode(selectedCondominiumRole.value.code)
     : null;
 
-  form.value.type = roleType;
-  form.value.condominiumId =
-    roleType === 'condominium_admin' ? activeCondominiumId.value : null;
+  form.value.type = roleType ?? 'condominium_admin';
+  form.value.condominiumId = activeCondominiumId.value;
 }
 
 function requiredRule(value: unknown) {
