@@ -17,8 +17,14 @@ export interface SaveAdministrativeUserPayload {
   email: string;
   phone: string;
   type: UserAssignmentType;
-  condominiumId: number;
+  condominiumId: number | null;
   roleId: number;
+}
+
+export interface AdministrativeUserRoleOption {
+  id: number;
+  code: string;
+  name: string;
 }
 
 export interface SaveAdministrativeUserResult {
@@ -50,11 +56,42 @@ function buildAdministrativeUserBody(payload: SaveAdministrativeUserPayload) {
     is_access_enabled: false,
     assignments: [
       {
-        condominium_id: payload.condominiumId,
+        ...(payload.condominiumId !== null
+          ? { condominium_id: payload.condominiumId }
+          : {}),
         role_id: payload.roleId,
       },
     ],
   };
+}
+
+export async function fetchAdministrativeUserRoleOptions(
+  token: string | null,
+): Promise<AdministrativeUserRoleOption[]> {
+  const response = await fetch(buildApiUrl('/api/users/form-options'), {
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (handleUnauthorizedResponse(response, token)) return [];
+  if (!response.ok) {
+    throw new Error(`No fue posible cargar los roles administrativos (${response.status})`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  if (!isRecord(payload) || !isRecord(payload.data) || !Array.isArray(payload.data.roles)) {
+    return [];
+  }
+
+  return payload.data.roles.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const id = Number(item.id);
+    const code = typeof item.code === 'string' ? item.code.trim() : '';
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    return Number.isInteger(id) && id > 0 && code && name ? [{ id, code, name }] : [];
+  });
 }
 
 async function submitAdministrativeUserRequest(

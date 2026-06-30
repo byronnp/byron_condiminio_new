@@ -95,6 +95,33 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'administradores',
+        name: 'administradores',
+        component: () => import('@/pages/administradores/AdministradoresPage.vue'),
+        meta: {
+          title: 'Administradores',
+          subtitle: 'Gestión de administradores senior y de condominios',
+        },
+      },
+      {
+        path: 'administradores/nuevo',
+        name: 'administradores-nuevo',
+        component: () => import('@/pages/administradores/NuevoAdministradorPage.vue'),
+        meta: {
+          title: 'Nuevo administrador',
+          subtitle: 'Registro, alcance e invitación de acceso',
+        },
+      },
+      {
+        path: 'administradores/:id/editar',
+        name: 'administradores-editar',
+        component: () => import('@/pages/administradores/EditarAdministradorPage.vue'),
+        meta: {
+          title: 'Editar administrador',
+          subtitle: 'Actualización de información y alcance',
+        },
+      },
+      {
         path: 'unidades',
         name: 'unidades',
         component: () => import('@/pages/unidades/UnidadesPage.vue'),

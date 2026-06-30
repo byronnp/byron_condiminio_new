@@ -16,6 +16,13 @@ interface ApiListResponse {
 
 export type AdministratorType = 'senior' | 'condominium_admin';
 export type AdministratorStatus = 'pending' | 'active' | 'suspended';
+export type AdministratorAccessStatus = 'Activo' | 'Inactivo';
+export type AdministratorInvitationStatus =
+  | 'Pendiente'
+  | 'Aceptada'
+  | 'Expirada'
+  | 'Cancelada'
+  | 'Sin invitacion';
 
 export interface SaveAdministratorPayload {
   firstName: string;
@@ -40,7 +47,8 @@ export interface AdministratorListItem {
   email: string;
   type: 'Senior' | 'Administrador de condominio';
   scope: string;
-  status: 'Activo' | 'Pendiente' | 'Suspendido';
+  status: AdministratorAccessStatus;
+  invitationStatus: AdministratorInvitationStatus;
   initials: string;
 }
 
@@ -155,24 +163,47 @@ function normalizeAdministratorPayloadType(record: Record<string, unknown>): Adm
 
 function normalizeAdministratorStatus(record: Record<string, unknown>) {
   const accessEnabled = record.is_access_enabled ?? record.isAccessEnabled ?? record.access_enabled;
-  if (accessEnabled === false) {
-    return 'Suspendido' as const;
-  }
-
   const rawStatus = pickFirstText(record, ['status', 'state'])
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
 
-  if (['pending', 'pendiente', 'invited', 'invitation_pending'].includes(rawStatus)) {
-    return 'Pendiente' as const;
-  }
-
   if (['suspended', 'suspendido', 'inactive', 'inactivo', 'blocked', 'bloqueado'].includes(rawStatus)) {
-    return 'Suspendido' as const;
+    return 'Inactivo' as const;
   }
 
+  if (accessEnabled === false) return 'Inactivo' as const;
   return 'Activo' as const;
+}
+
+function normalizeAdministratorInvitationStatus(
+  record: Record<string, unknown>,
+): AdministratorInvitationStatus {
+  const invitation = isRecord(record.invitation) ? record.invitation : null;
+  const rawStatus = (
+    pickFirstText(record, [
+      'invitation_status',
+      'invitationStatus',
+      'invite_status',
+      'invitation_state',
+    ]) ||
+    pickFirstText(invitation ?? {}, ['status', 'state']) ||
+    pickFirstText(record, ['status', 'state'])
+  )
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+
+  if (['pending', 'pendiente', 'invited', 'invitation_pending', 'sent'].includes(rawStatus)) {
+    return 'Pendiente';
+  }
+  if (['accepted', 'aceptada', 'completed', 'active', 'activo'].includes(rawStatus)) {
+    return 'Aceptada';
+  }
+  if (['expired', 'expirada', 'vencida'].includes(rawStatus)) return 'Expirada';
+  if (['cancelled', 'canceled', 'cancelada', 'revoked'].includes(rawStatus)) return 'Cancelada';
+
+  return 'Sin invitacion';
 }
 
 function normalizeAdministratorScope(record: Record<string, unknown>, type: AdministratorListItem['type']) {
@@ -210,6 +241,7 @@ function normalizeAdministratorListItem(item: unknown): AdministratorListItem | 
     type,
     scope: normalizeAdministratorScope(item, type),
     status: normalizeAdministratorStatus(item),
+    invitationStatus: normalizeAdministratorInvitationStatus(item),
     initials: buildInitials(name, email),
   };
 }

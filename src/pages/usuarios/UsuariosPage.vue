@@ -196,6 +196,14 @@
             </q-td>
           </template>
 
+          <template #body-cell-invitationStatus="props">
+            <q-td :props="props">
+              <q-badge :color="invitationTone(props.value)" outline rounded class="status-badge">
+                {{ props.value }}
+              </q-badge>
+            </q-td>
+          </template>
+
           <template #body-cell-actions="props">
             <q-td :props="props" class="table-actions">
               <q-btn
@@ -261,7 +269,7 @@
                       </q-item>
 
                       <q-item
-                        v-if="props.row.status === 'Suspendido'"
+                        v-if="props.row.status === 'Inactivo'"
                         v-close-popup
                         clickable
                         class="table-actions-menu__item"
@@ -384,7 +392,7 @@ type DialogTone = 'primary' | 'positive' | 'negative' | 'warning';
 const search = ref('');
 const router = useRouter();
 const session = useSessionStore();
-const statusFilter = ref<'Todos' | 'Activo' | 'Pendiente' | 'Suspendido'>('Todos');
+const statusFilter = ref<'Todos' | 'Activo' | 'Inactivo'>('Todos');
 const typeFilter = ref<TypeFilter>('Todos');
 const condominiumFilter = ref('Todos');
 const condominiumFilterSearch = ref('');
@@ -420,7 +428,13 @@ const columns = [
   { name: 'admin', label: 'Nombre', field: 'name', align: 'left' as const },
   { name: 'type', label: 'Rol', field: 'type', align: 'left' as const },
   { name: 'scope', label: 'Condominio', field: 'scope', align: 'left' as const },
-  { name: 'status', label: 'Estado', field: 'status', align: 'center' as const },
+  { name: 'status', label: 'Acceso', field: 'status', align: 'center' as const },
+  {
+    name: 'invitationStatus',
+    label: 'Invitacion',
+    field: 'invitationStatus',
+    align: 'center' as const,
+  },
   { name: 'actions', label: 'Acciones', field: 'actions', align: 'right' as const },
 ];
 
@@ -430,7 +444,7 @@ const statsCards = computed(() => {
   const condominiumAdmins = rows.value.filter(
     (row) => row.type === 'Administrador de condominio',
   ).length;
-  const pending = rows.value.filter((row) => row.status === 'Pendiente').length;
+  const pending = rows.value.filter((row) => row.invitationStatus === 'Pendiente').length;
   const palette = [
     { bg: 'rgba(37, 99, 235, 0.12)', fg: '#2563eb' },
     { bg: 'rgba(34, 197, 94, 0.12)', fg: '#16a34a' },
@@ -472,8 +486,7 @@ const statsCards = computed(() => {
 const statusOptions = [
   { label: 'Estado: Todos', value: 'Todos' },
   { label: 'Activos', value: 'Activo' },
-  { label: 'Pendientes', value: 'Pendiente' },
-  { label: 'Suspendidos', value: 'Suspendido' },
+  { label: 'Inactivos', value: 'Inactivo' },
 ];
 
 const typeFilterOptions = [
@@ -700,8 +713,14 @@ function filterCondominiumOptions(value: string, update: (callback: () => void) 
 
 function statusTone(status: AdminRow['status']) {
   if (status === 'Activo') return 'positive';
-  if (status === 'Pendiente') return 'warning';
   return 'negative';
+}
+
+function invitationTone(status: AdminRow['invitationStatus']) {
+  if (status === 'Aceptada') return 'positive';
+  if (status === 'Pendiente') return 'warning';
+  if (status === 'Expirada' || status === 'Cancelada') return 'negative';
+  return 'grey-7';
 }
 
 function goToNewUser() {
@@ -721,7 +740,7 @@ function showUserDetail(row: AdminRow) {
     tone: 'primary',
     icon: row.type === 'Senior' ? 'public' : 'manage_accounts',
     title: row.name,
-    message: `${row.email}. ${row.type}, ${scopeDescription}. Estado actual: ${row.status}.`,
+    message: `${row.email}. ${row.type}, ${scopeDescription}. Acceso: ${row.status}. Invitacion: ${row.invitationStatus}.`,
   });
 }
 

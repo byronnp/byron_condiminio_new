@@ -73,6 +73,11 @@ Backend documentation: `http://localhost:8001/api/documentation`
 - The administrators module must follow the visual and structural pattern established by the condominiums module.
 - Administrator list screens must use `AppListPageShell` with header, search, status filter, CTA, stats cards, table, actions, and pagination.
 - Administrator creation and editing must reuse `src/pages/administradores/components/AdministradorWizardForm.vue`.
+- The administrator CRUD is available through:
+  - list: `/administradores`
+  - create: `/administradores/nuevo`
+  - edit: `/administradores/{id}/editar`
+- Keep administrator pages connected to `src/services/administrators.service.ts` and the documented `/api/administrators` endpoints.
 - Administrator forms must not include photo upload, username, temporary password, or manual credential generation. The backend API sends the email invitation.
 - Administrators can be either `senior` or `condominium_admin`.
   - `senior` administrators have global scope and do not require `condominium_id`.
