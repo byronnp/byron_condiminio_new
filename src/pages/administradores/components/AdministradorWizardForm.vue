@@ -174,7 +174,7 @@
                       Define si tendrá alcance global o acceso limitado a un condominio.
                     </div>
 
-                    <div class="type-grid q-mt-md">
+                    <div v-if="session.isSenior" class="type-grid q-mt-md">
                       <button
                         v-for="option in administratorTypeOptions"
                         :key="option.value"
@@ -204,6 +204,19 @@
                       </button>
                     </div>
 
+                    <div v-else class="scope-panel q-mt-md">
+                      <div class="scope-panel__icon">
+                        <q-icon name="apartment" size="21px" />
+                      </div>
+                      <div>
+                        <div class="scope-panel__title">Administrador de condominio</div>
+                        <div class="scope-panel__text">
+                          La nueva cuenta se asignará automáticamente a
+                          <strong>{{ selectedCondominiumName }}</strong>.
+                        </div>
+                      </div>
+                    </div>
+
                     <div v-if="form.type === 'senior'" class="scope-panel q-mt-md">
                       <div class="scope-panel__icon">
                         <q-icon name="public" size="21px" />
@@ -228,6 +241,7 @@
                       </div>
 
                       <q-select
+                        v-if="session.isSenior"
                         v-model="form.condominiumId"
                         class="q-mt-md"
                         dense
@@ -257,6 +271,16 @@
                           </q-item>
                         </template>
                       </q-select>
+
+                      <div v-else class="scope-panel q-mt-md">
+                        <div class="scope-panel__icon">
+                          <q-icon name="domain" size="21px" />
+                        </div>
+                        <div>
+                          <div class="scope-panel__title">{{ selectedCondominiumName }}</div>
+                          <div class="scope-panel__text">Condominio definido por tu sesión.</div>
+                        </div>
+                      </div>
 
                       <div v-if="condominiumsLoadError" class="load-error q-mt-sm">
                         <q-icon name="error_outline" size="18px" />
@@ -385,6 +409,8 @@ import { useRoute, useRouter } from 'vue-router';
 
 import AppStepper from '@/components/shared/AppStepper.vue';
 import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
+import { fetchCurrentPlatformRoleId } from '@/services/auth.service';
+import { fetchCondominiumRoles } from '@/services/condominium-roles.service';
 import {
   createAdministrator,
   fetchAdministratorById,
@@ -398,10 +424,7 @@ import {
   type CondominiumOptionItem,
 } from '@/services/condominiums.service';
 import { type CatalogItem } from '@/services/catalog.service';
-import {
-  createAdministrativeUser,
-  fetchAdministrativeUserRoleOptions,
-} from '@/services/users.service';
+import { createAdministrativeUser, updateAdministrativeUser } from '@/services/users.service';
 import { useSessionStore } from '@/stores/session.store';
 
 type StepKey = 'personal' | 'assignment' | 'review';
@@ -434,6 +457,7 @@ const isSubmitting = ref(false);
 const submitError = ref('');
 const isLoadingAdministrator = ref(false);
 const initialLoadError = ref('');
+const initialAdministratorType = ref<AdministratorType | null>(null);
 const { options: documentTypeOptions, loading: documentTypeOptionsLoading, loadOptions } =
   useCatalogOptions<DocumentTypeOption>('document_types', {
     fallback: [],
@@ -509,6 +533,7 @@ const selectedCondominiumName = computed(() => {
   if (form.value.type === 'senior') return 'No aplica';
   return (
     condominiumOptions.value.find((option) => option.value === form.value.condominiumId)?.label ??
+    (!session.isSenior ? session.activeCondominium?.name : null) ??
     'Sin asignar'
   );
 });
@@ -520,10 +545,15 @@ const documentSummary = computed(() => {
   return [type, form.value.documentNumber.trim()].filter(Boolean).join(' · ') || '-';
 });
 
-onMounted(() => {
-  void loadOptions();
-  void loadCondominiums();
-  if (isEditMode.value) void loadAdministratorForEdit();
+onMounted(async () => {
+  const initialLoads: Promise<unknown>[] = [loadOptions()];
+  if (session.isSenior) {
+    initialLoads.push(loadCondominiums());
+  } else {
+    assignSessionCondominium();
+  }
+  await Promise.all(initialLoads);
+  if (isEditMode.value) await loadAdministratorForEdit();
 });
 
 function stepIndex(step: StepKey) {
@@ -594,7 +624,9 @@ async function submitAdministrator() {
     const result = isEditMode.value
       ? await (async () => {
           if (id === null) throw new Error('El identificador del administrador no es válido.');
-          return updateAdministrator(id, payload, session.accessToken);
+          return payload.type === 'senior' || initialAdministratorType.value !== payload.type
+            ? updateAdministrativeUserAssignment(id, payload)
+            : updateAdministrator(id, payload, session.accessToken);
         })()
       : payload.type === 'senior'
         ? await createSeniorAdministrator(payload)
@@ -619,27 +651,65 @@ async function submitAdministrator() {
 }
 
 async function createSeniorAdministrator(payload: SaveAdministratorPayload) {
-  const roles = await fetchAdministrativeUserRoleOptions(session.accessToken);
-  const seniorRole = roles.find((role) => {
-    const code = role.code.trim().toLowerCase().replace(/[\s-]+/g, '_');
-    const name = role.name.trim().toLowerCase();
-    return ['senior', 'super_admin', 'global_admin', 'platform_admin'].includes(code) ||
-      name.includes('senior');
-  });
+  return saveSeniorAdministrator(null, payload);
+}
 
-  if (!seniorRole) {
-    throw new Error('No existe un rol senior activo para el condominio seleccionado.');
+async function updateSeniorAdministrator(id: number, payload: SaveAdministratorPayload) {
+  return saveSeniorAdministrator(id, payload);
+}
+
+async function updateAdministrativeUserAssignment(
+  id: number,
+  payload: SaveAdministratorPayload,
+) {
+  if (payload.type === 'senior') return updateSeniorAdministrator(id, payload);
+  if (payload.condominiumId === null) {
+    throw new Error('Selecciona el condominio para el administrador.');
   }
 
-  return createAdministrativeUser(
+  const roles = await fetchCondominiumRoles(payload.condominiumId, session.accessToken);
+  const administratorRole = roles.find((role) => {
+    const code = role.code.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return [
+      'administrador',
+      'administrador_condominio',
+      'condominium_admin',
+      'admin_condominio',
+    ].includes(code);
+  });
+
+  if (!administratorRole) {
+    throw new Error('El condominio seleccionado no tiene un rol de administrador activo.');
+  }
+
+  return updateAdministrativeUser(
+    id,
     {
       ...payload,
-      type: 'senior',
-      condominiumId: null,
-      roleId: seniorRole.id,
+      type: 'condominium_admin',
+      condominiumId: payload.condominiumId,
+      roleId: administratorRole.id,
     },
     session.accessToken,
   );
+}
+
+async function saveSeniorAdministrator(id: number | null, payload: SaveAdministratorPayload) {
+  const platformRoleId = await fetchCurrentPlatformRoleId(session.accessToken);
+  if (platformRoleId === null) {
+    throw new Error('La sesión no contiene el rol de plataforma devuelto por /api/auth/me.');
+  }
+
+  const seniorPayload = {
+    ...payload,
+    type: 'senior' as const,
+    condominiumId: null,
+    roleId: platformRoleId,
+  };
+
+  return id === null
+    ? createAdministrativeUser(seniorPayload, session.accessToken)
+    : updateAdministrativeUser(id, seniorPayload, session.accessToken);
 }
 
 async function loadAdministratorForEdit() {
@@ -665,6 +735,7 @@ async function loadAdministratorForEdit() {
 }
 
 function applyAdministratorDetail(detail: AdministratorDetail) {
+  initialAdministratorType.value = detail.type;
   form.value = {
     firstName: detail.firstName,
     lastName: detail.lastName,
@@ -695,6 +766,15 @@ function buildAdministratorPayload(): SaveAdministratorPayload {
     throw new Error('La información del administrador está incompleta.');
   }
 
+  const administratorType = session.isSenior ? form.value.type : 'condominium_admin';
+  const condominiumId = session.isSenior
+    ? form.value.condominiumId
+    : resolveSessionCondominiumId();
+
+  if (administratorType === 'condominium_admin' && condominiumId === null) {
+    throw new Error('No fue posible identificar el condominio asignado a tu sesión.');
+  }
+
   return {
     firstName: form.value.firstName,
     lastName: form.value.lastName,
@@ -702,17 +782,23 @@ function buildAdministratorPayload(): SaveAdministratorPayload {
     documentNumber: form.value.documentNumber,
     email: form.value.email,
     phone: form.value.phone,
-    type: form.value.type,
-    condominiumId: form.value.type === 'condominium_admin' ? form.value.condominiumId : null,
+    type: administratorType,
+    condominiumId: administratorType === 'condominium_admin' ? condominiumId : null,
   };
 }
 
 function selectAdministratorType(type: AdministratorType) {
+  if (!session.isSenior) return;
   form.value.type = type;
   if (type === 'senior') form.value.condominiumId = null;
 }
 
 async function loadCondominiums() {
+  if (!session.isSenior) {
+    assignSessionCondominium();
+    return;
+  }
+
   isLoadingCondominiums.value = true;
   condominiumsLoadError.value = '';
   try {
@@ -727,6 +813,32 @@ async function loadCondominiums() {
   } finally {
     isLoadingCondominiums.value = false;
   }
+}
+
+function assignSessionCondominium() {
+  if (session.isSenior || isEditMode.value) return;
+
+  form.value.type = 'condominium_admin';
+  form.value.condominiumId = resolveSessionCondominiumId();
+  if (form.value.condominiumId === null) {
+    condominiumsLoadError.value =
+      'El condominio de tu sesión no coincide con los condominios disponibles.';
+  }
+}
+
+function resolveSessionCondominiumId() {
+  const activeCondominium = session.activeCondominium;
+  if (!activeCondominium) return null;
+
+  const numericId = Number(activeCondominium.id);
+  if (Number.isInteger(numericId) && numericId > 0) return numericId;
+
+  const matchedOption = condominiumOptions.value.find(
+    (option) =>
+      normalizeCatalogText(option.label) === normalizeCatalogText(activeCondominium.name),
+  );
+
+  return matchedOption?.value ?? null;
 }
 
 function mapCondominiumOption(item: CondominiumOptionItem): SelectOption<number> {
@@ -782,7 +894,7 @@ function createEmptyAdministratorForm(): AdministratorForm {
     documentNumber: '',
     email: '',
     phone: '',
-    type: null,
+    type: session.isSenior ? null : 'condominium_admin',
     condominiumId: null,
   };
 }

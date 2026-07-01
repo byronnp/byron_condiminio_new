@@ -22,6 +22,8 @@ interface ApiUser {
   condominiums?: unknown[];
   activeCondominium?: unknown;
   active_condominium?: unknown;
+  platform_role?: unknown;
+  platformRole?: unknown;
 }
 
 interface LoginResponseShape {
@@ -39,6 +41,8 @@ interface LoginResponseShape {
   activeCondominium?: unknown;
   active_condominium?: unknown;
   roles?: unknown[];
+  platform_role?: unknown;
+  platformRole?: unknown;
 }
 
 export interface ActivateAccessPayload {
@@ -373,7 +377,61 @@ function resolveUser(payload: unknown, fallbackEmail: string): ApiUser {
       user.activeCondominium ?? record.activeCondominium ?? dataRecord.activeCondominium ?? null,
     active_condominium:
       user.active_condominium ?? record.active_condominium ?? dataRecord.active_condominium ?? null,
+    platform_role: user.platform_role ?? record.platform_role ?? dataRecord.platform_role ?? null,
+    platformRole: user.platformRole ?? record.platformRole ?? dataRecord.platformRole ?? null,
   };
+}
+
+function extractPlatformRoleId(user: ApiUser) {
+  const role = isRecord(user.platform_role)
+    ? user.platform_role
+    : isRecord(user.platformRole)
+      ? user.platformRole
+      : null;
+  const id = Number(role?.id);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function extractPlatformRoleIdFromPayload(payload: unknown) {
+  if (!isRecord(payload)) return null;
+
+  const data = isRecord(payload.data) ? payload.data : null;
+  const user = isRecord(payload.user) ? payload.user : null;
+  const dataUser = data && isRecord(data.user) ? data.user : null;
+  const candidates = [
+    payload.platform_role,
+    payload.platformRole,
+    data?.platform_role,
+    data?.platformRole,
+    user?.platform_role,
+    user?.platformRole,
+    dataUser?.platform_role,
+    dataUser?.platformRole,
+  ];
+
+  for (const candidate of candidates) {
+    if (!isRecord(candidate)) continue;
+    const id = Number(candidate.id);
+    if (Number.isInteger(id) && id > 0) return id;
+  }
+
+  return null;
+}
+
+export async function fetchCurrentPlatformRoleId(token: string | null) {
+  if (!token) return null;
+
+  const { response, data, unauthorized } = await requestJson<Record<string, unknown>>(
+    '/api/auth/me',
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+    token,
+  );
+
+  if (unauthorized || !response.ok || !data) return null;
+  return extractPlatformRoleIdFromPayload(data) ?? extractPlatformRoleId(resolveUser(data, ''));
 }
 
 async function fetchCondominiumsForSenior(token: string | null): Promise<CondoOption[] | null> {
@@ -485,6 +543,7 @@ async function hydrateUserSession(
             name: meUser.name ?? fallbackEmail,
             email: meUser.email ?? fallbackEmail,
             role: userRole,
+            platformRoleId: extractPlatformRoleId(meUser),
           },
           allowedCondominiums,
           activeCondoId:
@@ -504,6 +563,7 @@ async function hydrateUserSession(
       name: userFromPayload.name ?? fallbackEmail,
       email: userFromPayload.email ?? fallbackEmail,
       role: resolveUserRole(userFromPayload),
+      platformRoleId: extractPlatformRoleId(userFromPayload),
     },
     allowedCondominiums: normalizedCondominiums,
     activeCondoId: resolveUserRole(userFromPayload) === 'senior'

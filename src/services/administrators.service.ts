@@ -176,6 +176,21 @@ function normalizeAdministratorStatus(record: Record<string, unknown>) {
   return 'Activo' as const;
 }
 
+export interface AdministratorsPageResult {
+  items: AdministratorListItem[];
+  page: number;
+  perPage: number;
+  total: number;
+  lastPage: number;
+}
+
+export interface FetchAdministratorsPageParams {
+  page: number;
+  perPage: number;
+  search?: string;
+  status?: 'active' | 'inactive';
+}
+
 function normalizeAdministratorInvitationStatus(
   record: Record<string, unknown>,
 ): AdministratorInvitationStatus {
@@ -212,9 +227,17 @@ function normalizeAdministratorScope(record: Record<string, unknown>, type: Admi
   }
 
   const condominium = isRecord(record.condominium) ? record.condominium : null;
+  const condominiumNames = Array.isArray(record.condominiums)
+    ? record.condominiums
+        .filter(isRecord)
+        .map((item) => pickFirstText(item, ['name', 'title']))
+        .filter(Boolean)
+    : [];
+
   return (
     pickFirstText(record, ['scope', 'condominium_name', 'condo_name']) ||
     pickFirstText(condominium ?? {}, ['name', 'title']) ||
+    condominiumNames.join(', ') ||
     'Sin condominio asignado'
   );
 }
@@ -277,16 +300,28 @@ function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | n
   }
 
   const condominium = isRecord(record.condominium) ? record.condominium : null;
+  const firstCondominium = Array.isArray(record.condominiums)
+    ? record.condominiums.find(isRecord) ?? null
+    : null;
   const condominiumId = toNumber(
-    record.condominium_id ?? record.condominiumId ?? record.condo_id ?? condominium?.id,
+    record.condominium_id ??
+      record.condominiumId ??
+      record.condo_id ??
+      condominium?.id ??
+      firstCondominium?.id,
   );
+  const documentType = isRecord(record.document_type)
+    ? record.document_type
+    : isRecord(record.documentType)
+      ? record.documentType
+      : null;
 
   return {
     id,
     firstName,
     lastName,
     documentTypeId: toNumber(
-      record.document_type_id ?? record.documentTypeId ?? record.document_type ?? record.documentType,
+      record.document_type_id ?? record.documentTypeId ?? documentType?.id,
     ),
     documentNumber: pickFirstText(record, [
       'document_number',
@@ -472,8 +507,17 @@ export async function updateAdministrator(
   );
 }
 
-export async function fetchAdministrators(token: string | null): Promise<AdministratorListItem[]> {
-  const response = await fetch(buildApiUrl('/api/administrators'), {
+export async function fetchAdministratorsPage(
+  params: FetchAdministratorsPageParams,
+  token: string | null,
+): Promise<AdministratorsPageResult> {
+  const url = new URL('/api/administrators', apiHost);
+  url.searchParams.set('page', String(params.page));
+  url.searchParams.set('per_page', String(params.perPage));
+  if (params.search?.trim()) url.searchParams.set('search', params.search.trim());
+  if (params.status) url.searchParams.set('status', params.status);
+
+  const response = await fetch(url.toString(), {
     headers: {
       Accept: 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -481,7 +525,7 @@ export async function fetchAdministrators(token: string | null): Promise<Adminis
   });
 
   if (handleUnauthorizedResponse(response, token)) {
-    return [];
+    return { items: [], page: 1, perPage: params.perPage, total: 0, lastPage: 1 };
   }
 
   if (!response.ok) {
@@ -489,11 +533,26 @@ export async function fetchAdministrators(token: string | null): Promise<Adminis
   }
 
   const payload = (await response.json()) as ApiListResponse;
-  const items = extractListItems(payload);
-
-  return items
+  const items = extractListItems(payload)
     .map(normalizeAdministratorListItem)
     .filter((item): item is AdministratorListItem => item !== null);
+  const meta = isRecord(payload.meta)
+    ? payload.meta
+    : isRecord(payload.data) && isRecord(payload.data.meta)
+      ? payload.data.meta
+      : {};
+  const total = toNumber(meta.total) ?? items.length;
+  const page = toNumber(meta.current_page ?? meta.currentPage) ?? params.page;
+  const perPage = toNumber(meta.per_page ?? meta.perPage) ?? params.perPage;
+  const lastPage =
+    toNumber(meta.last_page ?? meta.lastPage) ?? Math.max(1, Math.ceil(total / perPage));
+
+  return { items, page, perPage, total, lastPage };
+}
+
+export async function fetchAdministrators(token: string | null): Promise<AdministratorListItem[]> {
+  const result = await fetchAdministratorsPage({ page: 1, perPage: 100 }, token);
+  return result.items;
 }
 
 export async function fetchAdministratorById(

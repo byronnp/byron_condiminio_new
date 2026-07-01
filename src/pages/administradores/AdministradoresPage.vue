@@ -82,9 +82,10 @@
         <q-table
           flat
           bordered
-          :rows="paginatedRows"
+          :rows="sortedRows"
           :columns="columns"
           row-key="id"
+          :pagination="{ rowsPerPage: 0 }"
           hide-bottom
           :loading="isLoadingRows"
           class="list-table"
@@ -293,7 +294,7 @@ import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import {
   deleteAdministrator,
-  fetchAdministrators,
+  fetchAdministratorsPage,
   reactivateAdministrator,
   suspendAdministrator,
   type AdministratorListItem,
@@ -312,7 +313,7 @@ const statusFilter = ref<'Todos' | 'Activo' | 'Inactivo'>('Todos');
 const typeFilter = ref<'Todos' | AdminRow['type']>('Todos');
 const advancedFiltersOpen = ref(false);
 const sortBy = ref<SortOption>('recent');
-const rowsPerPageOptions = [10, 20, 50] as const;
+const rowsPerPageOptions = [5, 10, 15, 20, 25] as const;
 const pagination = ref({ page: 1, rowsPerPage: 10 });
 const isLoadingRows = ref(false);
 const loadError = ref('');
@@ -328,6 +329,8 @@ const alertDialog = ref<{ tone: DialogTone; icon: string; title: string; message
   message: '',
 });
 const rows = ref<AdminRow[]>([]);
+const serverTotalPages = ref(1);
+const serverTotalItems = ref(0);
 
 const columns = [
   { name: 'admin', label: 'Administrador', field: 'name', align: 'left' as const },
@@ -362,7 +365,7 @@ const sortOptions = [
 ] as const;
 
 const statsCards = computed(() => {
-  const total = rows.value.length;
+  const total = serverTotalItems.value;
   const senior = rows.value.filter((row) => row.type === 'Senior').length;
   const condominiumAdmins = rows.value.filter(
     (row) => row.type === 'Administrador de condominio',
@@ -384,19 +387,9 @@ const statsCards = computed(() => {
 });
 
 const filteredRows = computed(() => {
-  const query = search.value.trim().toLowerCase();
-
   return rows.value.filter((row) => {
-    const matchesStatus = statusFilter.value === 'Todos' || row.status === statusFilter.value;
     const matchesType = typeFilter.value === 'Todos' || row.type === typeFilter.value;
-    const matchesQuery =
-      !query ||
-      row.name.toLowerCase().includes(query) ||
-      row.email.toLowerCase().includes(query) ||
-      row.type.toLowerCase().includes(query) ||
-      row.scope.toLowerCase().includes(query);
-
-    return matchesStatus && matchesType && matchesQuery;
+    return matchesType;
   });
 });
 
@@ -426,14 +419,7 @@ const sortedRows = computed(() => {
   return source;
 });
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage)),
-);
-
-const paginatedRows = computed(() => {
-  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
-  return sortedRows.value.slice(start, start + pagination.value.rowsPerPage);
-});
+const totalPages = computed(() => serverTotalPages.value);
 
 const confirmDialogTitle = computed(() => {
   if (pendingAction.value === 'suspend') return 'Suspender administrador';
@@ -473,18 +459,24 @@ const confirmDialogLabel = computed(() => {
 });
 
 watch(
-  () => [filteredRows.value.length, pagination.value.rowsPerPage] as const,
+  () => [search.value, statusFilter.value, typeFilter.value] as const,
   () => {
-    const maxPage = Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage));
-    if (pagination.value.page > maxPage) pagination.value.page = maxPage;
+    if (pagination.value.page !== 1) {
+      pagination.value.page = 1;
+      return;
+    }
+    void loadAdministrators();
   },
-  { immediate: true },
 );
 
 watch(
-  () => [search.value, statusFilter.value, typeFilter.value] as const,
-  () => {
-    pagination.value.page = 1;
+  () => [pagination.value.page, pagination.value.rowsPerPage] as const,
+  ([page, rowsPerPage], previous) => {
+    if (previous && rowsPerPage !== previous[1] && page !== 1) {
+      pagination.value.page = 1;
+      return;
+    }
+    void loadAdministrators();
   },
 );
 
@@ -501,7 +493,21 @@ async function loadAdministrators() {
   isLoadingRows.value = true;
   loadError.value = '';
   try {
-    rows.value = await fetchAdministrators(session.accessToken);
+    const result = await fetchAdministratorsPage(
+      {
+        page: pagination.value.page,
+        perPage: pagination.value.rowsPerPage,
+        search: search.value,
+        ...(statusFilter.value === 'Todos'
+          ? {}
+          : { status: statusFilter.value === 'Activo' ? 'active' as const : 'inactive' as const }),
+      },
+      session.accessToken,
+    );
+    rows.value = result.items;
+    serverTotalItems.value = result.total;
+    serverTotalPages.value = result.lastPage;
+    if (pagination.value.page !== result.page) pagination.value.page = result.page;
   } catch (error) {
     rows.value = [];
     loadError.value =

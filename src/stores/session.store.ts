@@ -19,6 +19,7 @@ export interface SessionUser {
   name: string;
   email: string;
   role: UserRole;
+  platformRoleId: number | null;
 }
 
 interface SessionState {
@@ -170,6 +171,11 @@ function readSessionFromStorage(raw: string | null): SessionState | null {
               name: parsed.user.name,
               email: parsed.user.email,
               role: parsed.user.role === 'senior' ? 'senior' : 'admin',
+              platformRoleId:
+                Number.isInteger(Number(parsed.user.platformRoleId)) &&
+                Number(parsed.user.platformRoleId) > 0
+                  ? Number(parsed.user.platformRoleId)
+                  : null,
             }
           : null,
       activeCondoId: typeof parsed.activeCondoId === 'string' ? parsed.activeCondoId : null,
@@ -317,6 +323,7 @@ export const useSessionStore = defineStore('session', () => {
         name: derivedName,
         email: payload.email,
         role: resolvedRole,
+        platformRoleId: null,
       },
       activeCondoId: selectedCondoId,
       allowedCondoIds:
