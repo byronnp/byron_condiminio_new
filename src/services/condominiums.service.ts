@@ -52,10 +52,21 @@ export interface CondominiumListItem {
   name: string;
   location: string;
   type: string;
+  country: string;
+  province: string;
+  city: string;
   units: number;
   principal: string;
   status: 'Activo' | 'Inactivo';
   image: string;
+}
+
+export interface CondominiumsPageResult {
+  items: CondominiumListItem[];
+  page: number;
+  perPage: number;
+  total: number;
+  lastPage: number;
 }
 
 export interface CondominiumOptionItem {
@@ -145,8 +156,13 @@ function buildLocationLabel(record: Record<string, unknown>) {
     return directLocation;
   }
 
-  const city = pickFirstText(record, ['city', 'city_name']);
-  const province = pickFirstText(record, ['province', 'province_name']);
+  const cityRecord = isRecord(record.city) ? record.city : null;
+  const provinceRecord = isRecord(record.province) ? record.province : null;
+  const city =
+    pickFirstText(cityRecord ?? {}, ['name', 'label']) || pickFirstText(record, ['city_name', 'city']);
+  const province =
+    pickFirstText(provinceRecord ?? {}, ['name', 'label']) ||
+    pickFirstText(record, ['province_name', 'province']);
 
   if (city && province) {
     return `${city}, ${province}`;
@@ -267,11 +283,31 @@ function normalizeCondominiumListItem(item: unknown): CondominiumListItem | null
     return null;
   }
 
+  const type = isRecord(item.type) ? item.type : null;
+  const country = isRecord(item.country) ? item.country : null;
+  const province = isRecord(item.province) ? item.province : null;
+  const city = isRecord(item.city) ? item.city : null;
+
   return {
     id,
     name,
     location: buildLocationLabel(item),
-    type: pickFirstText(item, ['type', 'condominium_type', 'category']) || 'Sin tipo',
+    type:
+      pickFirstText(type ?? {}, ['name', 'label']) ||
+      pickFirstText(item, ['type', 'condominium_type', 'category']) ||
+      'Sin tipo',
+    country:
+      pickFirstText(country ?? {}, ['name', 'label']) ||
+      pickFirstText(item, ['country_name', 'country']) ||
+      'Sin país',
+    province:
+      pickFirstText(province ?? {}, ['name', 'label']) ||
+      pickFirstText(item, ['province_name', 'province']) ||
+      'Sin provincia',
+    city:
+      pickFirstText(city ?? {}, ['name', 'label']) ||
+      pickFirstText(item, ['city_name', 'city']) ||
+      'Sin ciudad',
     units: pickFirstNumber(item, ['units', 'total_units', 'units_count', 'apartments_count']),
     principal: buildPrincipalLabel(item),
     status: buildStatusLabel(item),
@@ -557,8 +593,16 @@ export async function fetchCondominiumById(
   return normalizeCondominiumDetail(payload);
 }
 
-export async function fetchCondominiums(token: string | null): Promise<CondominiumListItem[]> {
-  const response = await fetch(buildApiUrl('/api/condominiums'), {
+export async function fetchCondominiumsPage(
+  page: number,
+  perPage: number,
+  token: string | null,
+): Promise<CondominiumsPageResult> {
+  const url = new URL('/api/condominiums', apiHost);
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('per_page', String(perPage));
+
+  const response = await fetch(url.toString(), {
     headers: {
       Accept: 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -566,7 +610,7 @@ export async function fetchCondominiums(token: string | null): Promise<Condomini
   });
 
   if (handleUnauthorizedResponse(response, token)) {
-    return [];
+    return { items: [], page: 1, perPage, total: 0, lastPage: 1 };
   }
 
   if (!response.ok) {
@@ -574,12 +618,28 @@ export async function fetchCondominiums(token: string | null): Promise<Condomini
   }
 
   const payload = (await response.json()) as ApiListResponse;
-  const items = extractListItems(payload);
-
-  return items
+  const items = extractListItems(payload)
     .map(normalizeCondominiumListItem)
     .filter((item): item is CondominiumListItem => item !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
+  const meta = isRecord(payload.meta)
+    ? payload.meta
+    : isRecord(payload.data) && isRecord(payload.data.meta)
+      ? payload.data.meta
+      : {};
+  const total = toNumber(meta.total) ?? items.length;
+  const currentPage = toNumber(meta.current_page ?? meta.currentPage) ?? page;
+  const currentPerPage = toNumber(meta.per_page ?? meta.perPage) ?? perPage;
+  const lastPage =
+    toNumber(meta.last_page ?? meta.lastPage) ??
+    Math.max(1, Math.ceil(total / currentPerPage));
+
+  return { items, page: currentPage, perPage: currentPerPage, total, lastPage };
+}
+
+export async function fetchCondominiums(token: string | null): Promise<CondominiumListItem[]> {
+  const result = await fetchCondominiumsPage(1, 100, token);
+  return result.items;
 }
 
 export async function fetchCondominiumOptions(

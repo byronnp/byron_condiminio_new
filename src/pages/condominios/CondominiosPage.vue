@@ -13,6 +13,9 @@
       :sort-options="sortOptions"
       action-label="Nuevo condominio"
       action-icon="add_home_work"
+      :filters-label="filtersButtonLabel"
+      :filters-expanded="advancedFiltersOpen"
+      @filters-click="toggleAdvancedFilters"
       @cta-click="goToNewCondominio"
     >
       <template #stats>
@@ -31,6 +34,24 @@
       </template>
 
       <template #table>
+        <div
+          v-if="advancedFiltersOpen"
+          class="advanced-filters q-mb-md"
+          role="region"
+          aria-label="Filtros avanzados de condominios"
+        >
+          <div class="advanced-filters__header">
+            <div>
+              <div class="advanced-filters__title">Filtros avanzados</div>
+              <div class="advanced-filters__hint">Refina el listado por tipo de condominio.</div>
+            </div>
+            <q-btn flat dense no-caps icon="restart_alt" label="Limpiar filtros" :disable="typeFilter === 'Todos'" @click="clearAdvancedFilters" />
+          </div>
+          <q-select v-model="typeFilter" dense outlined emit-value map-options label="Tipo de condominio" :options="typeFilterOptions" class="advanced-filters__field">
+            <template #prepend><q-icon name="category" /></template>
+          </q-select>
+        </div>
+
         <q-banner v-if="loadError" rounded class="q-mb-md condo-error-banner">
           <template #avatar>
             <q-icon name="error_outline" color="negative" />
@@ -41,9 +62,10 @@
         <q-table
           flat
           bordered
-          :rows="paginatedRows"
+          :rows="sortedRows"
           :columns="columns"
           row-key="id"
+          :pagination="{ rowsPerPage: 0 }"
           hide-bottom
           :loading="isLoadingRows"
           class="list-table"
@@ -62,7 +84,9 @@
                 {{
                   loadError
                     ? 'Revisa la conexión con el backend e intenta nuevamente.'
-                    : 'Aún no se han registrado condominios en la plataforma.'
+                    : hasActiveFilters
+                      ? 'No encontramos resultados con los criterios seleccionados.'
+                      : 'Aún no se han registrado condominios en la plataforma.'
                 }}
               </div>
             </div>
@@ -99,7 +123,7 @@
 
           <template #body-cell-actions="props">
             <q-td :props="props" class="table-actions">
-              <q-btn flat round dense icon="visibility" class="table-icon">
+              <q-btn flat round dense icon="visibility" class="table-icon" @click="showCondominiumDetail(props.row)">
                 <q-tooltip>Ver detalle</q-tooltip>
               </q-btn>
               <q-btn flat round dense icon="edit" class="table-icon" @click="goToEditCondominium(props.row)">
@@ -191,6 +215,14 @@
       @confirm="confirmDeleteCondominium"
       @cancel="clearDeleteConfirmation"
     />
+
+    <AppAlertDialog
+      v-model="detailDialogOpen"
+      tone="primary"
+      icon="apartment"
+      :title="detailDialog.title"
+      :message="detailDialog.message"
+    />
   </q-page>
 </template>
 
@@ -200,9 +232,10 @@ import { useRouter } from 'vue-router';
 
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
+import AppAlertDialog from '@/components/general/AppAlertDialog.vue';
 import {
   deleteCondominium,
-  fetchCondominiums,
+  fetchCondominiumsPage,
   type CondominiumListItem,
 } from '@/services/condominiums.service';
 import { useSessionStore } from '@/stores/session.store';
@@ -212,6 +245,9 @@ type CondoRow = {
   name: string;
   location: string;
   type: string;
+  country: string;
+  province: string;
+  city: string;
   units: number;
   principal: string;
   status: 'Activo' | 'Inactivo';
@@ -224,22 +260,31 @@ const router = useRouter();
 const session = useSessionStore();
 const search = ref('');
 const statusFilter = ref<'Todos' | 'Activo' | 'Inactivo'>('Todos');
+const typeFilter = ref('Todos');
+const advancedFiltersOpen = ref(false);
 const sortBy = ref<SortOption>('recent');
-const rowsPerPageOptions = [10, 20, 50] as const;
+const rowsPerPageOptions = [5, 10, 15, 20, 25] as const;
 const pagination = ref({
   page: 1,
   rowsPerPage: 10,
 });
 const rows = ref<CondoRow[]>([]);
+const serverTotalItems = ref(0);
+const serverTotalPages = ref(1);
 const isLoadingRows = ref(false);
 const deletingCondominiumId = ref<number | null>(null);
 const deleteConfirmOpen = ref(false);
 const pendingDeleteRow = ref<CondoRow | null>(null);
 const loadError = ref('');
+const detailDialogOpen = ref(false);
+const detailDialog = ref({ title: '', message: '' });
 
 const columns = [
   { name: 'condominio', label: 'Condominio', field: 'name', align: 'left' as const },
   { name: 'type', label: 'Tipo', field: 'type', align: 'left' as const },
+  { name: 'country', label: 'País', field: 'country', align: 'left' as const },
+  { name: 'province', label: 'Provincia', field: 'province', align: 'left' as const },
+  { name: 'city', label: 'Ciudad', field: 'city', align: 'left' as const },
   { name: 'units', label: 'Unidades', field: 'units', align: 'right' as const },
   { name: 'principal', label: 'Administrador principal', field: 'principal', align: 'left' as const },
   { name: 'status', label: 'Estado', field: 'status', align: 'center' as const },
@@ -247,10 +292,10 @@ const columns = [
 ];
 
 const statsCards = computed(() => {
-  const total = rows.value.length;
+  const total = serverTotalItems.value;
   const active = rows.value.filter((row) => row.status === 'Activo').length;
   const inactive = rows.value.filter((row) => row.status === 'Inactivo').length;
-  const typeCount = new Set(rows.value.map((row) => row.type).filter(Boolean)).size;
+  const units = rows.value.reduce((total, row) => total + row.units, 0);
   const palette = [
     { bg: 'rgba(37, 99, 235, 0.12)', fg: '#2563eb' },
     { bg: 'rgba(34, 197, 94, 0.12)', fg: '#16a34a' },
@@ -278,10 +323,10 @@ const statsCards = computed(() => {
       icon: 'groups',
     },
     {
-      label: 'Tipos registrados',
-      value: String(typeCount),
-      hint: 'Tipos detectados en el listado',
-      icon: 'category',
+      label: 'Total de unidades',
+      value: String(units),
+      hint: 'Unidades registradas',
+      icon: 'home_work',
     },
   ].map((card, index) => ({
     ...card,
@@ -295,6 +340,13 @@ const statusOptions = [
   { label: 'Inactivos', value: 'Inactivo' },
 ];
 
+const typeFilterOptions = computed(() => [
+  { label: 'Tipo: Todos', value: 'Todos' },
+  ...[...new Set(rows.value.map((row) => row.type).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((type) => ({ label: type, value: type })),
+]);
+
 const sortOptions = [
   { label: 'Mas recientes', value: 'recent' },
   { label: 'Mas antiguos', value: 'oldest' },
@@ -306,15 +358,33 @@ const filteredRows = computed(() => {
 
   return rows.value.filter((row) => {
     const matchesStatus = statusFilter.value === 'Todos' || row.status === statusFilter.value;
+    const matchesType = typeFilter.value === 'Todos' || row.type === typeFilter.value;
     const matchesQuery =
       !query ||
       row.name.toLowerCase().includes(query) ||
       row.location.toLowerCase().includes(query) ||
+      row.country.toLowerCase().includes(query) ||
+      row.province.toLowerCase().includes(query) ||
+      row.city.toLowerCase().includes(query) ||
       row.principal.toLowerCase().includes(query);
 
-    return matchesStatus && matchesQuery;
+    return matchesStatus && matchesType && matchesQuery;
   });
 });
+
+const hasActiveFilters = computed(
+  () =>
+    Boolean(search.value.trim()) || statusFilter.value !== 'Todos' || typeFilter.value !== 'Todos',
+);
+const activeFiltersCount = computed(
+  () =>
+    Number(Boolean(search.value.trim())) +
+    Number(statusFilter.value !== 'Todos') +
+    Number(typeFilter.value !== 'Todos'),
+);
+const filtersButtonLabel = computed(() =>
+  activeFiltersCount.value ? `Filtros (${activeFiltersCount.value})` : 'Filtros',
+);
 
 const sortedRows = computed(() => {
   const source = [...filteredRows.value];
@@ -330,25 +400,24 @@ const sortedRows = computed(() => {
   return source;
 });
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage)),
-);
-
-const paginatedRows = computed(() => {
-  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
-  const end = start + pagination.value.rowsPerPage;
-  return sortedRows.value.slice(start, end);
-});
+const totalPages = computed(() => serverTotalPages.value);
 
 watch(
-  () => [filteredRows.value.length, pagination.value.rowsPerPage] as const,
+  () => [search.value, statusFilter.value, typeFilter.value] as const,
   () => {
-    const maxPage = Math.max(1, Math.ceil(sortedRows.value.length / pagination.value.rowsPerPage));
-    if (pagination.value.page > maxPage) {
-      pagination.value.page = maxPage;
-    }
+    pagination.value.page = 1;
   },
-  { immediate: true },
+);
+
+watch(
+  () => [pagination.value.page, pagination.value.rowsPerPage] as const,
+  ([page, rowsPerPage], previous) => {
+    if (previous && rowsPerPage !== previous[1] && page !== 1) {
+      pagination.value.page = 1;
+      return;
+    }
+    void loadCondominiums();
+  },
 );
 
 function mapCondominiumRow(item: CondominiumListItem): CondoRow {
@@ -357,6 +426,9 @@ function mapCondominiumRow(item: CondominiumListItem): CondoRow {
     name: item.name,
     location: item.location,
     type: item.type,
+    country: item.country,
+    province: item.province,
+    city: item.city,
     units: item.units,
     principal: item.principal,
     status: item.status,
@@ -374,8 +446,15 @@ async function loadCondominiums() {
   loadError.value = '';
 
   try {
-    const condominiums = await fetchCondominiums(session.accessToken);
-    rows.value = condominiums.map(mapCondominiumRow);
+    const result = await fetchCondominiumsPage(
+      pagination.value.page,
+      pagination.value.rowsPerPage,
+      session.accessToken,
+    );
+    rows.value = result.items.map(mapCondominiumRow);
+    serverTotalItems.value = result.total;
+    serverTotalPages.value = result.lastPage;
+    if (pagination.value.page !== result.page) pagination.value.page = result.page;
   } catch (error) {
     rows.value = [];
     loadError.value =
@@ -431,6 +510,22 @@ function statusTone(status: CondoRow['status']) {
   return status === 'Activo' ? 'positive' : 'negative';
 }
 
+function toggleAdvancedFilters() {
+  advancedFiltersOpen.value = !advancedFiltersOpen.value;
+}
+
+function clearAdvancedFilters() {
+  typeFilter.value = 'Todos';
+}
+
+function showCondominiumDetail(row: CondoRow) {
+  detailDialog.value = {
+    title: row.name,
+    message: `${row.city}, ${row.province}, ${row.country}. Tipo: ${row.type}. Unidades: ${row.units}. Administrador principal: ${row.principal}. Estado: ${row.status}.`,
+  };
+  detailDialogOpen.value = true;
+}
+
 function goToNewCondominio() {
   void router.push('/condominios/nuevo');
 }
@@ -474,6 +569,39 @@ const deleteConfirmMessage = computed(() => {
 <style scoped>
 .condominios-page {
   min-height: 100%;
+}
+
+.advanced-filters {
+  background: rgba(248, 250, 252, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 16px;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.advanced-filters__header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.advanced-filters__title {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.advanced-filters__hint {
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+.advanced-filters__field {
+  max-width: 360px;
 }
 
 .stat-card {
@@ -520,6 +648,14 @@ const deleteConfirmMessage = computed(() => {
 
 .list-table :deep(.q-table__container) {
   border-radius: 16px;
+}
+
+.list-table :deep(.q-table__middle) {
+  overflow-x: auto;
+}
+
+.list-table :deep(table) {
+  min-width: 1180px;
 }
 
 .list-table :deep(thead tr th) {
