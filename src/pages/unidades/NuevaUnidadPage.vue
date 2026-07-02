@@ -1,603 +1,132 @@
 <template>
-  <q-page class="nueva-unidad-page">
+  <q-page class="house-page">
     <div class="page-shell">
       <header class="page-header">
-        <div class="page-header__copy">
-          <div class="page-header__eyebrow">Módulo / Unidades</div>
-          <h1 class="page-header__title">Nueva unidad</h1>
-          <p class="page-header__subtitle">
-            Registra una nueva unidad con sus datos base y revisa el resumen a la derecha mientras avanzas.
-          </p>
+        <div>
+          <div class="eyebrow">Módulo / Casas</div>
+          <h1>Nueva casa</h1>
+          <p>Registra los datos esenciales. Personas y parqueaderos se agregan después.</p>
         </div>
-
-        <div class="page-header__actions">
-          <q-btn flat no-caps icon="arrow_back" label="Volver" class="header-action header-action--ghost" @click="goBack" />
-        </div>
+        <q-btn flat no-caps icon="arrow_back" label="Volver" class="ghost-btn" @click="goBack" />
       </header>
 
-      <section class="page-layout">
-        <q-form ref="formRef" class="page-layout__main" @submit.prevent="submitForm">
+      <q-banner v-if="!activeCondominiumId" rounded class="context-warning">
+        <template #avatar><q-icon name="apartment" /></template>
+        Selecciona un condominio en el layout para registrar una casa.
+      </q-banner>
+
+      <div v-else class="content-grid">
+        <q-form ref="formRef" class="form-column" @submit.prevent="submitForm">
+          <section class="context-panel">
+            <q-icon name="apartment" size="22px" />
+            <div><span>Condominio seleccionado</span><strong>{{ condominiumName }}</strong></div>
+          </section>
+
           <q-card flat bordered class="section-card">
             <q-card-section>
-              <div class="section-card__header">
-                <div>
-                  <div class="section-card__title">Identificación</div>
-                  <div class="section-card__subtitle">
-                    Define el bloque, número y estado inicial de la unidad.
-                  </div>
-                </div>
-              </div>
-
-              <div class="form-grid q-mt-md">
-                <q-input
-                  v-model="form.bloque"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  label="Bloque *"
-                  placeholder="Ej: A"
-                  maxlength="10"
-                  :rules="[requiredRule]"
-                />
-                <q-input
-                  v-model="form.numero"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  label="Número de unidad *"
-                  placeholder="Ej: A-101"
-                  maxlength="20"
-                  :rules="[requiredRule]"
-                />
-              </div>
-
-              <div class="form-grid q-mt-md">
-                <q-select
-                  v-model="form.estado"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  :options="statusOptions"
-                  label="Estado *"
-                  :rules="[requiredRule]"
-                />
-                <q-input
-                  v-model="form.propietario"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  label="Propietario asignado *"
-                  placeholder="Buscar o escribir propietario"
-                  :rules="[requiredRule]"
-                />
+              <div class="section-heading"><q-icon name="tag" /><div><strong>Identificación</strong><span>Define dónde se encuentra y cómo reconocerla.</span></div></div>
+              <div class="form-grid q-mt-lg">
+                <q-select v-model="form.blockId" dense outlined emit-value map-options label="Bloque, manzana o sector *" :options="blockOptions" :loading="loadingOptions" :rules="[requiredRule]" />
+                <q-input v-model="form.number" dense outlined label="Número de casa *" placeholder="Ej: 12" maxlength="30" :rules="[requiredTextRule]" @update:model-value="suggestCode" />
+                <q-input v-model="form.code" dense outlined label="Código interno *" placeholder="Ej: CASA-12" maxlength="40" :rules="[requiredTextRule]" @update:model-value="codeWasEdited = true" />
               </div>
             </q-card-section>
           </q-card>
 
           <q-card flat bordered class="section-card">
             <q-card-section>
-              <div class="section-card__header">
-                <div>
-                  <div class="section-card__title">Dimensiones</div>
-                  <div class="section-card__subtitle">
-                    Agrega el área y la distribución base de la unidad.
-                  </div>
-                </div>
+              <div class="section-heading"><q-icon name="straighten" /><div><strong>Características</strong><span>Configura únicamente los datos propios de la casa.</span></div></div>
+              <div class="form-grid form-grid--compact q-mt-lg">
+                <q-input v-model.number="form.areaM2" dense outlined type="number" min="0.01" step="0.01" label="Área *" suffix="m²" :rules="[positiveNumberRule]" />
               </div>
-
-              <div class="form-grid q-mt-md">
-                <q-input
-                  v-model.number="form.piso"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  type="number"
-                  min="0"
-                  label="Piso *"
-                  :rules="[requiredNumberRule]"
-                />
-                <q-input
-                  v-model.number="form.area"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  type="number"
-                  min="0"
-                  label="Área (m²) *"
-                  :rules="[requiredNumberRule]"
-                />
-                <q-input
-                  v-model.number="form.habitaciones"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  type="number"
-                  min="0"
-                  label="Habitaciones *"
-                  :rules="[requiredNumberRule]"
-                />
-                <q-input
-                  v-model.number="form.banos"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  type="number"
-                  min="0"
-                  label="Baños *"
-                  :rules="[requiredNumberRule]"
-                />
-              </div>
-
-              <div class="form-grid q-mt-md">
-                <q-input
-                  v-model.number="form.estacionamientos"
-                  dense
-                  outlined
-                  hide-bottom-space
-                  type="number"
-                  min="0"
-                  label="Estacionamientos *"
-                  :rules="[requiredNumberRule]"
-                />
-                <q-card flat bordered class="availability-card">
-                  <q-card-section class="availability-card__content">
-                    <div class="availability-card__label">Disponibilidad</div>
-                    <div class="availability-card__value">Se determinará al guardar</div>
-                  </q-card-section>
-                </q-card>
+              <div class="switch-list q-mt-md">
+                <q-item tag="label"><q-item-section><q-item-label>Permitir asignar personas</q-item-label><q-item-label caption>Habilita propietarios, residentes y responsables de facturación.</q-item-label></q-item-section><q-item-section side><q-toggle v-model="form.isAssignable" /></q-item-section></q-item>
+                <q-separator />
+                <q-item tag="label"><q-item-section><q-item-label>Casa activa</q-item-label><q-item-label caption>Permite utilizarla en las operaciones del condominio.</q-item-label></q-item-section><q-item-section side><q-toggle v-model="form.isActive" /></q-item-section></q-item>
               </div>
             </q-card-section>
           </q-card>
 
-          <q-card flat bordered class="section-card">
-            <q-card-section>
-              <div class="section-card__header">
-                <div>
-                  <div class="section-card__title">Observaciones</div>
-                  <div class="section-card__subtitle">
-                    Incluye notas útiles para administración y seguimiento.
-                  </div>
-                </div>
-              </div>
-
-              <q-input
-                v-model="form.observaciones"
-                class="q-mt-md"
-                dense
-                outlined
-                type="textarea"
-                autogrow
-                label="Notas adicionales"
-                placeholder="Ej: Unidad con balcón, vista interna y contrato vigente..."
-              />
-            </q-card-section>
-          </q-card>
-
-          <div class="page-footer">
-            <div class="page-footer__copy">
-              <div class="page-footer__step">Formulario de nueva unidad</div>
-              <div class="page-footer__label">La información se sincroniza con el listado al guardar.</div>
-            </div>
-
-            <div class="page-footer__actions">
-              <q-btn flat no-caps label="Cancelar" class="footer-action footer-action--ghost" @click="goBack" />
-              <q-btn
-                color="primary"
-                unelevated
-                no-caps
-                icon="save"
-                label="Guardar unidad"
-                class="footer-action"
-                :loading="saving"
-                @click="submitForm"
-              />
-            </div>
-          </div>
+          <q-banner v-if="submitError" rounded class="submit-error">{{ submitError }}</q-banner>
+          <div class="form-actions"><q-btn flat no-caps label="Cancelar" @click="goBack" /><q-btn color="primary" unelevated no-caps icon="add_home" label="Crear casa" type="submit" :loading="saving" /></div>
         </q-form>
 
-        <aside class="page-layout__aside">
-          <q-card flat bordered class="summary-panel summary-panel--sticky">
-            <q-card-section class="summary-panel__section">
-              <div class="summary-preview">
-                <div class="summary-preview__icon">
-                  <q-icon name="domain" size="34px" />
-                </div>
-                <div class="summary-preview__body">
-                  <div class="summary-preview__eyebrow">Ficha rápida</div>
-                  <div class="summary-preview__name">
-                    {{ form.numero || 'Nueva unidad' }}
-                  </div>
-                  <div class="summary-preview__meta">
-                    <q-badge :color="statusTone(form.estado)" rounded>
-                      {{ form.estado }}
-                    </q-badge>
-                    <q-badge outline color="primary" rounded>
-                      {{ form.bloque || 'Sin bloque' }}
-                    </q-badge>
-                  </div>
-                </div>
+        <aside>
+          <q-card flat bordered class="summary-card">
+            <q-card-section>
+              <div class="summary-icon"><q-icon name="home" size="30px" /></div>
+              <div class="summary-eyebrow">Resumen de la casa</div>
+              <h2>{{ form.code || 'Nueva casa' }}</h2>
+              <div class="summary-list">
+                <div><span>Condominio</span><strong>{{ condominiumName }}</strong></div>
+                <div><span>Número</span><strong>{{ form.number || 'Sin definir' }}</strong></div>
+                <div><span>Sector</span><strong>{{ selectedBlockName }}</strong></div>
+                <div><span>Área</span><strong>{{ form.areaM2 || 0 }} m²</strong></div>
+                <div><span>Asignable</span><strong>{{ form.isAssignable ? 'Sí' : 'No' }}</strong></div>
+                <div><span>Estado</span><q-badge :color="form.isActive ? 'positive' : 'grey-7'">{{ form.isActive ? 'Activa' : 'Inactiva' }}</q-badge></div>
               </div>
-
-              <div class="summary-list q-mt-md">
-                <div class="summary-item">
-                  <span class="summary-item__label">Bloque</span>
-                  <span class="summary-item__value">{{ form.bloque || 'Sin bloque' }}</span>
-                </div>
-                <div class="summary-item">
-                  <span class="summary-item__label">Unidad</span>
-                  <span class="summary-item__value">{{ form.numero || 'Sin número' }}</span>
-                </div>
-                <div class="summary-item">
-                  <span class="summary-item__label">Área</span>
-                  <span class="summary-item__value">{{ form.area ?? '0' }} m²</span>
-                </div>
-                <div class="summary-item">
-                  <span class="summary-item__label">Propietario</span>
-                  <span class="summary-item__value summary-item__value--wrap">
-                    {{ form.propietario || 'Sin propietario' }}
-                  </span>
-                </div>
-              </div>
-
-              <q-separator class="q-my-md" />
-
-              <div class="summary-note">
-                Revisa el resumen antes de guardar. El listado se actualizará con la nueva unidad.
-              </div>
+              <q-banner rounded class="next-step q-mt-lg">Después podrás agregar personas y parqueaderos desde el detalle.</q-banner>
             </q-card-section>
           </q-card>
         </aside>
-      </section>
+      </div>
     </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { Notify, type QForm } from 'quasar';
 import { useRouter } from 'vue-router';
-import { createUnidadForm, type UnidadStatus, useUnidades } from '@/composables/unidades/useUnidades';
+import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
+import { createHouse, fetchCondominiumBlocks } from '@/services/units.service';
+import { useSessionStore } from '@/stores/session.store';
 
 const router = useRouter();
-const formRef = ref();
+const session = useSessionStore();
+const formRef = ref<QForm | null>(null);
+const saving = ref(false);
+const submitError = ref('');
+const blockOptions = ref<{ label: string; value: number }[]>([]);
+const loadingOptions = ref(false);
+const codeWasEdited = ref(false);
+const form = reactive({ blockId: null as number | null, unitTypeId: null as number | null, number: '', code: '', areaM2: null as number | null, isAssignable: true, isActive: true });
+const { options: unitTypes, loadOptions: loadUnitTypes } = useCatalogOptions<{ label: string; value: number; code: string }>('unit_types', { fallback: [], mapItem: (item) => ({ label: item.name, value: item.id, code: item.code }) });
+const activeCondominiumId = computed(() => { const id = Number(session.activeCondoId); return Number.isInteger(id) && id > 0 ? id : null; });
+const condominiumName = computed(() => session.activeCondominium?.name ?? 'Sin condominio');
+const selectedBlockName = computed(() => blockOptions.value.find((item) => item.value === form.blockId)?.label ?? 'Sin definir');
+const requiredRule = (value: unknown) => value !== null && value !== undefined || 'Campo requerido';
+const requiredTextRule = (value: unknown) => typeof value === 'string' && value.trim() ? true : 'Campo requerido';
+const positiveNumberRule = (value: unknown) => Number(value) > 0 || 'Debe ser mayor que cero';
 
-const { form, saving, editingId, saveUnit } = useUnidades();
-
-const statusOptions: UnidadStatus[] = ['Disponible', 'Ocupada', 'Mora', 'Exonerada'];
-
-onMounted(() => {
-  editingId.value = null;
-  form.value = createUnidadForm();
+onMounted(async () => {
+  if (!activeCondominiumId.value) return;
+  loadingOptions.value = true;
+  try {
+    const [blocks] = await Promise.all([fetchCondominiumBlocks(activeCondominiumId.value, session.accessToken), loadUnitTypes()]);
+    blockOptions.value = blocks.map((item) => ({ label: item.name, value: item.id }));
+    const houseType = unitTypes.value.find((item) => item.code.toLowerCase().includes('casa'));
+    form.unitTypeId = houseType?.value ?? unitTypes.value[0]?.value ?? null;
+  } catch (error) { submitError.value = error instanceof Error ? error.message : 'No fue posible cargar las opciones.'; }
+  finally { loadingOptions.value = false; }
 });
 
-const requiredRule = (value: unknown) =>
-  typeof value === 'string' && value.trim().length > 0 ? true : 'Campo requerido';
-
-const requiredNumberRule = (value: number | null) =>
-  value !== null && value !== undefined ? true : 'Campo requerido';
-
-function statusTone(status: UnidadStatus) {
-  if (status === 'Disponible') return 'positive';
-  if (status === 'Ocupada') return 'primary';
-  if (status === 'Mora') return 'negative';
-  return 'warning';
+function suggestCode(value: string | number | null) {
+  if (!codeWasEdited.value) form.code = value ? `CASA-${String(value).trim()}`.toUpperCase() : '';
 }
-
 async function submitForm() {
-  const isValid = await formRef.value?.validate?.();
-  if (!isValid) {
-    return;
-  }
-
-  saveUnit(form.value);
-  await router.push('/unidades');
+  if (!(await formRef.value?.validate()) || !activeCondominiumId.value || !form.blockId || !form.unitTypeId || !form.areaM2) return;
+  saving.value = true; submitError.value = '';
+  try {
+    await createHouse(activeCondominiumId.value, { blockId: form.blockId, unitTypeId: form.unitTypeId, number: form.number, code: form.code, areaM2: form.areaM2, isAssignable: form.isAssignable, isActive: form.isActive }, session.accessToken);
+    Notify.create({ type: 'positive', message: 'Casa creada correctamente.', position: 'top-right' });
+    await router.push('/unidades');
+  } catch (error) { submitError.value = error instanceof Error ? error.message : 'No fue posible crear la casa.'; }
+  finally { saving.value = false; }
 }
-
-function goBack() {
-  void router.push('/unidades');
-}
+function goBack() { void router.push('/unidades'); }
 </script>
 
 <style scoped>
-.nueva-unidad-page {
-  min-height: 100%;
-  padding: 6px 8px 0 4px;
-}
-
-.page-shell {
-  display: grid;
-  gap: 18px;
-}
-
-.page-header {
-  align-items: flex-start;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.page-header__copy {
-  display: grid;
-  gap: 4px;
-}
-
-.page-header__eyebrow {
-  color: var(--app-primary);
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.page-header__title {
-  color: var(--app-text);
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-}
-
-.page-header__subtitle {
-  color: var(--app-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.page-header__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.header-action {
-  min-height: 42px;
-}
-
-.header-action--ghost {
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.page-layout {
-  display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(0, 1fr) 330px;
-  align-items: start;
-}
-
-.page-layout__main {
-  display: grid;
-  gap: 18px;
-}
-
-.section-card,
-.summary-panel {
-  border-radius: 18px;
-  overflow: hidden;
-}
-
-.section-card__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.section-card__title {
-  color: var(--app-text);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.section-card__subtitle {
-  color: var(--app-text-muted);
-  font-size: 11px;
-  line-height: 1.4;
-  margin-top: 3px;
-}
-
-.form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.availability-card {
-  align-self: stretch;
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.availability-card__content {
-  display: grid;
-  gap: 4px;
-  min-height: 100%;
-  padding: 12px 14px;
-}
-
-.availability-card__label {
-  color: var(--app-text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.availability-card__value {
-  color: var(--app-text);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-}
-
-.page-layout__aside {
-  display: grid;
-}
-
-.summary-panel--sticky {
-  position: sticky;
-  top: 18px;
-}
-
-.summary-preview {
-  align-items: center;
-  display: flex;
-  gap: 12px;
-}
-
-.summary-preview__icon {
-  align-items: center;
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.05));
-  border-radius: 16px;
-  color: var(--app-primary);
-  display: inline-flex;
-  height: 64px;
-  justify-content: center;
-  width: 64px;
-  flex-shrink: 0;
-}
-
-.summary-preview__body {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.summary-preview__eyebrow {
-  color: var(--app-primary);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.summary-preview__name {
-  color: var(--app-text);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.summary-preview__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.summary-list {
-  display: grid;
-  gap: 8px;
-}
-
-.summary-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.summary-item__label {
-  color: var(--app-text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.summary-item__value {
-  color: var(--app-text);
-  font-size: 11px;
-  font-weight: 800;
-  text-align: right;
-}
-
-.summary-item__value--wrap {
-  max-width: 180px;
-  white-space: normal;
-}
-
-.summary-note {
-  background: rgba(37, 99, 235, 0.05);
-  border-radius: 16px;
-  color: var(--app-text-muted);
-  font-size: 11px;
-  line-height: 1.5;
-  padding: 12px 14px;
-}
-
-.page-footer {
-  align-items: center;
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 18px;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-}
-
-.page-footer__copy {
-  display: grid;
-  gap: 4px;
-}
-
-.page-footer__step {
-  color: var(--app-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.page-footer__label {
-  color: var(--app-text);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.page-footer__actions {
-  display: flex;
-  gap: 10px;
-}
-
-.footer-action {
-  min-width: 150px;
-}
-
-.footer-action--ghost {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-@media (max-width: 1439px) {
-  .page-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 767px) {
-  .page-header {
-    flex-direction: column;
-  }
-
-  .page-header__actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .header-action,
-  .footer-action {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .page-footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .page-footer__actions {
-    flex-direction: column;
-  }
-}
+.house-page{min-height:100%;padding:16px 0 0}.page-shell{display:grid;gap:18px}.page-header{align-items:flex-start;display:flex;justify-content:space-between}.page-header h1{color:var(--app-text);font-size:26px;margin:3px 0}.page-header p,.section-heading span{color:var(--app-text-muted);font-size:12px}.eyebrow{color:var(--app-primary);font-size:11px;font-weight:800;text-transform:uppercase}.ghost-btn,.section-card,.summary-card{background:#fff;border-color:rgba(15,23,42,.08);border-radius:16px}.content-grid{display:grid;gap:18px;grid-template-columns:minmax(0,1fr) 320px}.form-column{display:grid;gap:16px}.context-panel{align-items:center;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.14);border-radius:14px;color:var(--app-primary);display:flex;gap:12px;padding:13px 16px}.context-panel div{display:grid}.context-panel span{font-size:11px}.section-heading{align-items:center;display:flex;gap:10px}.section-heading div{display:grid}.form-grid{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr))}.form-grid--compact{grid-template-columns:minmax(220px,360px)}.switch-list{border:1px solid rgba(15,23,42,.07);border-radius:14px}.form-actions{display:flex;gap:10px;justify-content:flex-end}.summary-card{position:sticky;top:16px}.summary-icon{align-items:center;background:rgba(37,99,235,.1);border-radius:14px;color:var(--app-primary);display:flex;height:52px;justify-content:center;width:52px}.summary-eyebrow{color:var(--app-text-muted);font-size:11px;margin-top:14px}.summary-card h2{font-size:21px;margin:3px 0 16px}.summary-list{display:grid;gap:11px}.summary-list>div{align-items:center;display:flex;gap:14px;justify-content:space-between}.summary-list span{color:var(--app-text-muted);font-size:11px}.summary-list strong{font-size:12px;text-align:right}.next-step{background:rgba(37,99,235,.06);color:var(--app-text-muted);font-size:11px}.context-warning,.submit-error{background:rgba(245,158,11,.1);color:#92400e}@media(max-width:900px){.content-grid{grid-template-columns:1fr}.summary-card{position:static}}@media(max-width:650px){.house-page{padding:12px 0 0}.page-header{gap:12px}.form-grid{grid-template-columns:1fr}.form-actions>*{flex:1}}
 </style>

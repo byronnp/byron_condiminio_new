@@ -493,11 +493,17 @@ async function loadAdministrators() {
   isLoadingRows.value = true;
   loadError.value = '';
   try {
+    const activeCondominiumId = Number(session.activeCondoId);
+    const condominiumId =
+      Number.isInteger(activeCondominiumId) && activeCondominiumId > 0
+        ? activeCondominiumId
+        : null;
     const result = await fetchAdministratorsPage(
       {
         page: pagination.value.page,
         perPage: pagination.value.rowsPerPage,
         search: search.value,
+        ...(condominiumId !== null ? { condominiumId } : {}),
         ...(statusFilter.value === 'Todos'
           ? {}
           : { status: statusFilter.value === 'Activo' ? 'active' as const : 'inactive' as const }),
@@ -516,6 +522,24 @@ async function loadAdministrators() {
     isLoadingRows.value = false;
   }
 }
+
+watch(
+  () => session.activeCondoId,
+  () => {
+    const hadActiveFilters =
+      Boolean(search.value.trim()) || statusFilter.value !== 'Todos' || typeFilter.value !== 'Todos';
+    search.value = '';
+    statusFilter.value = 'Todos';
+    typeFilter.value = 'Todos';
+
+    if (pagination.value.page !== 1) {
+      pagination.value.page = 1;
+      return;
+    }
+
+    if (!hadActiveFilters) void loadAdministrators();
+  },
+);
 
 function handleAdministratorsChanged() {
   void loadAdministrators();

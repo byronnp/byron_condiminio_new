@@ -506,6 +506,22 @@ watch(
   },
 );
 
+watch(
+  () => session.activeCondoId,
+  () => {
+    search.value = '';
+    statusFilter.value = 'Todos';
+    typeFilter.value = 'Todos';
+
+    if (pagination.value.page !== 1) {
+      pagination.value.page = 1;
+      return;
+    }
+
+    void loadCondominiums();
+  },
+);
+
 function statusTone(status: CondoRow['status']) {
   return status === 'Activo' ? 'positive' : 'negative';
 }
@@ -541,7 +557,7 @@ function goToEditCondominium(row: CondoRow) {
 
 function goToNewAdministrator(row: CondoRow) {
   void router.push({
-    path: '/usuarios/nuevo',
+    path: '/administradores/nuevo',
     query: {
       condominioId: String(row.id),
       condominio: row.name,

@@ -189,6 +189,7 @@ export interface FetchAdministratorsPageParams {
   perPage: number;
   search?: string;
   status?: 'active' | 'inactive';
+  condominiumId?: number;
 }
 
 function normalizeAdministratorInvitationStatus(
@@ -516,6 +517,9 @@ export async function fetchAdministratorsPage(
   url.searchParams.set('per_page', String(params.perPage));
   if (params.search?.trim()) url.searchParams.set('search', params.search.trim());
   if (params.status) url.searchParams.set('status', params.status);
+  if (params.condominiumId) {
+    url.searchParams.set('condominium_id', String(params.condominiumId));
+  }
 
   const response = await fetch(url.toString(), {
     headers: {
