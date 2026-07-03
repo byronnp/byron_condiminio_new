@@ -142,6 +142,12 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'unidades/:id',
+        name: 'unidades-detalle',
+        component: () => import('@/pages/unidades/CasaDetallePage.vue'),
+        meta: { title: 'Detalle de casa', subtitle: 'Personas y parqueaderos asociados' },
+      },
+      {
         path: 'propietarios',
         name: 'propietarios',
         component: () => import('@/pages/propietarios/PropietariosPage.vue'),
@@ -240,4 +246,3 @@ const routes: RouteRecordRaw[] = [
 ];
 
 export default routes;
-

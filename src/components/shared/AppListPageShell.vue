@@ -47,6 +47,7 @@
           no-caps
           :icon="actionIcon"
           :label="actionLabel"
+          :disable="actionDisabled"
           class="header-action header-action--primary"
           @click="emit('cta-click')"
         />
@@ -119,6 +120,7 @@ const props = withDefaults(
     sortOptions: readonly Option[];
     actionLabel: string;
     actionIcon: string;
+    actionDisabled?: boolean;
     filtersLabel?: string;
     filtersIcon?: string;
     filtersExpanded?: boolean;
@@ -128,6 +130,7 @@ const props = withDefaults(
     filtersLabel: 'Filtros',
     filtersIcon: 'filter_alt',
     filtersExpanded: false,
+    actionDisabled: false,
   },
 );
 
