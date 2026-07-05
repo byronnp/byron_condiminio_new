@@ -1,4 +1,5 @@
-import { handleUnauthorizedResponse } from '@/services/auth-redirect';
+import { buildApiUrl, http } from '@/services/api/http';
+import { isRecord, toNumber, toText } from '@/utils/api/common';
 
 export interface UnitListItem {
   id: number;
@@ -51,6 +52,7 @@ export interface UnitPersonProfile {
   secondaryPhone: string;
   isAccessEnabled: boolean;
 }
+
 export interface UnitsPageResult {
   items: UnitListItem[];
   page: number;
@@ -74,17 +76,6 @@ export interface CreateHousePayload {
   isActive: boolean;
 }
 
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
-const apiUrl = (path: string) => new URL(path, apiHost).toString();
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value && typeof value === 'object');
-const toNumber = (value: unknown) => {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-};
-const toText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
-
 function extractItems(payload: unknown) {
   if (Array.isArray(payload)) return payload;
   if (!isRecord(payload)) return [];
@@ -92,89 +83,10 @@ function extractItems(payload: unknown) {
   return isRecord(payload.data) && Array.isArray(payload.data.data) ? payload.data.data : [];
 }
 
-export async function fetchUnitsPage(
-  condominiumId: number,
-  page: number,
-  perPage: number,
-  token: string | null,
-): Promise<UnitsPageResult> {
-  const url = new URL(`/api/condominiums/${condominiumId}/units`, apiHost);
-  url.searchParams.set('page', String(page));
-  url.searchParams.set('per_page', String(perPage));
-  const response = await fetch(url.toString(), {
-    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-  });
-  if (handleUnauthorizedResponse(response, token)) {
-    return { items: [], page: 1, perPage, total: 0, lastPage: 1 };
-  }
-  if (!response.ok) throw new Error(`No fue posible cargar las casas (${response.status})`);
-  const payload = (await response.json()) as unknown;
-  const items = extractItems(payload).flatMap((item): UnitListItem[] => {
-    if (!isRecord(item)) return [];
-    const id = toNumber(item.id);
-    const code = toText(item.code);
-    const block = isRecord(item.block)
-      ? item.block
-      : isRecord(item.condominium_block)
-        ? item.condominium_block
-        : null;
-    const owner = isRecord(item.owner)
-      ? item.owner
-      : isRecord(item.primary_owner)
-        ? item.primary_owner
-        : null;
-    if (id === null || !code) return [];
-    return [
-      {
-        id,
-        code,
-        number: toText(item.number),
-        areaM2: toNumber(item.area_m2) ?? 0,
-        isAssignable: item.is_assignable !== false,
-        isActive: item.is_active !== false,
-        parentUnitId: toNumber(item.parent_unit_id),
-        blockName: toText(block?.name ?? block?.code) || toText(item.block_name) || 'Sin bloque',
-        ownerName:
-          toText(owner?.name) ||
-          toText(item.owner_name ?? item.primary_owner_name) ||
-          'Sin propietario',
-        peopleCount: toNumber(item.people_count ?? item.users_count ?? item.residents_count) ?? 0,
-        parkingCount:
-          toNumber(item.parking_units_count ?? item.parkings_count) ??
-          (Array.isArray(item.parking_units) ? item.parking_units.length : 0),
-      },
-    ];
-  });
-  const root = isRecord(payload) ? payload : {};
-  const meta = isRecord(root.meta)
-    ? root.meta
-    : isRecord(root.data) && isRecord(root.data.meta)
-      ? root.data.meta
-      : {};
-  const total = toNumber(meta.total) ?? items.length;
-  const currentPage = toNumber(meta.current_page ?? meta.currentPage) ?? page;
-  const currentPerPage = toNumber(meta.per_page ?? meta.perPage) ?? perPage;
-  const lastPage =
-    toNumber(meta.last_page ?? meta.lastPage) ?? Math.max(1, Math.ceil(total / currentPerPage));
-  return { items, page: currentPage, perPage: currentPerPage, total, lastPage };
-}
-
-export async function fetchUnits(condominiumId: number, token: string | null) {
-  return (await fetchUnitsPage(condominiumId, 1, 100, token)).items;
-}
-
-export async function fetchUnitById(condominiumId: number, unitId: number, token: string | null) {
-  const response = await fetch(apiUrl(`/api/condominiums/${condominiumId}/units/${unitId}`), {
-    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-  });
-  if (handleUnauthorizedResponse(response, token)) return null;
-  if (!response.ok) throw new Error(`No fue posible cargar la casa (${response.status})`);
-  const payload = (await response.json()) as unknown;
-  const item = isRecord(payload) && isRecord(payload.data) ? payload.data : payload;
+function normalizeUnitItem(item: unknown): UnitListItem | null {
   if (!isRecord(item)) return null;
   const id = toNumber(item.id);
   const code = toText(item.code);
-  if (id === null || !code) return null;
   const block = isRecord(item.block)
     ? item.block
     : isRecord(item.condominium_block)
@@ -185,6 +97,7 @@ export async function fetchUnitById(condominiumId: number, unitId: number, token
     : isRecord(item.primary_owner)
       ? item.primary_owner
       : null;
+  if (id === null || !code) return null;
   return {
     id,
     code,
@@ -202,43 +115,32 @@ export async function fetchUnitById(condominiumId: number, unitId: number, token
     parkingCount:
       toNumber(item.parking_units_count ?? item.parkings_count) ??
       (Array.isArray(item.parking_units) ? item.parking_units.length : 0),
-  } satisfies UnitListItem;
+  };
 }
 
-export async function fetchUnitPeople(condominiumId: number, unitId: number, token: string | null) {
-  const response = await fetch(apiUrl(`/api/condominiums/${condominiumId}/units/${unitId}/users`), {
-    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-  });
-  if (handleUnauthorizedResponse(response, token)) return [];
-  if (!response.ok) throw new Error(`No fue posible cargar las personas (${response.status})`);
-  const payload = (await response.json()) as unknown;
-  return extractItems(payload).flatMap((item): UnitPersonItem[] => {
-    if (!isRecord(item)) return [];
-    const id = toNumber(item.id);
-    const name = toText(item.name);
-    return id !== null && name
-      ? [
-          {
-            id,
-            name,
-            email: toText(item.email),
-            relationship: toText(item.relationship_code) || 'persona',
-            isPrimary: item.is_primary === true,
-            isBillingResponsible: item.is_billing_responsible === true,
-            isActive: item.is_active !== false,
-          },
-        ]
-      : [];
-  });
+function normalizeUnitDetail(payload: unknown): UnitListItem | null {
+  const item = isRecord(payload) && isRecord(payload.data) ? payload.data : payload;
+  return normalizeUnitItem(item);
 }
 
-export async function fetchUnitPersonProfile(userId: number, token: string | null) {
-  const response = await fetch(apiUrl(`/api/users/${userId}`), {
-    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-  });
-  if (handleUnauthorizedResponse(response, token)) return null;
-  if (!response.ok) throw new Error(`No fue posible cargar la persona (${response.status})`);
-  const payload = (await response.json()) as unknown;
+function normalizePersonItem(item: unknown): UnitPersonItem | null {
+  if (!isRecord(item)) return null;
+  const id = toNumber(item.id);
+  const name = toText(item.name);
+  return id !== null && name
+    ? {
+        id,
+        name,
+        email: toText(item.email),
+        relationship: toText(item.relationship_code) || 'persona',
+        isPrimary: item.is_primary === true,
+        isBillingResponsible: item.is_billing_responsible === true,
+        isActive: item.is_active !== false,
+      }
+    : null;
+}
+
+function normalizePersonProfile(payload: unknown): UnitPersonProfile | null {
   const item = isRecord(payload) && isRecord(payload.data) ? payload.data : payload;
   if (!isRecord(item)) return null;
   const id = toNumber(item.id);
@@ -256,7 +158,124 @@ export async function fetchUnitPersonProfile(userId: number, token: string | nul
     phone: toText(item.phone),
     secondaryPhone: toText(item.secondary_phone),
     isAccessEnabled: item.is_access_enabled === true,
-  } satisfies UnitPersonProfile;
+  };
+}
+
+function buildPersonBody(payload: CreateUnitPersonPayload) {
+  return {
+    name: [payload.firstName.trim(), payload.lastName.trim()].filter(Boolean).join(' '),
+    first_name: payload.firstName.trim(),
+    last_name: payload.lastName.trim(),
+    country: 'EC',
+    document_type_id: payload.documentTypeId,
+    document_number: payload.documentNumber.trim(),
+    phone: payload.phone.trim() || null,
+    secondary_phone: payload.secondaryPhone.trim() || null,
+    relationship_type_id: payload.relationshipTypeId,
+    started_at: payload.startedAt || null,
+    ended_at: payload.endedAt || null,
+    is_primary: payload.isPrimary,
+    is_billing_responsible: payload.isBillingResponsible,
+  };
+}
+
+function buildHouseBody(payload: CreateHousePayload, parentUnitId: number | null = null) {
+  return {
+    condominium_block_id: payload.blockId,
+    parent_unit_id: parentUnitId,
+    unit_type_id: payload.unitTypeId,
+    number: payload.number.trim(),
+    code: payload.code.trim().toUpperCase(),
+    floor: null,
+    area_m2: payload.areaM2,
+    is_assignable: payload.isAssignable,
+    is_active: payload.isActive,
+    parking_units: [],
+  };
+}
+
+function extractMeta(payload: unknown, page: number, perPage: number, itemsLength: number) {
+  const root = isRecord(payload) ? payload : {};
+  const meta = isRecord(root.meta)
+    ? root.meta
+    : isRecord(root.data) && isRecord(root.data.meta)
+      ? root.data.meta
+      : {};
+  const total = toNumber(meta.total) ?? itemsLength;
+  const currentPage = toNumber(meta.current_page ?? meta.currentPage) ?? page;
+  const currentPerPage = toNumber(meta.per_page ?? meta.perPage) ?? perPage;
+  const lastPage =
+    toNumber(meta.last_page ?? meta.lastPage) ?? Math.max(1, Math.ceil(total / currentPerPage));
+
+  return { total, currentPage, currentPerPage, lastPage };
+}
+
+export async function fetchUnitsPage(
+  condominiumId: number,
+  page: number,
+  perPage: number,
+  token: string | null,
+): Promise<UnitsPageResult> {
+  const url = new URL(buildApiUrl(`/api/condominiums/${condominiumId}/units`));
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('per_page', String(perPage));
+
+  const { response, data, unauthorized } = await http.get<unknown>(url.toString(), { token });
+
+  if (unauthorized) {
+    return { items: [], page: 1, perPage, total: 0, lastPage: 1 };
+  }
+
+  if (!response.ok) throw new Error(`No fue posible cargar las casas (${response.status})`);
+
+  const items = extractItems(data).flatMap((item): UnitListItem[] => {
+    const normalized = normalizeUnitItem(item);
+    return normalized ? [normalized] : [];
+  });
+  const meta = extractMeta(data, page, perPage, items.length);
+  return {
+    items,
+    page: meta.currentPage,
+    perPage: meta.currentPerPage,
+    total: meta.total,
+    lastPage: meta.lastPage,
+  };
+}
+
+export async function fetchUnits(condominiumId: number, token: string | null) {
+  return (await fetchUnitsPage(condominiumId, 1, 100, token)).items;
+}
+
+export async function fetchUnitById(condominiumId: number, unitId: number, token: string | null) {
+  const { response, data, unauthorized } = await http.get<unknown>(
+    `/api/condominiums/${condominiumId}/units/${unitId}`,
+    { token },
+  );
+  if (unauthorized) return null;
+  if (!response.ok) throw new Error(`No fue posible cargar la casa (${response.status})`);
+  return normalizeUnitDetail(data);
+}
+
+export async function fetchUnitPeople(condominiumId: number, unitId: number, token: string | null) {
+  const { response, data, unauthorized } = await http.get<unknown>(
+    `/api/condominiums/${condominiumId}/units/${unitId}/users`,
+    { token },
+  );
+  if (unauthorized) return [];
+  if (!response.ok) throw new Error(`No fue posible cargar las personas (${response.status})`);
+  return extractItems(data).flatMap((item): UnitPersonItem[] => {
+    const normalized = normalizePersonItem(item);
+    return normalized ? [normalized] : [];
+  });
+}
+
+export async function fetchUnitPersonProfile(userId: number, token: string | null) {
+  const { response, data, unauthorized } = await http.get<unknown>(`/api/users/${userId}`, {
+    token,
+  });
+  if (unauthorized) return null;
+  if (!response.ok) throw new Error(`No fue posible cargar la persona (${response.status})`);
+  return normalizePersonProfile(data);
 }
 
 export async function createUnitPerson(
@@ -265,39 +284,26 @@ export async function createUnitPerson(
   payload: CreateUnitPersonPayload,
   token: string | null,
 ) {
-  const response = await fetch(apiUrl(`/api/condominiums/${condominiumId}/units/${unitId}/users`), {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const { response, data, unauthorized } = await http.post<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/units/${unitId}/users`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: buildPersonBody(payload),
     },
-    body: JSON.stringify({
-      name: [payload.firstName.trim(), payload.lastName.trim()].filter(Boolean).join(' '),
-      first_name: payload.firstName.trim(),
-      last_name: payload.lastName.trim(),
-      country: 'EC',
-      document_type_id: payload.documentTypeId,
-      document_number: payload.documentNumber.trim(),
-      phone: payload.phone.trim() || null,
-      secondary_phone: payload.secondaryPhone.trim() || null,
-      relationship_type_id: payload.relationshipTypeId,
-      started_at: payload.startedAt || null,
-      ended_at: payload.endedAt || null,
-      is_primary: payload.isPrimary,
-      is_billing_responsible: payload.isBillingResponsible,
-    }),
-  });
-  if (handleUnauthorizedResponse(response, token)) throw new Error('Sesión expirada.');
-  const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
   if (!response.ok) {
     throw new Error(
-      typeof body?.message === 'string'
-        ? body.message
+      typeof data?.message === 'string'
+        ? data.message
         : `No fue posible agregar la persona (${response.status})`,
     );
   }
-  return body;
+  return data;
 }
 
 export async function updateUnitPerson(
@@ -305,39 +311,26 @@ export async function updateUnitPerson(
   payload: CreateUnitPersonPayload,
   token: string | null,
 ) {
-  const response = await fetch(apiUrl(`/api/users/${userId}`), {
-    method: 'PUT',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const { response, data, unauthorized } = await http.put<Record<string, unknown>>(
+    `/api/users/${userId}`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: buildPersonBody(payload),
     },
-    body: JSON.stringify({
-      name: [payload.firstName.trim(), payload.lastName.trim()].filter(Boolean).join(' '),
-      first_name: payload.firstName.trim(),
-      last_name: payload.lastName.trim(),
-      country: 'EC',
-      document_type_id: payload.documentTypeId,
-      document_number: payload.documentNumber.trim(),
-      phone: payload.phone.trim() || null,
-      secondary_phone: payload.secondaryPhone.trim() || null,
-      relationship_type_id: payload.relationshipTypeId,
-      started_at: payload.startedAt || null,
-      ended_at: payload.endedAt || null,
-      is_primary: payload.isPrimary,
-      is_billing_responsible: payload.isBillingResponsible,
-    }),
-  });
-  if (handleUnauthorizedResponse(response, token)) throw new Error('Sesión expirada.');
-  const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
   if (!response.ok) {
     throw new Error(
-      typeof body?.message === 'string'
-        ? body.message
+      typeof data?.message === 'string'
+        ? data.message
         : `No fue posible actualizar la persona (${response.status})`,
     );
   }
-  return body;
+  return data;
 }
 
 export async function createParkingUnit(
@@ -347,45 +340,47 @@ export async function createParkingUnit(
   payload: { number: string; code: string; areaM2: number | null },
   token: string | null,
 ) {
-  const response = await fetch(apiUrl(`/api/condominiums/${condominiumId}/units`), {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const { response, data, unauthorized } = await http.post<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/units`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: buildHouseBody(
+        {
+          blockId: null,
+          unitTypeId,
+          number: payload.number,
+          code: payload.code,
+          areaM2: payload.areaM2 ?? 0,
+          isAssignable: false,
+          isActive: true,
+        },
+        parentUnitId,
+      ),
     },
-    body: JSON.stringify({
-      condominium_block_id: null,
-      parent_unit_id: parentUnitId,
-      unit_type_id: unitTypeId,
-      number: payload.number.trim(),
-      code: payload.code.trim().toUpperCase(),
-      floor: null,
-      area_m2: payload.areaM2,
-      is_assignable: false,
-      is_active: true,
-      parking_units: [],
-    }),
-  });
-  if (handleUnauthorizedResponse(response, token)) throw new Error('Sesión expirada.');
-  const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!response.ok)
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
+  if (!response.ok) {
     throw new Error(
-      typeof body?.message === 'string'
-        ? body.message
+      typeof data?.message === 'string'
+        ? data.message
         : `No fue posible crear el parqueadero (${response.status})`,
     );
-  return body;
+  }
+  return data;
 }
 
 export async function fetchCondominiumBlocks(condominiumId: number, token: string | null) {
-  const response = await fetch(apiUrl(`/api/condominiums/${condominiumId}/blocks`), {
-    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-  });
-  if (handleUnauthorizedResponse(response, token)) return [];
+  const { response, data, unauthorized } = await http.get<unknown>(
+    `/api/condominiums/${condominiumId}/blocks`,
+    { token },
+  );
+  if (unauthorized) return [];
   if (!response.ok) throw new Error(`No fue posible cargar los bloques (${response.status})`);
-  const payload = (await response.json()) as unknown;
-  return extractItems(payload).flatMap((item): CondominiumBlockOption[] => {
+  return extractItems(data).flatMap((item): CondominiumBlockOption[] => {
     if (!isRecord(item)) return [];
     const id = toNumber(item.id);
     const name = toText(item.name ?? item.label ?? item.code);
@@ -398,34 +393,24 @@ export async function createHouse(
   payload: CreateHousePayload,
   token: string | null,
 ) {
-  const response = await fetch(apiUrl(`/api/condominiums/${condominiumId}/units`), {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const { response, data, unauthorized } = await http.post<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/units`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: buildHouseBody(payload, null),
     },
-    body: JSON.stringify({
-      condominium_block_id: payload.blockId,
-      parent_unit_id: null,
-      unit_type_id: payload.unitTypeId,
-      number: payload.number.trim(),
-      code: payload.code.trim().toUpperCase(),
-      floor: null,
-      area_m2: payload.areaM2,
-      is_assignable: payload.isAssignable,
-      is_active: payload.isActive,
-      parking_units: [],
-    }),
-  });
-  if (handleUnauthorizedResponse(response, token)) throw new Error('Sesión expirada.');
-  const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
   if (!response.ok) {
     throw new Error(
-      typeof body?.message === 'string'
-        ? body.message
+      typeof data?.message === 'string'
+        ? data.message
         : `No fue posible crear la casa (${response.status})`,
     );
   }
-  return body;
+  return data;
 }

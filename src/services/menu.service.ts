@@ -3,7 +3,8 @@ import {
   type NavigationItem,
   type NavigationSection,
 } from '@/config/navigation';
-import { handleUnauthorizedResponse } from '@/services/auth-redirect';
+import { http } from '@/services/api/http';
+import { isRecord, toText } from '@/utils/api/common';
 
 interface MenuResponsePayload {
   success?: unknown;
@@ -11,8 +12,6 @@ interface MenuResponsePayload {
   data?: unknown;
   meta?: unknown;
 }
-
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
 
 const backendIconMap: Record<string, string> = {
   'layout-dashboard': 'dashboard',
@@ -32,18 +31,6 @@ const backendIconMap: Record<string, string> = {
   'chart-column': 'summarize',
   settings: 'settings',
 };
-
-function buildApiUrl(path: string) {
-  return new URL(path, apiHost).toString();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object');
-}
-
-function normalizeLabel(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value.trim() : '';
-}
 
 function normalizePath(value: unknown, fallbackLabel: string) {
   if (typeof value === 'string' && value.trim()) {
@@ -84,8 +71,7 @@ function normalizeMenuItem(item: unknown): NavigationItem | null {
     return null;
   }
 
-  const label =
-    normalizeLabel(item.name) || normalizeLabel(item.label) || normalizeLabel(item.title);
+  const label = toText(item.name) || toText(item.label) || toText(item.title);
   if (!label) {
     return null;
   }
@@ -103,7 +89,7 @@ function normalizeMenuItem(item: unknown): NavigationItem | null {
     normalizedItem.to = path;
   }
 
-  const trailingIcon = normalizeLabel(item.trailingIcon);
+  const trailingIcon = toText(item.trailingIcon);
   if (trailingIcon) {
     normalizedItem.trailingIcon = trailingIcon;
   }
@@ -140,12 +126,8 @@ function normalizeSection(section: unknown, fallbackKey: string): NavigationSect
     return null;
   }
 
-  const key = normalizeLabel(section.code) || normalizeLabel(section.key) || fallbackKey;
-  const label =
-    normalizeLabel(section.name) ||
-    normalizeLabel(section.label) ||
-    normalizeLabel(section.title) ||
-    key;
+  const key = toText(section.code) || toText(section.key) || fallbackKey;
+  const label = toText(section.name) || toText(section.label) || toText(section.title) || key;
   const items = collectMenuItems(section.menus ?? section.items ?? section.children);
 
   if (items.length === 0) {
@@ -206,14 +188,11 @@ function normalizeMenuResponse(payload: unknown): NavigationSection[] {
 }
 
 export async function fetchAuthMenu(accessToken: string | null) {
-  const response = await fetch(buildApiUrl('/api/auth/menu'), {
-    headers: {
-      Accept: 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
+  const { response, data, unauthorized } = await http.get<MenuResponsePayload>('/api/auth/menu', {
+    token: accessToken,
   });
 
-  if (handleUnauthorizedResponse(response, accessToken)) {
+  if (unauthorized) {
     return [];
   }
 
@@ -221,11 +200,9 @@ export async function fetchAuthMenu(accessToken: string | null) {
     throw new Error(`No fue posible cargar el menú (${response.status})`);
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json')) {
+  if (!data) {
     return [];
   }
 
-  const payload = (await response.json()) as unknown;
-  return normalizeMenuResponse(payload);
+  return normalizeMenuResponse(data);
 }

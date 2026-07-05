@@ -1,11 +1,5 @@
-import { handleUnauthorizedResponse } from '@/services/auth-redirect';
-
-interface ApiListResponse {
-  success?: unknown;
-  message?: unknown;
-  data?: unknown;
-  meta?: unknown;
-}
+import { http } from '@/services/api/http';
+import { isRecord, toNumber, toText } from '@/utils/api/common';
 
 export interface CountryOption {
   id: number;
@@ -27,26 +21,16 @@ export interface CityOption {
   name: string;
 }
 
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
-
-function buildApiUrl(path: string) {
-  return new URL(path, apiHost).toString();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object');
-}
-
 function normalizeCountry(item: unknown): CountryOption | null {
   if (!isRecord(item)) {
     return null;
   }
 
-  const id = Number(item.id);
-  const code = typeof item.code === 'string' ? item.code.trim() : '';
-  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  const id = toNumber(item.id);
+  const code = toText(item.code);
+  const name = toText(item.name);
 
-  if (!Number.isFinite(id) || !code || !name) {
+  if (id === null || !code || !name) {
     return null;
   }
 
@@ -58,12 +42,12 @@ function normalizeProvince(item: unknown): ProvinceOption | null {
     return null;
   }
 
-  const id = Number(item.id);
-  const countryId = Number(item.country_id);
-  const code = typeof item.code === 'string' ? item.code.trim() : '';
-  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  const id = toNumber(item.id);
+  const countryId = toNumber(item.country_id);
+  const code = toText(item.code);
+  const name = toText(item.name);
 
-  if (!Number.isFinite(id) || !Number.isFinite(countryId) || !code || !name) {
+  if (id === null || countryId === null || !code || !name) {
     return null;
   }
 
@@ -75,30 +59,42 @@ function normalizeCity(item: unknown): CityOption | null {
     return null;
   }
 
-  const id = Number(item.id);
-  const provinceId = Number(item.province_id);
-  const code = typeof item.code === 'string' ? item.code.trim() : '';
-  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  const id = toNumber(item.id);
+  const provinceId = toNumber(item.province_id);
+  const code = toText(item.code);
+  const name = toText(item.name);
 
-  if (!Number.isFinite(id) || !Number.isFinite(provinceId) || !code || !name) {
+  if (id === null || provinceId === null || !code || !name) {
     return null;
   }
 
   return { id, province_id: provinceId, code, name };
 }
 
-async function requestLocationItems<T>(
-  path: string,
-  token: string | null,
-): Promise<T[]> {
-  const response = await fetch(buildApiUrl(path), {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+function extractItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (!isRecord(payload)) {
+    return [];
+  }
+
+  const data = payload.data;
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (isRecord(data) && Array.isArray(data.data)) {
+    return data.data;
+  }
+
+  return [];
+}
+
+export async function fetchCountries(token: string | null): Promise<CountryOption[]> {
+  const { response, data, unauthorized } = await http.get<unknown>('/api/countries', { token });
+  if (unauthorized) {
     return [];
   }
 
@@ -106,14 +102,7 @@ async function requestLocationItems<T>(
     throw new Error(`No fue posible cargar la ubicación (${response.status})`);
   }
 
-  const payload = (await response.json()) as ApiListResponse;
-  return Array.isArray(payload.data) ? (payload.data as T[]) : [];
-}
-
-export async function fetchCountries(token: string | null): Promise<CountryOption[]> {
-  const items = await requestLocationItems<unknown>('/api/countries', token);
-
-  return items
+  return extractItems(data)
     .map(normalizeCountry)
     .filter((item): item is CountryOption => item !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -123,27 +112,40 @@ export async function fetchProvinces(
   countryCode: string,
   token: string | null,
 ): Promise<ProvinceOption[]> {
-  const items = await requestLocationItems<unknown>(
+  const { response, data, unauthorized } = await http.get<unknown>(
     `/api/countries/${encodeURIComponent(countryCode)}/provinces`,
-    token,
+    { token },
   );
 
-  return items
+  if (unauthorized) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error(`No fue posible cargar las provincias (${response.status})`);
+  }
+
+  return extractItems(data)
     .map(normalizeProvince)
     .filter((item): item is ProvinceOption => item !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function fetchCities(
-  provinceId: number,
-  token: string | null,
-): Promise<CityOption[]> {
-  const items = await requestLocationItems<unknown>(
+export async function fetchCities(provinceId: number, token: string | null): Promise<CityOption[]> {
+  const { response, data, unauthorized } = await http.get<unknown>(
     `/api/provinces/${encodeURIComponent(String(provinceId))}/cities`,
-    token,
+    { token },
   );
 
-  return items
+  if (unauthorized) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error(`No fue posible cargar las ciudades (${response.status})`);
+  }
+
+  return extractItems(data)
     .map(normalizeCity)
     .filter((item): item is CityOption => item !== null)
     .sort((a, b) => a.name.localeCompare(b.name));

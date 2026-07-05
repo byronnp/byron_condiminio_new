@@ -1,3 +1,5 @@
+import { http } from '@/services/api/http';
+import { isRecord } from '@/utils/api/common';
 import { handleUnauthorizedResponse } from '@/services/auth-redirect';
 
 interface ApiMutationResponse {
@@ -27,16 +29,6 @@ export interface SaveAdministrativeUserResult {
   data: unknown;
 }
 
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
-
-function buildApiUrl(path: string) {
-  return new URL(path, apiHost).toString();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object');
-}
-
 function buildAdministrativeUserBody(payload: SaveAdministrativeUserPayload) {
   return {
     name: [payload.firstName.trim(), payload.lastName.trim()].filter(Boolean).join(' '),
@@ -63,15 +55,18 @@ async function submitAdministrativeUserRequest(
   payload: SaveAdministrativeUserPayload,
   token: string | null,
 ): Promise<SaveAdministrativeUserResult> {
-  const response = await fetch(buildApiUrl(path), {
-    method,
+  const requestOptions = {
+    token,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(buildAdministrativeUserBody(payload)),
-  });
+    body: buildAdministrativeUserBody(payload),
+  };
+  const { response, data, unauthorized } =
+    method === 'POST'
+      ? await http.post<ApiMutationResponse>(path, requestOptions)
+      : await http.put<ApiMutationResponse>(path, requestOptions);
 
   if (handleUnauthorizedResponse(response, token)) {
     return {
@@ -81,25 +76,28 @@ async function submitAdministrativeUserRequest(
     };
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const body = contentType.includes('application/json')
-    ? ((await response.json()) as ApiMutationResponse)
-    : null;
+  if (unauthorized) {
+    return {
+      success: false,
+      message: 'Sesión expirada.',
+      data: null,
+    };
+  }
 
   if (!response.ok) {
-    const responseData = isRecord(body?.data) ? body.data : null;
+    const responseData = isRecord(data?.data) ? data.data : null;
     const message =
       (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof body?.message === 'string' && body.message) ||
+      (typeof data?.message === 'string' && data.message) ||
       `No fue posible guardar el usuario (${response.status})`;
 
     throw new Error(message);
   }
 
   return {
-    success: body?.success !== false,
-    message: typeof body?.message === 'string' ? body.message : 'Usuario guardado correctamente.',
-    data: body?.data ?? null,
+    success: data?.success !== false,
+    message: typeof data?.message === 'string' ? data.message : 'Usuario guardado correctamente.',
+    data: data?.data ?? null,
   };
 }
 

@@ -1,4 +1,5 @@
-import { handleUnauthorizedResponse } from '@/services/auth-redirect';
+import { buildApiUrl, http } from '@/services/api/http';
+import { isRecord, toNumber, toText } from '@/utils/api/common';
 
 interface ApiCreateResponse {
   success?: unknown;
@@ -101,33 +102,6 @@ export interface CondominiumDetail {
   logoUrl: string;
 }
 
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
-
-function buildApiUrl(path: string) {
-  return new URL(path, apiHost).toString();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object');
-}
-
-function toText(value: unknown) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function toNumber(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) ? numericValue : null;
-  }
-
-  return null;
-}
-
 function pickFirstText(record: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     const value = toText(record[key]);
@@ -159,7 +133,8 @@ function buildLocationLabel(record: Record<string, unknown>) {
   const cityRecord = isRecord(record.city) ? record.city : null;
   const provinceRecord = isRecord(record.province) ? record.province : null;
   const city =
-    pickFirstText(cityRecord ?? {}, ['name', 'label']) || pickFirstText(record, ['city_name', 'city']);
+    pickFirstText(cityRecord ?? {}, ['name', 'label']) ||
+    pickFirstText(record, ['city_name', 'city']);
   const province =
     pickFirstText(provinceRecord ?? {}, ['name', 'label']) ||
     pickFirstText(record, ['province_name', 'province']);
@@ -467,16 +442,21 @@ async function submitCondominiumRequest(
   payload: CreateCondominiumPayload,
   token: string | null,
 ): Promise<CreateCondominiumResult> {
-  const response = await fetch(buildApiUrl(path), {
-    method,
+  const requestOptions = {
+    token,
     headers: {
       Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: buildCondominiumFormData(payload),
-  });
+    ...(method === 'DELETE' ? {} : { body: buildCondominiumFormData(payload) }),
+  };
+  const { response, data, unauthorized } =
+    method === 'POST'
+      ? await http.post<ApiCreateResponse>(path, requestOptions)
+      : method === 'PUT'
+        ? await http.put<ApiCreateResponse>(path, requestOptions)
+        : await http.delete<ApiCreateResponse>(path, requestOptions);
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return {
       success: false,
       message: 'Sesión expirada.',
@@ -484,26 +464,21 @@ async function submitCondominiumRequest(
     };
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const body = contentType.includes('application/json')
-    ? ((await response.json()) as ApiCreateResponse)
-    : null;
-
   if (!response.ok) {
-    const responseData = isRecord(body?.data) ? body.data : null;
+    const responseData = isRecord(data?.data) ? data.data : null;
     const message =
       (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof body?.message === 'string' && body.message) ||
+      (typeof data?.message === 'string' && data.message) ||
       `No fue posible guardar el condominio (${response.status})`;
 
     throw new Error(message);
   }
 
   return {
-    success: body?.success !== false,
+    success: data?.success !== false,
     message:
-      typeof body?.message === 'string' ? body.message : 'Condominio guardado correctamente.',
-    data: body?.data ?? null,
+      typeof data?.message === 'string' ? data.message : 'Condominio guardado correctamente.',
+    data: data?.data ?? null,
   };
 }
 
@@ -531,15 +506,17 @@ export async function deleteCondominium(
   id: number,
   token: string | null,
 ): Promise<CreateCondominiumResult> {
-  const response = await fetch(buildApiUrl(`/api/condominiums/${encodeURIComponent(String(id))}`), {
-    method: 'DELETE',
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const { response, data, unauthorized } = await http.delete<ApiCreateResponse>(
+    `/api/condominiums/${encodeURIComponent(String(id))}`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+      },
     },
-  });
+  );
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return {
       success: false,
       message: 'Sesión expirada.',
@@ -547,26 +524,21 @@ export async function deleteCondominium(
     };
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const body = contentType.includes('application/json')
-    ? ((await response.json()) as ApiCreateResponse)
-    : null;
-
   if (!response.ok) {
-    const responseData = isRecord(body?.data) ? body.data : null;
+    const responseData = isRecord(data?.data) ? data.data : null;
     const message =
       (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof body?.message === 'string' && body.message) ||
+      (typeof data?.message === 'string' && data.message) ||
       `No fue posible eliminar el condominio (${response.status})`;
 
     throw new Error(message);
   }
 
   return {
-    success: body?.success !== false,
+    success: data?.success !== false,
     message:
-      typeof body?.message === 'string' ? body.message : 'Condominio eliminado correctamente.',
-    data: body?.data ?? null,
+      typeof data?.message === 'string' ? data.message : 'Condominio eliminado correctamente.',
+    data: data?.data ?? null,
   };
 }
 
@@ -574,14 +546,14 @@ export async function fetchCondominiumById(
   id: number,
   token: string | null,
 ): Promise<CondominiumDetail | null> {
-  const response = await fetch(buildApiUrl(`/api/condominiums/${encodeURIComponent(String(id))}`), {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const { response, data, unauthorized } = await http.get<unknown>(
+    `/api/condominiums/${encodeURIComponent(String(id))}`,
+    {
+      token,
     },
-  });
+  );
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return null;
   }
 
@@ -589,8 +561,7 @@ export async function fetchCondominiumById(
     throw new Error(`No fue posible cargar el condominio (${response.status})`);
   }
 
-  const payload = (await response.json()) as unknown;
-  return normalizeCondominiumDetail(payload);
+  return normalizeCondominiumDetail(data);
 }
 
 export async function fetchCondominiumsPage(
@@ -598,18 +569,15 @@ export async function fetchCondominiumsPage(
   perPage: number,
   token: string | null,
 ): Promise<CondominiumsPageResult> {
-  const url = new URL('/api/condominiums', apiHost);
+  const url = new URL(buildApiUrl('/api/condominiums'));
   url.searchParams.set('page', String(page));
   url.searchParams.set('per_page', String(perPage));
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+  const { response, data, unauthorized } = await http.get<ApiListResponse>(url.toString(), {
+    token,
   });
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return { items: [], page: 1, perPage, total: 0, lastPage: 1 };
   }
 
@@ -617,22 +585,20 @@ export async function fetchCondominiumsPage(
     throw new Error(`No fue posible cargar los condominios (${response.status})`);
   }
 
-  const payload = (await response.json()) as ApiListResponse;
-  const items = extractListItems(payload)
+  const items = extractListItems(data)
     .map(normalizeCondominiumListItem)
     .filter((item): item is CondominiumListItem => item !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
-  const meta = isRecord(payload.meta)
-    ? payload.meta
-    : isRecord(payload.data) && isRecord(payload.data.meta)
-      ? payload.data.meta
+  const meta = isRecord(data?.meta)
+    ? data.meta
+    : isRecord(data?.data) && isRecord(data.data.meta)
+      ? data.data.meta
       : {};
   const total = toNumber(meta.total) ?? items.length;
   const currentPage = toNumber(meta.current_page ?? meta.currentPage) ?? page;
   const currentPerPage = toNumber(meta.per_page ?? meta.perPage) ?? perPage;
   const lastPage =
-    toNumber(meta.last_page ?? meta.lastPage) ??
-    Math.max(1, Math.ceil(total / currentPerPage));
+    toNumber(meta.last_page ?? meta.lastPage) ?? Math.max(1, Math.ceil(total / currentPerPage));
 
   return { items, page: currentPage, perPage: currentPerPage, total, lastPage };
 }
@@ -646,21 +612,18 @@ export async function fetchCondominiumOptions(
   token: string | null,
   search = '',
 ): Promise<CondominiumOptionItem[]> {
-  const url = new URL('/api/condominiums/options', apiHost);
+  const url = new URL(buildApiUrl('/api/condominiums/options'));
   const normalizedSearch = search.trim();
 
   if (normalizedSearch) {
     url.searchParams.set('search', normalizedSearch);
   }
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+  const { response, data, unauthorized } = await http.get<ApiListResponse>(url.toString(), {
+    token,
   });
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return [];
   }
 
@@ -668,8 +631,7 @@ export async function fetchCondominiumOptions(
     throw new Error(`No fue posible cargar las opciones de condominios (${response.status})`);
   }
 
-  const payload = (await response.json()) as ApiListResponse;
-  const items = extractListItems(payload);
+  const items = extractListItems(data);
 
   return items
     .map(normalizeCondominiumOptionItem)

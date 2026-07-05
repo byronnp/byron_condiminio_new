@@ -1,3 +1,6 @@
+import { http } from '@/services/api/http';
+import { isRecord, toNumber, toText } from '@/utils/api/common';
+
 export interface CatalogItem {
   id: number;
   catalog_id: number;
@@ -17,28 +20,18 @@ interface CatalogItemsResponse {
   meta?: unknown;
 }
 
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
-
-function buildApiUrl(path: string) {
-  return new URL(path, apiHost).toString();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object');
-}
-
 function normalizeCatalogItem(item: unknown): CatalogItem | null {
   if (!isRecord(item)) {
     return null;
   }
 
-  const id = Number(item.id);
-  const catalogId = Number(item.catalog_id);
-  const sortOrder = Number(item.sort_order ?? 0);
-  const code = typeof item.code === 'string' ? item.code.trim() : '';
-  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  const id = toNumber(item.id);
+  const catalogId = toNumber(item.catalog_id);
+  const sortOrder = toNumber(item.sort_order) ?? 0;
+  const code = toText(item.code);
+  const name = toText(item.name);
 
-  if (!Number.isFinite(id) || !Number.isFinite(catalogId) || !code || !name) {
+  if (id === null || catalogId === null || !code || !name) {
     return null;
   }
 
@@ -48,7 +41,7 @@ function normalizeCatalogItem(item: unknown): CatalogItem | null {
     code,
     name,
     description: typeof item.description === 'string' ? item.description : null,
-    sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
+    sort_order: sortOrder,
     metadata: item.metadata,
     is_system: item.is_system === true,
     is_active: item.is_active !== false,
@@ -56,18 +49,15 @@ function normalizeCatalogItem(item: unknown): CatalogItem | null {
 }
 
 export async function fetchCatalogItems(code: string): Promise<CatalogItem[]> {
-  const response = await fetch(buildApiUrl(`/api/catalogs/${encodeURIComponent(code)}/items`), {
-    headers: {
-      Accept: 'application/json',
-    },
-  });
+  const { response, data } = await http.get<CatalogItemsResponse>(
+    `/api/catalogs/${encodeURIComponent(code)}/items`,
+  );
 
   if (!response.ok) {
     throw new Error(`No fue posible cargar el catálogo ${code} (${response.status})`);
   }
 
-  const payload = (await response.json()) as CatalogItemsResponse;
-  const rawItems = Array.isArray(payload.data) ? payload.data : [];
+  const rawItems = Array.isArray(data?.data) ? data.data : [];
 
   return rawItems
     .map(normalizeCatalogItem)

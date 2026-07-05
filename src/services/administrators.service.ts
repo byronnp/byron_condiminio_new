@@ -1,4 +1,5 @@
-import { handleUnauthorizedResponse } from '@/services/auth-redirect';
+import { buildApiUrl, http } from '@/services/api/http';
+import { isRecord, toNumber, toText } from '@/utils/api/common';
 
 interface ApiMutationResponse {
   success?: unknown;
@@ -62,33 +63,6 @@ export interface AdministratorDetail {
   phone: string;
   type: AdministratorType;
   condominiumId: number | null;
-}
-
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
-
-function buildApiUrl(path: string) {
-  return new URL(path, apiHost).toString();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object');
-}
-
-function toText(value: unknown) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function toNumber(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) ? numericValue : null;
-  }
-
-  return null;
 }
 
 function pickFirstText(record: Record<string, unknown>, keys: string[]) {
@@ -168,7 +142,9 @@ function normalizeAdministratorStatus(record: Record<string, unknown>) {
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
 
-  if (['suspended', 'suspendido', 'inactive', 'inactivo', 'blocked', 'bloqueado'].includes(rawStatus)) {
+  if (
+    ['suspended', 'suspendido', 'inactive', 'inactivo', 'blocked', 'bloqueado'].includes(rawStatus)
+  ) {
     return 'Inactivo' as const;
   }
 
@@ -222,7 +198,10 @@ function normalizeAdministratorInvitationStatus(
   return 'Sin invitacion';
 }
 
-function normalizeAdministratorScope(record: Record<string, unknown>, type: AdministratorListItem['type']) {
+function normalizeAdministratorScope(
+  record: Record<string, unknown>,
+  type: AdministratorListItem['type'],
+) {
   if (type === 'Senior') {
     return 'Vista global';
   }
@@ -302,7 +281,7 @@ function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | n
 
   const condominium = isRecord(record.condominium) ? record.condominium : null;
   const firstCondominium = Array.isArray(record.condominiums)
-    ? record.condominiums.find(isRecord) ?? null
+    ? (record.condominiums.find(isRecord) ?? null)
     : null;
   const condominiumId = toNumber(
     record.condominium_id ??
@@ -321,9 +300,7 @@ function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | n
     id,
     firstName,
     lastName,
-    documentTypeId: toNumber(
-      record.document_type_id ?? record.documentTypeId ?? documentType?.id,
-    ),
+    documentTypeId: toNumber(record.document_type_id ?? record.documentTypeId ?? documentType?.id),
     documentNumber: pickFirstText(record, [
       'document_number',
       'documentNumber',
@@ -398,19 +375,28 @@ async function submitAdministratorRequest(
   payload: SaveAdministratorPayload,
   token: string | null,
 ): Promise<SaveAdministratorResult> {
-  const response = await fetch(buildApiUrl(path), {
-    method,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(
-      method === 'POST' ? buildAdministratorBody(payload) : buildAdministratorUpdateBody(payload),
-    ),
-  });
+  const requestBody =
+    method === 'POST' ? buildAdministratorBody(payload) : buildAdministratorUpdateBody(payload);
+  const { response, data, unauthorized } =
+    method === 'POST'
+      ? await http.post<ApiMutationResponse>(path, {
+          token,
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: requestBody,
+        })
+      : await http.put<ApiMutationResponse>(path, {
+          token,
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: requestBody,
+        });
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return {
       success: false,
       message: 'Sesión expirada.',
@@ -418,26 +404,21 @@ async function submitAdministratorRequest(
     };
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const body = contentType.includes('application/json')
-    ? ((await response.json()) as ApiMutationResponse)
-    : null;
-
   if (!response.ok) {
-    const responseData = isRecord(body?.data) ? body.data : null;
+    const responseData = isRecord(data?.data) ? data.data : null;
     const message =
       (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof body?.message === 'string' && body.message) ||
+      (typeof data?.message === 'string' && data.message) ||
       `No fue posible guardar el administrador (${response.status})`;
 
     throw new Error(message);
   }
 
   return {
-    success: body?.success !== false,
+    success: data?.success !== false,
     message:
-      typeof body?.message === 'string' ? body.message : 'Administrador guardado correctamente.',
-    data: body?.data ?? null,
+      typeof data?.message === 'string' ? data.message : 'Administrador guardado correctamente.',
+    data: data?.data ?? null,
   };
 }
 
@@ -448,17 +429,22 @@ async function submitAdministratorActionRequest(
   fallbackMessage: string,
   requestBody?: Record<string, unknown>,
 ): Promise<SaveAdministratorResult> {
-  const response = await fetch(buildApiUrl(path), {
-    method,
+  const requestOptions = {
+    token,
     headers: {
       Accept: 'application/json',
       ...(requestBody ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    ...(requestBody ? { body: JSON.stringify(requestBody) } : {}),
-  });
+    ...(requestBody ? { body: requestBody } : {}),
+  };
+  const { response, data, unauthorized } =
+    method === 'POST'
+      ? await http.post<ApiMutationResponse>(path, requestOptions)
+      : method === 'PATCH'
+        ? await http.patch<ApiMutationResponse>(path, requestOptions)
+        : await http.delete<ApiMutationResponse>(path, requestOptions);
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return {
       success: false,
       message: 'Sesión expirada.',
@@ -466,25 +452,20 @@ async function submitAdministratorActionRequest(
     };
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const body = contentType.includes('application/json')
-    ? ((await response.json()) as ApiMutationResponse)
-    : null;
-
   if (!response.ok) {
-    const responseData = isRecord(body?.data) ? body.data : null;
+    const responseData = isRecord(data?.data) ? data.data : null;
     const message =
       (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof body?.message === 'string' && body.message) ||
+      (typeof data?.message === 'string' && data.message) ||
       `${fallbackMessage} (${response.status})`;
 
     throw new Error(message);
   }
 
   return {
-    success: body?.success !== false,
-    message: typeof body?.message === 'string' ? body.message : fallbackMessage,
-    data: body?.data ?? null,
+    success: data?.success !== false,
+    message: typeof data?.message === 'string' ? data.message : fallbackMessage,
+    data: data?.data ?? null,
   };
 }
 
@@ -512,7 +493,7 @@ export async function fetchAdministratorsPage(
   params: FetchAdministratorsPageParams,
   token: string | null,
 ): Promise<AdministratorsPageResult> {
-  const url = new URL('/api/administrators', apiHost);
+  const url = new URL(buildApiUrl('/api/administrators'));
   url.searchParams.set('page', String(params.page));
   url.searchParams.set('per_page', String(params.perPage));
   if (params.search?.trim()) url.searchParams.set('search', params.search.trim());
@@ -521,14 +502,11 @@ export async function fetchAdministratorsPage(
     url.searchParams.set('condominium_id', String(params.condominiumId));
   }
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+  const { response, data, unauthorized } = await http.get<ApiListResponse>(url.toString(), {
+    token,
   });
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return { items: [], page: 1, perPage: params.perPage, total: 0, lastPage: 1 };
   }
 
@@ -536,14 +514,13 @@ export async function fetchAdministratorsPage(
     throw new Error(`No fue posible cargar los administradores (${response.status})`);
   }
 
-  const payload = (await response.json()) as ApiListResponse;
-  const items = extractListItems(payload)
+  const items = extractListItems(data)
     .map(normalizeAdministratorListItem)
     .filter((item): item is AdministratorListItem => item !== null);
-  const meta = isRecord(payload.meta)
-    ? payload.meta
-    : isRecord(payload.data) && isRecord(payload.data.meta)
-      ? payload.data.meta
+  const meta = isRecord(data?.meta)
+    ? data.meta
+    : isRecord(data?.data) && isRecord(data.data.meta)
+      ? data.data.meta
       : {};
   const total = toNumber(meta.total) ?? items.length;
   const page = toNumber(meta.current_page ?? meta.currentPage) ?? params.page;
@@ -563,14 +540,12 @@ export async function fetchAdministratorById(
   id: number,
   token: string | null,
 ): Promise<AdministratorDetail | null> {
-  const response = await fetch(buildApiUrl(`/api/administrators/${encodeURIComponent(String(id))}`), {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  const { response, data, unauthorized } = await http.get<unknown>(
+    `/api/administrators/${encodeURIComponent(String(id))}`,
+    { token },
+  );
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return null;
   }
 
@@ -578,8 +553,7 @@ export async function fetchAdministratorById(
     throw new Error(`No fue posible cargar el administrador (${response.status})`);
   }
 
-  const payload = (await response.json()) as unknown;
-  return normalizeAdministratorDetail(payload);
+  return normalizeAdministratorDetail(data);
 }
 
 export async function resendAdministratorInvitation(
@@ -588,7 +562,9 @@ export async function resendAdministratorInvitation(
 ): Promise<SaveAdministratorResult> {
   void id;
   void token;
-  return Promise.reject(new Error('El contrato Swagger no expone una ruta para reenviar invitaciones.'));
+  return Promise.reject(
+    new Error('El contrato Swagger no expone una ruta para reenviar invitaciones.'),
+  );
 }
 
 async function updateAdministratorStatus(

@@ -15,6 +15,13 @@ This is a Quasar + Vue 3 + TypeScript SPA for multi-condominium administration.
 - `src/referencias/`: design reference images only
 
 List screens should follow the shared shell pattern: header, search, status filter, CTA, stats cards, table controls, table, and pagination.
+New modules must follow the `page + composable + service` pattern:
+
+- `page`: UI composition, navigation, and event wiring only
+- `composable`: reactive state, validation, orchestration, and view logic
+- `service`: API access, endpoint contracts, and data access helpers
+
+Do not place business logic in pages when it belongs in a composable or service.
 
 ## UI Design Guidelines
 Use the current condominium wizard implementation as a reference for future form-heavy screens and new module screens.
@@ -28,6 +35,8 @@ Use the current condominium wizard implementation as a reference for future form
 - Preserve restrained spacing, dense Quasar controls, and low-contrast surfaces instead of decorative or marketing-style layouts.
 - On mobile, reduce visual noise: compact headers, one-column forms, horizontally scrollable step navigation when needed, and fewer always-visible actions.
 - Do not nest UI cards inside other cards unless the nested element is a repeated item or a true modal/tool surface.
+- Place dialogs inside `src/pages/[modulo]/components/` when they are only used by that module.
+- Promote dialogs to `src/components/general/` only when they are reused across multiple modules or represent shared app-level surfaces.
 
 ## Build, Test, and Development Commands
 - `npm run dev`: start the Quasar dev server
@@ -109,3 +118,14 @@ Backend documentation: `http://localhost:8001/api/documentation`
 - Global confirmation and alert dialogs must come from `src/components/general/` instead of `window.confirm`, ad hoc banners, or duplicated modal code.
 - Use the general confirmation dialog for destructive actions such as deleting condominiums and similar cross-module operations.
 - Public authentication routes such as `/activar-acceso` must use `meta.public = true` and remain accessible without session. The login screen may surface `?activated=true` as a success banner only; do not reintroduce condo selection there.
+- The houses detail module must keep the same visual and structural pattern used in `CasaDetallePage.vue`:
+  - one outer `detail-frame` container
+  - `AppStepper` at the top, outside any inner card
+  - `q-separator` directly below the stepper
+  - `detail-stage__body` as the two-column layout
+  - `detail-main` for the active tab content
+  - `detail-summary` for the lateral summary
+  - `transition name="fade-slide" mode="out-in"` for tab changes
+  - `step-panel` as the base surface for each tab
+  - `field-group` for internal sections inside each tab
+  - no extra nested card that visually separates the step content from the summary

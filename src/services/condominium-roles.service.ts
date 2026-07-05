@@ -1,4 +1,5 @@
-import { handleUnauthorizedResponse } from '@/services/auth-redirect';
+import { http } from '@/services/api/http';
+import { isRecord, toNumber, toText } from '@/utils/api/common';
 
 export interface CondominiumRoleItem {
   id: number;
@@ -13,33 +14,6 @@ interface ApiRolesResponse {
   message?: unknown;
   data?: unknown;
   meta?: unknown;
-}
-
-const apiHost = import.meta.env.VITE_API_HOST ?? 'http://localhost:8001/';
-
-function buildApiUrl(path: string) {
-  return new URL(path, apiHost).toString();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object');
-}
-
-function toText(value: unknown) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function toNumber(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) ? numericValue : null;
-  }
-
-  return null;
 }
 
 function normalizeRoleItem(item: unknown): CondominiumRoleItem | null {
@@ -97,14 +71,12 @@ export async function fetchCondominiumRoles(
   condominiumId: number,
   token: string | null,
 ): Promise<CondominiumRoleItem[]> {
-  const response = await fetch(buildApiUrl(`/api/condominiums/${encodeURIComponent(String(condominiumId))}/roles`), {
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  const { response, data, unauthorized } = await http.get<ApiRolesResponse>(
+    `/api/condominiums/${encodeURIComponent(String(condominiumId))}/roles`,
+    { token },
+  );
 
-  if (handleUnauthorizedResponse(response, token)) {
+  if (unauthorized) {
     return [];
   }
 
@@ -112,13 +84,7 @@ export async function fetchCondominiumRoles(
     throw new Error(`No fue posible cargar los roles del condominio (${response.status})`);
   }
 
-  const contentType = response.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json')) {
-    return [];
-  }
-
-  const payload = (await response.json()) as ApiRolesResponse;
-  const items = extractRoleItems(payload);
+  const items = extractRoleItems(data);
 
   return items
     .map(normalizeRoleItem)
