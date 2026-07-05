@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <q-page class="detail-page">
     <div class="page-shell">
       <AppPageHeader
@@ -34,152 +34,193 @@
           align="left"
           active-color="primary"
           indicator-color="primary"
-          class="tabs"
+          class="tabs app-nav-tabs"
           ><q-tab name="summary" label="Resumen" /><q-tab
             name="people"
             :label="`Personas (${people.length})`" /><q-tab
             name="parking"
             :label="`Parqueaderos (${parkings.length})`"
         /></q-tabs>
-        <q-tab-panels v-model="tab" animated class="panels">
-          <q-tab-panel name="summary"
-            ><div class="section-header">
-              <div>
-                <h2>Información de la casa</h2>
-                <p>Datos estructurales registrados.</p>
+        <q-tab-panels v-model="tab" animated class="panels app-nav-panels">
+          <q-tab-panel name="summary">
+            <section class="tab-panel-shell">
+              <div class="tab-panel-header">
+                <div>
+                  <div class="tab-panel-header__eyebrow">Ficha técnica</div>
+                  <h2>Información de la casa</h2>
+                  <p>Datos estructurales registrados.</p>
+                </div>
               </div>
-            </div>
-            <div class="detail-list">
-              <div>
-                <span>Código</span><strong>{{ house.code }}</strong>
-              </div>
-              <div>
-                <span>Número</span><strong>{{ house.number }}</strong>
-              </div>
-              <div>
-                <span>Área</span><strong>{{ house.areaM2 }} m²</strong>
-              </div>
-              <div>
-                <span>Bloque o sector</span><strong>{{ house.blockName }}</strong>
-              </div>
-              <div>
-                <span>Propietario principal</span><strong>{{ house.ownerName }}</strong>
-              </div>
-              <div>
-                <span>Estado</span><strong>{{ house.isActive ? 'Activa' : 'Inactiva' }}</strong>
-              </div>
-              <div>
-                <span>Asignación de personas</span
-                ><strong>{{ house.isAssignable ? 'Habilitada' : 'Deshabilitada' }}</strong>
-              </div>
-            </div></q-tab-panel
-          >
-          <q-tab-panel name="people"
-            ><div class="section-header">
-              <div>
-                <h2>Personas asociadas</h2>
-                <p>Propietarios, residentes y responsables.</p>
-              </div>
-              <q-btn
-                color="primary"
-                unelevated
-                no-caps
-                icon="person_add"
-                label="Agregar persona"
-                :disable="!house.isAssignable"
-                @click="openPersonDialog"
-                ><q-tooltip>{{
-                  house.isAssignable
-                    ? 'Registrar una persona asociada a esta casa'
-                    : 'La casa no permite asignar personas'
-                }}</q-tooltip></q-btn
-              >
-            </div>
-            <q-list v-if="people.length" separator bordered class="rounded-borders"
-              ><q-item v-for="person in people" :key="person.id"
-                ><q-item-section avatar
-                  ><q-avatar color="primary" text-color="white">{{
-                    initials(person.name)
-                  }}</q-avatar></q-item-section
-                ><q-item-section
-                  ><q-item-label>{{ person.name }}</q-item-label
-                  ><q-item-label caption
-                    >{{ person.relationship }} · {{ person.email || 'Sin correo' }}</q-item-label
-                  ></q-item-section
-                ><q-item-section side
-                  ><div class="person-badges">
-                    <q-badge v-if="person.isPrimary" outline color="primary">Principal</q-badge
-                    ><q-badge v-if="person.isBillingResponsible" outline color="positive"
-                      >Facturación</q-badge
-                    >
-                    <div class="person-actions">
-                      <q-btn
-                        flat
-                        round
-                        dense
-                        icon="edit"
-                        class="table-icon"
-                        @click="openPersonEditDialog(person)"
-                      >
-                        <q-tooltip>Editar persona</q-tooltip>
-                      </q-btn>
+
+              <q-card flat bordered class="tab-panel-card">
+                <q-card-section class="tab-panel-card__section">
+                  <div class="detail-spec-grid">
+                    <div class="detail-spec">
+                      <span>Código</span><strong>{{ house.code }}</strong>
                     </div>
-                  </div></q-item-section
-                ></q-item
-              ></q-list
-            >
-            <AppEmptyState
-              v-else
-              icon="groups"
-              title="No existen personas asociadas."
-              text="Agrega una persona cuando la casa permita asignaciones."
-              tight
-          /></q-tab-panel>
-          <q-tab-panel name="parking"
-            ><div class="section-header">
-              <div>
-                <h2>Parqueaderos privados</h2>
-                <p>Unidades hijas asociadas a esta casa.</p>
-              </div>
-              <q-btn
-                color="primary"
-                unelevated
-                no-caps
-                icon="local_parking"
-                label="Agregar parqueadero"
-                @click="parkingDialog = true"
-              />
-            </div>
-            <div v-if="parkings.length" class="parking-grid">
-              <q-card v-for="parking in parkings" :key="parking.id" flat bordered
-                ><q-card-section
-                  ><div class="parking-card__header">
-                    <strong>{{ parking.code }}</strong
-                    ><q-badge :color="parking.isActive ? 'positive' : 'grey-7'" rounded>{{
-                      parking.isActive ? 'Activo' : 'Inactivo'
-                    }}</q-badge>
+                    <div class="detail-spec">
+                      <span>Número</span><strong>{{ house.number }}</strong>
+                    </div>
+                    <div class="detail-spec">
+                      <span>Área</span><strong>{{ house.areaM2 }} m²</strong>
+                    </div>
+                    <div class="detail-spec">
+                      <span>Bloque o sector</span><strong>{{ house.blockName }}</strong>
+                    </div>
+                    <div class="detail-spec">
+                      <span>Propietario principal</span><strong>{{ house.ownerName }}</strong>
+                    </div>
+                    <div class="detail-spec">
+                      <span>Estado</span
+                      ><strong>{{ house.isActive ? 'Activa' : 'Inactiva' }}</strong>
+                    </div>
+                    <div class="detail-spec detail-spec--wide">
+                      <span>Asignación de personas</span
+                      ><strong>{{ house.isAssignable ? 'Habilitada' : 'Deshabilitada' }}</strong>
+                    </div>
                   </div>
-                  <span>Número {{ parking.number }} · {{ parking.areaM2 }} m²</span></q-card-section
-                ></q-card
-              >
-            </div>
-            <AppEmptyState
-              v-else
-              icon="local_parking"
-              title="No existen parqueaderos asociados."
-              text="Crea el primer parqueadero para esta casa."
-              tight
-          /></q-tab-panel>
+                </q-card-section>
+              </q-card>
+            </section>
+          </q-tab-panel>
+          <q-tab-panel name="people">
+            <section class="tab-panel-shell">
+              <div class="tab-panel-header">
+                <div>
+                  <div class="tab-panel-header__eyebrow">Gestión de personas</div>
+                  <h2>Personas asociadas</h2>
+                  <p>Propietarios, residentes y responsables.</p>
+                </div>
+                <q-btn
+                  color="primary"
+                  unelevated
+                  no-caps
+                  icon="person_add"
+                  label="Agregar persona"
+                  :disable="!house.isAssignable"
+                  @click="openPersonDialog"
+                >
+                  <q-tooltip>{{
+                    house.isAssignable
+                      ? 'Registrar una persona asociada a esta casa'
+                      : 'La casa no permite asignar personas'
+                  }}</q-tooltip>
+                </q-btn>
+              </div>
+
+              <q-card flat bordered class="tab-panel-card">
+                <q-card-section class="tab-panel-card__section">
+                  <q-list v-if="people.length" class="people-list">
+                    <q-item v-for="person in people" :key="person.id" class="people-item">
+                      <q-item-section avatar>
+                        <q-avatar color="primary" text-color="white">{{
+                          initials(person.name)
+                        }}</q-avatar>
+                      </q-item-section>
+                      <q-item-section class="people-item__copy">
+                        <q-item-label>{{ person.name }}</q-item-label>
+                        <q-item-label caption
+                          >{{ person.relationship }} ·
+                          {{ person.email || 'Sin correo' }}</q-item-label
+                        >
+                      </q-item-section>
+                      <q-item-section side>
+                        <div class="person-badges">
+                          <q-badge v-if="person.isPrimary" outline color="primary"
+                            >Principal</q-badge
+                          >
+                          <q-badge v-if="person.isBillingResponsible" outline color="positive"
+                            >Facturación</q-badge
+                          >
+                          <div class="person-actions">
+                            <q-btn
+                              flat
+                              round
+                              dense
+                              icon="edit"
+                              class="table-icon"
+                              @click="openPersonEditDialog(person)"
+                            >
+                              <q-tooltip>Editar persona</q-tooltip>
+                            </q-btn>
+                          </div>
+                        </div>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                  <AppEmptyState
+                    v-else
+                    icon="groups"
+                    title="No existen personas asociadas."
+                    text="Agrega una persona cuando la casa permita asignaciones."
+                    tight
+                  />
+                </q-card-section>
+              </q-card>
+            </section>
+          </q-tab-panel>
+          <q-tab-panel name="parking">
+            <section class="tab-panel-shell">
+              <div class="tab-panel-header">
+                <div>
+                  <div class="tab-panel-header__eyebrow">Gestión de parqueaderos</div>
+                  <h2>Parqueaderos privados</h2>
+                  <p>Unidades hijas asociadas a esta casa.</p>
+                </div>
+                <q-btn
+                  color="primary"
+                  unelevated
+                  no-caps
+                  icon="local_parking"
+                  label="Agregar parqueadero"
+                  @click="parkingDialog = true"
+                />
+              </div>
+
+              <q-card flat bordered class="tab-panel-card">
+                <q-card-section class="tab-panel-card__section">
+                  <div v-if="parkings.length" class="parking-grid">
+                    <q-card
+                      v-for="parking in parkings"
+                      :key="parking.id"
+                      flat
+                      bordered
+                      class="parking-card"
+                    >
+                      <q-card-section class="parking-card__section">
+                        <div class="parking-card__header">
+                          <strong>{{ parking.code }}</strong>
+                          <q-badge :color="parking.isActive ? 'positive' : 'grey-7'" rounded>{{
+                            parking.isActive ? 'Activo' : 'Inactivo'
+                          }}</q-badge>
+                        </div>
+                        <span>Número {{ parking.number }} · {{ parking.areaM2 }} m²</span>
+                      </q-card-section>
+                    </q-card>
+                  </div>
+                  <AppEmptyState
+                    v-else
+                    icon="local_parking"
+                    title="No existen parqueaderos asociados."
+                    text="Crea el primer parqueadero para esta casa."
+                    tight
+                  />
+                </q-card-section>
+              </q-card>
+            </section>
+          </q-tab-panel>
         </q-tab-panels>
       </template>
     </div>
     <q-dialog v-model="personDialog">
       <q-card class="dialog-card dialog-card--wide">
         <q-form ref="personFormRef" @submit.prevent="savePerson">
-          <q-card-section>
+          <q-card-section class="dialog-card__header">
+            <div class="dialog-card__eyebrow">Nueva asociación</div>
             <h2>Agregar persona</h2>
             <p>Se asociará a {{ house?.code }} dentro de {{ condominiumName }}.</p>
           </q-card-section>
+          <q-separator />
           <q-card-section class="dialog-form">
             <div class="dialog-grid">
               <q-input
@@ -259,12 +300,12 @@
                 </q-item-section>
               </q-item>
             </div>
-            <q-banner rounded class="context-note"
-              >País fijo: <strong>EC</strong>. El backend enviará la invitación o actualización
-              según corresponda.</q-banner
-            >
+            <q-banner rounded class="context-note">
+              País fijo: <strong>EC</strong>. El backend enviará la invitación o actualización según
+              corresponda.
+            </q-banner>
           </q-card-section>
-          <q-card-actions align="right">
+          <q-card-actions align="right" class="dialog-actions">
             <q-btn flat no-caps label="Cancelar" v-close-popup />
             <q-btn
               color="primary"
@@ -284,10 +325,12 @@
           <q-spinner color="primary" size="28px" />
         </q-inner-loading>
         <q-form ref="personEditFormRef" @submit.prevent="savePersonEdit">
-          <q-card-section>
+          <q-card-section class="dialog-card__header">
+            <div class="dialog-card__eyebrow">Edición de persona</div>
             <h2>Editar persona</h2>
             <p>{{ selectedPersonLabel }}</p>
           </q-card-section>
+          <q-separator />
           <q-card-section class="dialog-form">
             <div class="dialog-grid">
               <q-input
@@ -373,7 +416,7 @@
               </q-item>
             </div>
           </q-card-section>
-          <q-card-actions align="between">
+          <q-card-actions align="between" class="dialog-actions dialog-actions--split">
             <q-btn
               flat
               no-caps
@@ -398,31 +441,40 @@
         </q-form>
       </q-card>
     </q-dialog>
-    <q-dialog v-model="parkingDialog"
-      ><q-card class="dialog-card"
-        ><q-card-section
-          ><h2>Agregar parqueadero</h2>
-          <p>Se asociará a {{ house?.code }}.</p></q-card-section
-        ><q-card-section class="dialog-form"
-          ><q-input v-model="parking.number" dense outlined label="Número *" /><q-input
-            v-model="parking.code"
-            dense
-            outlined
-            label="Código *" /><q-input
-            v-model.number="parking.areaM2"
-            dense
-            outlined
-            type="number"
-            label="Área (m²)" /></q-card-section
-        ><q-card-actions align="right"
-          ><q-btn flat no-caps label="Cancelar" v-close-popup /><q-btn
+    <q-dialog v-model="parkingDialog">
+      <q-card class="dialog-card">
+        <q-card-section class="dialog-card__header">
+          <div class="dialog-card__eyebrow">Nueva unidad hija</div>
+          <h2>Agregar parqueadero</h2>
+          <p>Se asociará a {{ house?.code }}.</p>
+        </q-card-section>
+        <q-separator />
+        <q-card-section class="dialog-form">
+          <div class="dialog-grid dialog-grid--compact">
+            <q-input v-model="parking.number" dense outlined label="Número *" />
+            <q-input v-model="parking.code" dense outlined label="Código *" />
+            <q-input
+              v-model.number="parking.areaM2"
+              dense
+              outlined
+              type="number"
+              label="Área (m²)"
+            />
+          </div>
+        </q-card-section>
+        <q-card-actions align="right" class="dialog-actions">
+          <q-btn flat no-caps label="Cancelar" v-close-popup />
+          <q-btn
             color="primary"
             unelevated
             no-caps
             label="Guardar"
             :loading="savingParking"
-            @click="saveParking" /></q-card-actions></q-card
-    ></q-dialog>
+            @click="saveParking"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 <script setup lang="ts">
@@ -875,6 +927,90 @@ function goBack() {
   justify-content: center;
   width: 42px;
 }
+.tab-panel-shell {
+  display: grid;
+  gap: 14px;
+}
+.tab-panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+.tab-panel-header__eyebrow {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tab-panel-header h2 {
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 3px 0 0;
+}
+.tab-panel-header p {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 4px;
+  max-width: 42rem;
+}
+.tab-panel-card {
+  border-radius: var(--app-radius-lg);
+}
+.tab-panel-card__section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+.detail-spec-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.detail-spec {
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 14px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 14px;
+}
+.detail-spec--wide {
+  grid-column: 1 / -1;
+}
+.detail-spec span {
+  color: var(--app-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.detail-spec strong {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.people-list {
+  display: grid;
+  gap: 10px;
+}
+.people-item {
+  background: rgba(248, 250, 252, 0.66);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 16px;
+  min-height: 68px;
+  padding-block: 12px;
+}
+.people-item__copy {
+  min-width: 0;
+}
 .tabs,
 .panels {
   background: var(--app-surface);
@@ -906,6 +1042,15 @@ function goBack() {
 .parking-grid span {
   display: block;
 }
+.parking-card {
+  border-radius: 16px;
+}
+.parking-card__section {
+  display: grid;
+  gap: 6px;
+  min-height: 92px;
+  padding: 14px;
+}
 .parking-card__header {
   align-items: center;
   display: flex;
@@ -933,21 +1078,60 @@ function goBack() {
   width: 100%;
 }
 .dialog-card--wide {
-  max-width: 760px;
+  max-width: 820px;
+}
+.dialog-card__header {
+  display: grid;
+  gap: 4px;
+  padding: 18px 20px 16px;
+}
+.dialog-card__eyebrow {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.dialog-card__header h2 {
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.dialog-card__header p {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 .dialog-form {
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  padding: 18px 20px 8px;
 }
 .dialog-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.dialog-grid--compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.switch-list {
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 14px;
+  overflow: hidden;
+}
 .context-note {
   background: rgba(37, 99, 235, 0.06);
   color: var(--app-text-muted);
   font-size: 11px;
+}
+.dialog-actions {
+  padding: 0 20px 18px;
+}
+.dialog-actions--split {
+  justify-content: space-between;
 }
 .error-banner {
   background: rgba(239, 68, 68, 0.08);
@@ -959,11 +1143,32 @@ function goBack() {
   .detail-list {
     grid-template-columns: 1fr;
   }
-  .section-header {
+  .section-header,
+  .tab-panel-header {
     gap: 12px;
+    flex-direction: column;
+  }
+  .detail-spec-grid,
+  .dialog-grid,
+  .dialog-grid--compact {
+    grid-template-columns: 1fr;
+  }
+  .detail-spec--wide {
+    grid-column: auto;
+  }
+  .dialog-card__header,
+  .dialog-form,
+  .dialog-actions {
+    padding-inline: 16px;
   }
   .dialog-grid {
     grid-template-columns: 1fr;
+  }
+  .people-item {
+    padding-block: 10px;
+  }
+  .parking-card__section {
+    min-height: auto;
   }
 }
 </style>

@@ -209,6 +209,10 @@ const emit = defineEmits<{
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.stats-grid > * {
+  grid-column: 1 / -1;
+}
+
 .table-card {
   border-radius: var(--app-radius-xl);
   overflow: hidden;

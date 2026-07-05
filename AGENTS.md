@@ -37,6 +37,8 @@ Use the current condominium wizard implementation as a reference for future form
 - Do not nest UI cards inside other cards unless the nested element is a repeated item or a true modal/tool surface.
 - Place dialogs inside `src/pages/[modulo]/components/` when they are only used by that module.
 - Promote dialogs to `src/components/general/` only when they are reused across multiple modules or represent shared app-level surfaces.
+- Keep `AppStepper` and `QTabs` visually aligned as one navigation family: same surface treatment, radius, spacing, shadows, and active state language. Do not make Steps and Tabs look like different products.
+- For the houses detail module, keep the established structure: outer detail frame, stepper or tabs above the content, separator immediately below navigation, shared content shell, active-tab body, and a lateral summary when present. Avoid adding extra nested cards that visually detach the content from the summary.
 
 ## Build, Test, and Development Commands
 - `npm run dev`: start the Quasar dev server

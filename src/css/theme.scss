@@ -22,6 +22,14 @@
   --app-shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.06);
   --app-shadow-panel: 0 18px 45px rgba(15, 23, 42, 0.08);
   --app-shadow-card: 0 12px 32px rgba(15, 23, 42, 0.05);
+  --app-nav-surface: rgba(255, 255, 255, 0.94);
+  --app-nav-border: rgba(15, 23, 42, 0.08);
+  --app-nav-border-active: rgba(37, 99, 235, 0.22);
+  --app-nav-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  --app-nav-shadow-active: 0 14px 30px rgba(15, 23, 42, 0.09);
+  --app-nav-radius: 16px;
+  --app-nav-item-radius: 12px;
+  --app-nav-transition: 180ms ease;
   --app-container-width: 1440px;
   --app-content-width: 1320px;
   --app-font-family: 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;

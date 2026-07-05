@@ -77,6 +77,7 @@ const gridStyle = computed(() => ({
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(var(--app-stats-columns), minmax(0, 1fr));
+  width: 100%;
 }
 
 .app-stats-card {
