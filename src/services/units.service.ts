@@ -6,6 +6,8 @@ export interface UnitListItem {
   code: string;
   number: string;
   areaM2: number;
+  unitTypeId: number | null;
+  blockId: number | null;
   isAssignable: boolean;
   isActive: boolean;
   parentUnitId: number | null;
@@ -103,6 +105,11 @@ function normalizeUnitItem(item: unknown): UnitListItem | null {
     code,
     number: toText(item.number),
     areaM2: toNumber(item.area_m2) ?? 0,
+    unitTypeId: toNumber(item.unit_type_id),
+    blockId:
+      toNumber(item.condominium_block_id) ??
+      toNumber(item.block_id) ??
+      (isRecord(block) ? toNumber(block.id) : null),
     isAssignable: item.is_assignable !== false,
     isActive: item.is_active !== false,
     parentUnitId: toNumber(item.parent_unit_id),
@@ -410,6 +417,35 @@ export async function createHouse(
       typeof data?.message === 'string'
         ? data.message
         : `No fue posible crear la casa (${response.status})`,
+    );
+  }
+  return data;
+}
+
+export async function updateHouse(
+  condominiumId: number,
+  unitId: number,
+  payload: CreateHousePayload,
+  token: string | null,
+  parentUnitId: number | null = null,
+) {
+  const { response, data, unauthorized } = await http.put<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/units/${unitId}`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: buildHouseBody(payload, parentUnitId),
+    },
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.message === 'string'
+        ? data.message
+        : `No fue posible actualizar la casa (${response.status})`,
     );
   }
   return data;
