@@ -2,14 +2,17 @@ import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import {
+  createParkingUnit,
   createUnitPerson,
   fetchUnitById,
   fetchUnitPeople,
   fetchUnitsPage,
   type CreateUnitPersonPayload,
+  type CreateParkingUnitPayload,
   type UnitListItem,
   type UnitPersonItem,
 } from '@/services/units.service';
+import { fetchCatalogItems } from '@/services/catalog.service';
 import { useSessionStore } from '@/stores/session.store';
 
 interface HouseDetailItem extends UnitListItem {
@@ -36,9 +39,11 @@ export function useHouseDetail() {
   const error = ref('');
   const loadingPersonProfile = ref(false);
   const savingPerson = ref(false);
+  const savingParking = ref(false);
   const parkingDialog = ref(false);
   const personDialog = ref(false);
   const personEditDialog = ref(false);
+  const parkingUnitTypeId = ref<number | null>(null);
 
   const unitId = computed(() => {
     const id = Number(route.params.id);
@@ -90,6 +95,30 @@ export function useHouseDetail() {
   const personEdit = ref<Record<string, unknown> | null>(null);
   const parking = ref<Record<string, unknown> | null>(null);
   const deactivatingPerson = ref(false);
+
+  async function loadParkingUnitType() {
+    if (parkingUnitTypeId.value !== null) {
+      return parkingUnitTypeId.value;
+    }
+
+    try {
+      const unitTypes = await fetchCatalogItems('unit_types');
+      const parkingType = unitTypes.find((item) => {
+        const normalized = `${item.code} ${item.name}`.toLowerCase();
+        return (
+          normalized.includes('parqueadero') ||
+          normalized.includes('parking') ||
+          normalized.includes('estacionamiento')
+        );
+      });
+
+      parkingUnitTypeId.value = parkingType?.id ?? null;
+      return parkingUnitTypeId.value;
+    } catch {
+      parkingUnitTypeId.value = null;
+      return null;
+    }
+  }
 
   async function load() {
     if (!condominiumId.value || !unitId.value) {
@@ -183,9 +212,33 @@ export function useHouseDetail() {
     return Promise.resolve(true);
   }
 
-  function saveParking() {
-    parkingDialog.value = false;
-    return Promise.resolve(true);
+  async function saveParking(payload: CreateParkingUnitPayload) {
+    if (!condominiumId.value || !unitId.value) {
+      throw new Error('Selecciona un condominio válido para agregar el parqueadero.');
+    }
+
+    const unitTypeId = await loadParkingUnitType();
+    if (!unitTypeId) {
+      throw new Error('No se encontró un tipo de unidad para parqueadero.');
+    }
+
+    savingParking.value = true;
+
+    try {
+      const result = await createParkingUnit(
+        condominiumId.value,
+        unitId.value,
+        unitTypeId,
+        payload,
+        session.accessToken,
+      );
+
+      parkingDialog.value = false;
+      await load();
+      return result;
+    } finally {
+      savingParking.value = false;
+    }
   }
 
   function openParkingDialog() {
@@ -197,6 +250,8 @@ export function useHouseDetail() {
   watch([condominiumId, unitId], () => {
     void load();
   }, { immediate: true });
+
+  void loadParkingUnitType();
 
   return {
     condominiumName,
@@ -221,7 +276,7 @@ export function useHouseDetail() {
     saveParking,
     savePerson,
     savePersonEdit,
-    savingParking: computed(() => false),
+    savingParking,
     savingPerson,
     savingPersonEdit: computed(() => false),
     selectedPersonLabel,

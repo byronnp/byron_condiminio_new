@@ -2,7 +2,7 @@
   <q-page class="house-detail-page">
     <div class="detail-topbar">
       <div>
-        <div class="detail-path">Unidades / Detalle</div>
+        <div class="detail-path">Casa / Detalle</div>
       </div>
 
       <q-btn flat icon="arrow_back" label="Volver" class="detail-back-btn" @click="goBack" />
@@ -46,43 +46,41 @@
                 {{ blockName }}
               </q-badge>
             </div>
+
+            <div class="house-hero__actions">
+              <div class="hero-actions-grid">
+                <q-btn
+                  unelevated
+                  color="primary"
+                  icon="edit"
+                  label="Editar vivienda"
+                  class="hero-action hero-action--primary"
+                  @click="goToEdit"
+                />
+
+                <q-btn
+                  outline
+                  color="primary"
+                  icon="person_add"
+                  label="Agregar persona"
+                  class="hero-action"
+                  @click="openPersonDialog"
+                />
+
+                <q-btn
+                  outline
+                  color="primary"
+                  icon="local_parking"
+                  label="Agregar parqueadero"
+                  class="hero-action"
+                  @click="openParkingDialog"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="house-hero__rail">
-          <div class="house-hero__actions">
-            <div class="section-label">Acciones principales</div>
-
-            <div class="hero-actions-grid">
-              <q-btn
-                unelevated
-                color="primary"
-                icon="edit"
-                label="Editar vivienda"
-                class="hero-action hero-action--primary"
-                @click="goToEdit"
-              />
-
-              <q-btn
-                outline
-                color="primary"
-                icon="person_add"
-                label="Persona"
-                class="hero-action"
-                @click="openPersonDialog"
-              />
-
-              <q-btn
-                outline
-                color="primary"
-                icon="local_parking"
-                label="Parqueaderos"
-                class="hero-action"
-                @click="openParkingDialog"
-              />
-            </div>
-          </div>
-
           <div class="house-hero__metrics">
             <div class="hero-metric">
               <q-avatar color="blue-1" text-color="primary" icon="person" />
@@ -316,7 +314,11 @@
     </q-tab-panels>
 
     <HousePersonDialog v-model="personDialog" :saving="savingPerson" @save="handleSavePerson" />
-    <HouseParkingDialog v-model="parkingDialog" @save="handleSaveParking" />
+    <HouseParkingDialog
+      v-model="parkingDialog"
+      :saving="savingParking"
+      @save="handleSaveParking"
+    />
   </q-page>
 </template>
 
@@ -326,7 +328,7 @@ import { Notify } from 'quasar';
 import { useRouter } from 'vue-router';
 
 import { useHouseDetail } from '@/composables/unidades/useHouseDetail';
-import type { CreateUnitPersonPayload } from '@/services/units.service';
+import type { CreateParkingUnitPayload, CreateUnitPersonPayload } from '@/services/units.service';
 import { useSessionStore } from '@/stores/session.store';
 import HouseParkingDialog from './components/HouseParkingDialog.vue';
 import HousePersonDialog from './components/HousePersonDialog.vue';
@@ -347,6 +349,7 @@ const {
   parkingDialog,
   savePerson,
   saveParking,
+  savingParking,
   savingPerson,
   ownerName,
   peopleCount,
@@ -387,8 +390,16 @@ async function handleSavePerson(payload: CreateUnitPersonPayload) {
   }
 }
 
-async function handleSaveParking() {
-  await saveParking();
+async function handleSaveParking(payload: CreateParkingUnitPayload) {
+  try {
+    await saveParking(payload);
+  } catch (error) {
+    Notify.create({
+      type: 'negative',
+      message: error instanceof Error ? error.message : 'No fue posible agregar el parqueadero.',
+      position: 'top-right',
+    });
+  }
 }
 </script>
 
@@ -441,13 +452,13 @@ async function handleSaveParking() {
 
 .house-hero__rail {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
   align-items: start;
   background: rgba(37, 99, 235, 0.03);
   border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 16px;
-  padding: 14px;
+  padding: 13px;
 }
 
 .house-hero__left {
@@ -498,7 +509,8 @@ async function handleSaveParking() {
 }
 
 .house-hero__actions {
-  padding-right: 2px;
+  margin-top: 8px;
+  padding-top: 2px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -507,32 +519,41 @@ async function handleSaveParking() {
 .section-label {
   font-weight: 700;
   color: #0f172a;
-  margin-bottom: 2px;
+  margin-bottom: 0;
   font-size: 12px;
   letter-spacing: 0.01em;
+  line-height: 1.1;
 }
 
 .house-hero__metrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
   align-content: start;
+  margin-top: 1px;
+  justify-items: stretch;
 }
 
 .hero-metric {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
+  min-height: 40px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .hero-actions-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, max-content);
   gap: 8px;
+  justify-content: start;
 }
 
 .hero-action--primary {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .hero-metric span,
@@ -541,6 +562,7 @@ async function handleSaveParking() {
   display: block;
   font-size: 12px;
   color: #64748b;
+  line-height: 1.2;
 }
 
 .hero-metric strong,
@@ -550,6 +572,7 @@ async function handleSaveParking() {
   font-size: 14px;
   font-weight: 800;
   color: #0f172a;
+  line-height: 1.15;
 }
 
 .house-tabs {
@@ -703,20 +726,20 @@ async function handleSaveParking() {
   }
 
   .house-hero__rail {
-    grid-template-columns: 1fr;
     padding: 12px;
-  }
-
-  .house-hero__actions {
-    border-right: 0;
-    border-top: 1px solid rgba(15, 23, 42, 0.08);
-    padding-right: 0;
-    padding-top: 14px;
   }
 
   .house-hero__metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 2px;
+    margin-top: 0;
+  }
+
+  .hero-actions-grid {
+    grid-template-columns: repeat(2, max-content);
+  }
+
+  .hero-action--primary {
+    grid-column: 1 / -1;
   }
 }
 
@@ -747,6 +770,14 @@ async function handleSaveParking() {
   .house-hero__metrics,
   .technical-grid {
     grid-template-columns: 1fr;
+  }
+
+  .house-hero__actions {
+    margin-top: 10px;
+  }
+
+  .house-hero__metrics {
+    gap: 9px 10px;
   }
 
   .additional-list {
@@ -808,17 +839,40 @@ async function handleSaveParking() {
 }
 
 :deep(.house-hero .q-btn) {
-  min-height: 36px;
-  padding-left: 12px;
-  padding-right: 12px;
+  min-height: 32px;
+  padding-left: 10px;
+  padding-right: 10px;
+  font-size: 12px;
+  line-height: 1.1;
 }
 
 :deep(.house-hero .q-btn .q-icon) {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 :deep(.hero-actions-grid .q-btn) {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  justify-self: start;
+}
+
+:deep(.hero-action .q-btn__content) {
+  width: auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: start;
+  gap: 6px;
+}
+
+:deep(.hero-action .q-btn__content .q-icon) {
+  flex: 0 0 auto;
+}
+
+:deep(.hero-action .q-btn__content .block) {
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.05;
 }
 
 :deep(.house-tabs .q-tab) {
@@ -841,7 +895,11 @@ async function handleSaveParking() {
   }
 
   .house-hero__rail {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    padding: 15px;
+  }
+
+  .house-hero__metrics {
+    gap: 16px;
   }
 }
 
@@ -850,12 +908,16 @@ async function handleSaveParking() {
     grid-template-columns: 1fr;
   }
 
-  .house-hero__rail {
-    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  }
-
   .house-hero__metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-actions-grid {
+    grid-template-columns: repeat(2, max-content);
+  }
+
+  .hero-action--primary {
+    grid-column: 1 / -1;
   }
 
   .summary-grid {

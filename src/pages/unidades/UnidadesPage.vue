@@ -113,8 +113,8 @@
               >
                 <q-tooltip>Ver detalle</q-tooltip>
               </q-btn>
-              <q-btn flat round dense icon="edit" class="table-icon" disable>
-                <q-tooltip>Edición pendiente de soporte del API</q-tooltip>
+              <q-btn flat round dense icon="edit" class="table-icon" @click="goToEdit(props.row)">
+                <q-tooltip>Editar casa</q-tooltip>
               </q-btn>
             </q-td>
           </template>
@@ -205,7 +205,7 @@ const search = ref('');
 const status = ref<'Todas' | 'Activa' | 'Inactiva'>('Todas');
 const sortBy = ref<'recent' | 'code' | 'area'>('recent');
 const page = ref(1);
-const rowsPerPage = ref(10);
+const rowsPerPage = ref(25);
 const serverTotal = ref(0);
 const serverLastPage = ref(1);
 const loading = ref(false);
@@ -267,8 +267,13 @@ const sorted = computed(() => {
   return list.reverse();
 });
 
-const totalPages = computed(() => serverLastPage.value);
-const visibleRows = computed(() => sorted.value);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(sorted.value.length / Math.max(1, rowsPerPage.value))),
+);
+const visibleRows = computed(() => {
+  const start = (page.value - 1) * rowsPerPage.value;
+  return sorted.value.slice(start, start + rowsPerPage.value);
+});
 const hasFilters = computed(() => Boolean(search.value) || status.value !== 'Todas');
 
 const pageMeta = computed(() =>
@@ -321,18 +326,25 @@ async function load() {
 
   loading.value = true;
   error.value = '';
+  const condoId = condominiumId.value;
 
   try {
-    const result = await fetchUnitsPage(
-      condominiumId.value,
-      page.value,
-      rowsPerPage.value,
-      session.accessToken,
+    const firstPage = await fetchUnitsPage(condoId, 1, 100, session.accessToken);
+    const extraPages = Array.from({ length: Math.max(0, firstPage.lastPage - 1) }, (_, index) =>
+      index + 2,
     );
-    rows.value = result.items.filter((unit) => unit.parentUnitId === null);
-    serverTotal.value = result.total;
-    serverLastPage.value = result.lastPage;
-    if (page.value !== result.page) page.value = result.page;
+    const extraResults = extraPages.length
+      ? await Promise.all(
+          extraPages.map((pageNumber) =>
+            fetchUnitsPage(condoId, pageNumber, 100, session.accessToken),
+          ),
+        )
+      : [];
+    const combinedItems = [firstPage, ...extraResults].flatMap((result) => result.items);
+    rows.value = combinedItems.filter((unit) => unit.parentUnitId == null);
+    serverTotal.value = rows.value.length;
+    serverLastPage.value = Math.max(1, Math.ceil(rows.value.length / Math.max(1, rowsPerPage.value)));
+    if (page.value > serverLastPage.value) page.value = serverLastPage.value;
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No fue posible cargar las casas.';
   } finally {
@@ -346,6 +358,10 @@ function goToCreate() {
 
 function goToDetail(row: UnitListItem) {
   void router.push({ name: 'unidades-detalle', params: { id: String(row.id) } });
+}
+
+function goToEdit(row: UnitListItem) {
+  void router.push({ name: 'unidades-editar', params: { id: String(row.id) } });
 }
 
 watch(

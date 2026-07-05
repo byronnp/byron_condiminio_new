@@ -78,6 +78,12 @@ export interface CreateHousePayload {
   isActive: boolean;
 }
 
+export interface CreateParkingUnitPayload {
+  number: string;
+  code: string;
+  areaM2: number | null;
+}
+
 function extractItems(payload: unknown) {
   if (Array.isArray(payload)) return payload;
   if (!isRecord(payload)) return [];
@@ -186,7 +192,7 @@ function buildPersonBody(payload: CreateUnitPersonPayload) {
   };
 }
 
-function buildHouseBody(payload: CreateHousePayload, parentUnitId: number | null = null) {
+function buildHouseCreateBody(payload: CreateHousePayload, parentUnitId: number | null = null) {
   return {
     condominium_block_id: payload.blockId,
     parent_unit_id: parentUnitId,
@@ -198,6 +204,16 @@ function buildHouseBody(payload: CreateHousePayload, parentUnitId: number | null
     is_assignable: payload.isAssignable,
     is_active: payload.isActive,
     parking_units: [],
+  };
+}
+
+function buildHouseUpdateBody(payload: CreateHousePayload, parentUnitId: number | null = null) {
+  return {
+    ...(parentUnitId !== null ? { parent_unit_id: parentUnitId } : {}),
+    number: payload.number.trim(),
+    area_m2: payload.areaM2,
+    is_assignable: payload.isAssignable,
+    is_active: payload.isActive,
   };
 }
 
@@ -344,7 +360,7 @@ export async function createParkingUnit(
   condominiumId: number,
   parentUnitId: number,
   unitTypeId: number,
-  payload: { number: string; code: string; areaM2: number | null },
+  payload: CreateParkingUnitPayload,
   token: string | null,
 ) {
   const { response, data, unauthorized } = await http.post<Record<string, unknown>>(
@@ -355,7 +371,7 @@ export async function createParkingUnit(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: buildHouseBody(
+      body: buildHouseCreateBody(
         {
           blockId: null,
           unitTypeId,
@@ -408,7 +424,7 @@ export async function createHouse(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: buildHouseBody(payload, null),
+      body: buildHouseCreateBody(payload, null),
     },
   );
   if (unauthorized) throw new Error('Sesión expirada.');
@@ -429,7 +445,7 @@ export async function updateHouse(
   token: string | null,
   parentUnitId: number | null = null,
 ) {
-  const { response, data, unauthorized } = await http.put<Record<string, unknown>>(
+  const { response, data, unauthorized } = await http.patch<Record<string, unknown>>(
     `/api/condominiums/${condominiumId}/units/${unitId}`,
     {
       token,
@@ -437,7 +453,7 @@ export async function updateHouse(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: buildHouseBody(payload, parentUnitId),
+      body: buildHouseUpdateBody(payload, parentUnitId),
     },
   );
   if (unauthorized) throw new Error('Sesión expirada.');

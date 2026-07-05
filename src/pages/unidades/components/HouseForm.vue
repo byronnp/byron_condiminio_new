@@ -27,16 +27,27 @@
         </div>
 
         <div class="form-grid q-mt-md">
-          <q-select
-            v-model="form.blockId"
+          <template v-if="blockOptions.length">
+            <q-select
+              v-model="form.blockId"
+              dense
+              outlined
+              clearable
+              emit-value
+              map-options
+              label="Bloque, manzana o sector (opcional)"
+              :options="blockOptions"
+              :loading="loadingBlocks"
+            />
+          </template>
+          <q-input
+            v-else
+            :model-value="emptyBlockValue"
             dense
             outlined
-            clearable
-            emit-value
-            map-options
+            disable
+            readonly
             label="Bloque, manzana o sector (opcional)"
-            :options="blockOptions"
-            :loading="loadingBlocks"
           />
           <q-input
             v-model="form.number"
@@ -216,9 +227,10 @@ const characteristicsHint = computed(() =>
 
 const emptyBlocksText = computed(() =>
   props.mode === 'create'
-    ? 'La casa se registrará sin bloque asignado.'
-    : 'La casa se mantiene sin bloque asignado.',
+    ? 'No hay bloques asignados a este condominio.'
+    : 'No hay bloques asignados a este condominio.',
 );
+const emptyBlockValue = computed(() => 'No hay bloques asignados a este condominio');
 
 function requiredTextRule(value: unknown) {
   return typeof value === 'string' && value.trim() ? true : 'Campo requerido';
