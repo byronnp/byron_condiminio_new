@@ -51,6 +51,17 @@
             label="Número de casas *"
             :rules="[requiredRule, integerMinRule(1)]"
           />
+          <q-input
+            v-model="config.totalUnits"
+            class="step-field"
+            dense
+            outlined
+            stack-label
+            hide-bottom-space
+            type="number"
+            label="Total de unidades *"
+            :rules="[requiredRule, integerMinRule(1)]"
+          />
         </div>
       </div>
 
@@ -228,6 +239,7 @@ const props = defineProps<{
     currency: string;
   towers: string;
   houses: string;
+  totalUnits: string;
   logo: File | null;
   characteristics: number[];
   };

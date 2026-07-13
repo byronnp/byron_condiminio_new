@@ -20,17 +20,20 @@ export interface CreateCondominiumPayload {
   ruc: string;
   type: string;
   description: string;
-  status: string;
+  email: string;
+  phone: string;
   countryCode: string;
   provinceId: number | null;
   cityId: number | null;
-  direction: string;
+  address: string;
   reference: string;
   latitude?: number | null;
   longitude?: number | null;
   currency: string;
   towers: string;
   houses: string;
+  totalUnits: string;
+  isActive: boolean;
   characteristics: number[];
   adminName: string;
   adminLastName: string;
@@ -87,19 +90,34 @@ export interface CondominiumDetail {
   ruc: string;
   type: string;
   description: string;
-  status: string;
+  email: string;
+  phone: string;
+  isActive: boolean;
   countryCode: string;
   provinceId: number | null;
   cityId: number | null;
-  direction: string;
+  address: string;
   reference: string;
   latitude: number | null;
   longitude: number | null;
   currency: string;
   towers: string;
   houses: string;
+  totalUnits: string;
   characteristics: CondominiumFeatureItem[];
   logoUrl: string;
+}
+
+export class CondominiumServiceError extends Error {
+  status: number;
+  fieldErrors: Record<string, string>;
+
+  constructor(message: string, status: number, fieldErrors: Record<string, string> = {}) {
+    super(message);
+    this.name = 'CondominiumServiceError';
+    this.status = status;
+    this.fieldErrors = fieldErrors;
+  }
 }
 
 function pickFirstText(record: Record<string, unknown>, keys: string[]) {
@@ -206,11 +224,25 @@ function buildStatusLabel(record: Record<string, unknown>) {
   }
 
   const rawActive = record.is_active ?? record.active;
-  if (rawActive === false) {
+  if (rawActive === false || rawActive === 0 || rawActive === '0') {
     return 'Inactivo';
   }
 
   return 'Activo';
+}
+
+function resolveIsActive(record: Record<string, unknown>) {
+  const rawActive = record.is_active ?? record.active;
+  if (rawActive === false || rawActive === 0 || rawActive === '0') {
+    return false;
+  }
+
+  const rawStatus = pickFirstText(record, ['status']).trim().toLowerCase();
+  if (rawStatus === 'inactivo' || rawStatus === 'inactive') {
+    return false;
+  }
+
+  return true;
 }
 
 function buildImageLabel(record: Record<string, unknown>) {
@@ -326,18 +358,21 @@ function normalizeCondominiumDetail(payload: unknown): CondominiumDetail | null 
     ruc: pickFirstText(record, ['ruc']) || '',
     type: pickFirstText(typeRecord ?? record, ['name']) || pickFirstText(record, ['type']),
     description: pickFirstText(record, ['description']) || '',
-    status: pickFirstText(record, ['status']) || 'Activo',
+    email: pickFirstText(record, ['email']) || '',
+    phone: pickFirstText(record, ['phone']) || '',
+    isActive: resolveIsActive(record),
     countryCode:
       pickFirstText(record, ['country_code']) || pickFirstText(countryRecord ?? record, ['code']),
     provinceId: toNumber(record.province_id),
     cityId: toNumber(record.city_id),
-    direction: pickFirstText(record, ['direction', 'address']) || '',
+    address: pickFirstText(record, ['address', 'direction']) || '',
     reference: pickFirstText(record, ['reference', 'address_reference']) || '',
     latitude: toNumber(record.latitude),
     longitude: toNumber(record.longitude),
     currency: pickFirstText(record, ['currency']) || '',
     towers: String(pickFirstNumber(record, ['towers_count', 'towers'])),
     houses: String(pickFirstNumber(record, ['houses_count', 'houses'])),
+    totalUnits: String(pickFirstNumber(record, ['total_units', 'units', 'units_count'])),
     characteristics: Array.isArray(record.features)
       ? record.features
           .map(normalizeFeatureItem)
@@ -393,6 +428,19 @@ function appendIfPresent(formData: FormData, key: string, value: unknown) {
   }
 }
 
+function appendBoolean(formData: FormData, key: string, value: boolean) {
+  formData.append(key, value ? '1' : '0');
+}
+
+function appendNullableNumber(formData: FormData, key: string, value: number | null | undefined) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    formData.append(key, String(value));
+    return;
+  }
+
+  formData.append(key, '');
+}
+
 function appendNumberArray(formData: FormData, key: string, values: number[]) {
   for (const value of values) {
     if (Number.isFinite(value)) {
@@ -401,24 +449,103 @@ function appendNumberArray(formData: FormData, key: string, values: number[]) {
   }
 }
 
-function buildCondominiumFormData(payload: CreateCondominiumPayload) {
+function extractFirstMessage(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = extractFirstMessage(item);
+      if (message) {
+        return message;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractFieldErrors(payload: unknown) {
+  const source = isRecord(payload) ? payload : {};
+  const data = isRecord(source.data) ? source.data : {};
+  const errors = isRecord(source.errors)
+    ? source.errors
+    : isRecord(data.errors)
+      ? data.errors
+      : {};
+  const fieldErrors: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(errors)) {
+    const message = extractFirstMessage(value);
+    if (message) {
+      fieldErrors[key] = message;
+    }
+  }
+
+  return fieldErrors;
+}
+
+function extractResponseMessage(payload: unknown) {
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  return extractFirstMessage(payload.message) ?? extractFirstMessage(payload.error);
+}
+
+function buildFallbackMessage(status: number, action: 'listar' | 'cargar' | 'guardar' | 'eliminar' | 'estado') {
+  switch (status) {
+    case 401:
+      return 'Tu sesión expiró. Vuelve a iniciar sesión.';
+    case 403:
+      return 'No tienes permisos para gestionar condominios.';
+    case 404:
+      return 'El condominio solicitado no existe o ya no está disponible.';
+    case 422:
+      return 'Revisa los campos marcados antes de continuar.';
+    case 429:
+      return 'Demasiados intentos. Espera un momento e intenta nuevamente.';
+    case 500:
+      return 'Ocurrió un error en el servidor. Intenta nuevamente más tarde.';
+    default:
+      return `No fue posible ${action} el condominio (${status}).`;
+  }
+}
+
+function buildServiceError(payload: unknown, status: number, action: 'listar' | 'cargar' | 'guardar' | 'eliminar' | 'estado') {
+  const message = extractResponseMessage(payload) ?? buildFallbackMessage(status, action);
+  return new CondominiumServiceError(message, status, extractFieldErrors(payload));
+}
+
+function buildCondominiumFormData(
+  payload: CreateCondominiumPayload,
+  options: { spoofPut?: boolean } = {},
+) {
   const formData = new FormData();
+
+  if (options.spoofPut) {
+    formData.append('_method', 'PUT');
+  }
 
   appendIfPresent(formData, 'name', payload.name);
   appendIfPresent(formData, 'ruc', payload.ruc);
   appendIfPresent(formData, 'type', payload.type);
   appendIfPresent(formData, 'description', payload.description);
-  appendIfPresent(formData, 'status', payload.status);
+  appendIfPresent(formData, 'email', payload.email);
+  appendIfPresent(formData, 'phone', payload.phone);
   appendIfPresent(formData, 'country_code', payload.countryCode);
   appendIfPresent(formData, 'province_id', payload.provinceId);
   appendIfPresent(formData, 'city_id', payload.cityId);
-  appendIfPresent(formData, 'direction', payload.direction);
+  appendIfPresent(formData, 'address', payload.address);
   appendIfPresent(formData, 'reference', payload.reference);
-  appendIfPresent(formData, 'latitude', payload.latitude ?? null);
-  appendIfPresent(formData, 'longitude', payload.longitude ?? null);
+  appendNullableNumber(formData, 'latitude', payload.latitude ?? null);
+  appendNullableNumber(formData, 'longitude', payload.longitude ?? null);
   appendIfPresent(formData, 'currency', payload.currency);
   appendIfPresent(formData, 'towers', payload.towers);
   appendIfPresent(formData, 'houses', payload.houses);
+  appendIfPresent(formData, 'total_units', payload.totalUnits);
+  appendBoolean(formData, 'is_active', payload.isActive);
   appendIfPresent(formData, 'admin_name', payload.adminName);
   appendIfPresent(formData, 'admin_last_name', payload.adminLastName);
   appendIfPresent(formData, 'admin_document_type', payload.adminDocumentType);
@@ -438,23 +565,24 @@ function buildCondominiumFormData(payload: CreateCondominiumPayload) {
 
 async function submitCondominiumRequest(
   path: string,
-  method: 'POST' | 'PUT' | 'DELETE',
+  method: 'POST' | 'PUT',
   payload: CreateCondominiumPayload,
   token: string | null,
 ): Promise<CreateCondominiumResult> {
+  const spoofPut = method === 'PUT' && payload.logo !== null;
   const requestOptions = {
     token,
     headers: {
       Accept: 'application/json',
     },
-    ...(method === 'DELETE' ? {} : { body: buildCondominiumFormData(payload) }),
+    body: buildCondominiumFormData(payload, { spoofPut }),
   };
   const { response, data, unauthorized } =
     method === 'POST'
       ? await http.post<ApiCreateResponse>(path, requestOptions)
-      : method === 'PUT'
-        ? await http.put<ApiCreateResponse>(path, requestOptions)
-        : await http.delete<ApiCreateResponse>(path, requestOptions);
+      : spoofPut
+        ? await http.post<ApiCreateResponse>(path, requestOptions)
+        : await http.put<ApiCreateResponse>(path, requestOptions);
 
   if (unauthorized) {
     return {
@@ -465,13 +593,7 @@ async function submitCondominiumRequest(
   }
 
   if (!response.ok) {
-    const responseData = isRecord(data?.data) ? data.data : null;
-    const message =
-      (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof data?.message === 'string' && data.message) ||
-      `No fue posible guardar el condominio (${response.status})`;
-
-    throw new Error(message);
+    throw buildServiceError(data, response.status, 'guardar');
   }
 
   return {
@@ -525,13 +647,7 @@ export async function deleteCondominium(
   }
 
   if (!response.ok) {
-    const responseData = isRecord(data?.data) ? data.data : null;
-    const message =
-      (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof data?.message === 'string' && data.message) ||
-      `No fue posible eliminar el condominio (${response.status})`;
-
-    throw new Error(message);
+    throw buildServiceError(data, response.status, 'eliminar');
   }
 
   return {
@@ -558,7 +674,7 @@ export async function fetchCondominiumById(
   }
 
   if (!response.ok) {
-    throw new Error(`No fue posible cargar el condominio (${response.status})`);
+    throw buildServiceError(data, response.status, 'cargar');
   }
 
   return normalizeCondominiumDetail(data);
@@ -582,7 +698,7 @@ export async function fetchCondominiumsPage(
   }
 
   if (!response.ok) {
-    throw new Error(`No fue posible cargar los condominios (${response.status})`);
+    throw buildServiceError(data, response.status, 'listar');
   }
 
   const items = extractListItems(data)
@@ -606,6 +722,44 @@ export async function fetchCondominiumsPage(
 export async function fetchCondominiums(token: string | null): Promise<CondominiumListItem[]> {
   const result = await fetchCondominiumsPage(1, 100, token);
   return result.items;
+}
+
+export async function updateCondominiumStatus(
+  id: number,
+  isActive: boolean,
+  token: string | null,
+): Promise<CreateCondominiumResult> {
+  const { response, data, unauthorized } = await http.patch<ApiCreateResponse>(
+    `/api/condominiums/${encodeURIComponent(String(id))}/status`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+      },
+      body: {
+        is_active: isActive,
+      },
+    },
+  );
+
+  if (unauthorized) {
+    return {
+      success: false,
+      message: 'Tu sesión expiró. Vuelve a iniciar sesión.',
+      data: null,
+    };
+  }
+
+  if (!response.ok) {
+    throw buildServiceError(data, response.status, 'estado');
+  }
+
+  return {
+    success: data?.success !== false,
+    message:
+      typeof data?.message === 'string' ? data.message : 'Estado actualizado correctamente.',
+    data: data?.data ?? null,
+  };
 }
 
 export async function fetchCondominiumOptions(

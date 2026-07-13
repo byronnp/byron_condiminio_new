@@ -65,7 +65,7 @@
             :disable="!location.provinceId"
           />
           <q-input
-            v-model="location.direction"
+            v-model="location.address"
             class="step-field step-field--full"
             dense
             outlined
@@ -141,7 +141,7 @@ defineProps<{
     countryCode: string;
     provinceId: number | null;
     cityId: number | null;
-    direction: string;
+    address: string;
     reference: string;
   };
   countryOptions: SelectOption<string | number>[];

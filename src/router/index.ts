@@ -36,6 +36,10 @@ export default defineRouter(() => {
       return { name: 'login', query: { redirect: to.fullPath } };
     }
 
+    if (to.meta.requiresSeniorAccess && !session.isSenior) {
+      return { name: 'dashboard', query: { forbidden: 'condominios' } };
+    }
+
     if (to.meta.requiresCondoContext && !session.activeCondominium) {
       const fallbackCondo = session.allowedCondominiums[0];
 

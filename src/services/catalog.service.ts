@@ -48,9 +48,13 @@ function normalizeCatalogItem(item: unknown): CatalogItem | null {
   };
 }
 
-export async function fetchCatalogItems(code: string): Promise<CatalogItem[]> {
+export async function fetchCatalogItems(
+  code: string,
+  token: string | null = null,
+): Promise<CatalogItem[]> {
   const { response, data } = await http.get<CatalogItemsResponse>(
     `/api/catalogs/${encodeURIComponent(code)}/items`,
+    { token },
   );
 
   if (!response.ok) {

@@ -47,6 +47,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Condominios',
           subtitle: 'Gestión general de condominios',
+          requiresSeniorAccess: true,
         },
       },
       {
@@ -56,6 +57,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Nuevo condominio',
           subtitle: 'Registro y configuración inicial del condominio',
+          requiresSeniorAccess: true,
         },
       },
       {
@@ -65,6 +67,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'Editar condominio',
           subtitle: 'Actualización de información del condominio',
+          requiresSeniorAccess: true,
         },
       },
       {

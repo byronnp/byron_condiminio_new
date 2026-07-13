@@ -7,6 +7,7 @@
       </div>
       <div class="page-hero__actions">
         <q-input
+          v-if="showSearch"
           v-model="searchValue"
           dense
           outlined
@@ -17,6 +18,7 @@
           <template #prepend> <q-icon name="search" /> </template>
         </q-input>
         <q-select
+          v-if="showStatusFilter"
           v-model="statusValue"
           :options="statusOptions"
           dense
@@ -26,6 +28,7 @@
           class="status-field"
         />
         <q-btn
+          v-if="showFilters"
           outline
           no-caps
           :icon="filtersIcon"
@@ -63,7 +66,7 @@
           />
           <span>registros</span>
         </div>
-        <div class="table-controls__right">
+        <div v-if="showSort" class="table-controls__right">
           <span>Ordenar por:</span>
           <q-select
             v-model="sortByValue"
@@ -103,6 +106,10 @@ const props = withDefaults(
     filtersLabel?: string;
     filtersIcon?: string;
     filtersExpanded?: boolean;
+    showSearch?: boolean;
+    showStatusFilter?: boolean;
+    showFilters?: boolean;
+    showSort?: boolean;
   }>(),
   {
     rowsPerPageOptions: () => [10, 20, 50],
@@ -110,6 +117,10 @@ const props = withDefaults(
     filtersIcon: 'filter_alt',
     filtersExpanded: false,
     actionDisabled: false,
+    showSearch: true,
+    showStatusFilter: true,
+    showFilters: true,
+    showSort: true,
   },
 );
 const searchValue = computed({

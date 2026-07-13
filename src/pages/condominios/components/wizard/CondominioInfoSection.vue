@@ -54,6 +54,23 @@
           />
         </div>
         <q-input
+          v-model="form.email"
+          class="step-field"
+          dense
+          outlined
+          hide-bottom-space
+          type="email"
+          label="Correo del condominio"
+        />
+        <q-input
+          v-model="form.phone"
+          class="step-field"
+          dense
+          outlined
+          hide-bottom-space
+          label="Teléfono del condominio"
+        />
+        <q-input
           v-model="form.description"
           class="step-field step-field--full"
           dense
@@ -78,6 +95,8 @@ defineProps<{
   type: string;
   description: string;
   status: string;
+  email: string;
+  phone: string;
   };
   typeOptions: string[];
   typeOptionsLoading: boolean;

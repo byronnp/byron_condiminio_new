@@ -15,6 +15,10 @@
       action-icon="add_home_work"
       :filters-label="filtersButtonLabel"
       :filters-expanded="advancedFiltersOpen"
+      :show-search="false"
+      :show-status-filter="false"
+      :show-filters="false"
+      :show-sort="false"
       @filters-click="toggleAdvancedFilters"
       @cta-click="goToNewCondominio"
     >
@@ -370,43 +374,15 @@ const sortOptions = [
   { label: 'Nombre A-Z', value: 'name' },
 ] as const;
 const filteredRows = computed(() => {
-  const query = search.value.trim().toLowerCase();
-  return rows.value.filter((row) => {
-    const matchesStatus = statusFilter.value === 'Todos' || row.status === statusFilter.value;
-    const matchesType = typeFilter.value === 'Todos' || row.type === typeFilter.value;
-    const matchesQuery =
-      !query ||
-      row.name.toLowerCase().includes(query) ||
-      row.location.toLowerCase().includes(query) ||
-      row.country.toLowerCase().includes(query) ||
-      row.province.toLowerCase().includes(query) ||
-      row.city.toLowerCase().includes(query) ||
-      row.principal.toLowerCase().includes(query);
-    return matchesStatus && matchesType && matchesQuery;
-  });
+  return rows.value;
 });
-const hasActiveFilters = computed(
-  () =>
-    Boolean(search.value.trim()) || statusFilter.value !== 'Todos' || typeFilter.value !== 'Todos',
-);
-const activeFiltersCount = computed(
-  () =>
-    Number(Boolean(search.value.trim())) +
-    Number(statusFilter.value !== 'Todos') +
-    Number(typeFilter.value !== 'Todos'),
-);
+const hasActiveFilters = computed(() => false);
+const activeFiltersCount = computed(() => 0);
 const filtersButtonLabel = computed(() =>
   activeFiltersCount.value ? `Filtros (${activeFiltersCount.value})` : 'Filtros',
 );
 const sortedRows = computed(() => {
-  const source = [...filteredRows.value];
-  if (sortBy.value === 'name') {
-    return source.sort((a, b) => a.name.localeCompare(b.name));
-  }
-  if (sortBy.value === 'oldest') {
-    return source.reverse();
-  }
-  return source;
+  return filteredRows.value;
 });
 const totalPages = computed(() => serverTotalPages.value);
 watch(
