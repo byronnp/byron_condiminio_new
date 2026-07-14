@@ -3,10 +3,13 @@ import { useRoute } from 'vue-router';
 
 import {
   createParkingUnit,
+  createUnitAccessInvitation,
+  deactivateUnitPerson,
   createUnitPerson,
   fetchUnitById,
   fetchUnitPeople,
   fetchUnitsPage,
+  setUnitBillingResponsible,
   type CreateUnitPersonPayload,
   type CreateParkingUnitPayload,
   type UnitListItem,
@@ -43,7 +46,10 @@ export function useHouseDetail() {
   const parkingDialog = ref(false);
   const personDialog = ref(false);
   const personEditDialog = ref(false);
-  const parkingUnitTypeId = ref<number | null>(null);
+  const childUnitTypeIds = ref<{ parking: number | null; storage: number | null }>({
+    parking: null,
+    storage: null,
+  });
 
   const unitId = computed(() => {
     const id = Number(route.params.id);
@@ -96,26 +102,32 @@ export function useHouseDetail() {
   const parking = ref<Record<string, unknown> | null>(null);
   const deactivatingPerson = ref(false);
 
-  async function loadParkingUnitType() {
-    if (parkingUnitTypeId.value !== null) {
-      return parkingUnitTypeId.value;
+  async function loadChildUnitType(kind: 'parking' | 'storage') {
+    if (childUnitTypeIds.value[kind] !== null) {
+      return childUnitTypeIds.value[kind];
     }
 
     try {
       const unitTypes = await fetchCatalogItems('unit_types');
-      const parkingType = unitTypes.find((item) => {
+      const unitType = unitTypes.find((item) => {
         const normalized = `${item.code} ${item.name}`.toLowerCase();
-        return (
-          normalized.includes('parqueadero') ||
-          normalized.includes('parking') ||
-          normalized.includes('estacionamiento')
-        );
+        if (kind === 'storage') {
+          return normalized.includes('bodega') || normalized.includes('storage');
+        }
+
+        return normalized.includes('parqueadero') || normalized.includes('parking') || normalized.includes('estacionamiento');
       });
 
-      parkingUnitTypeId.value = parkingType?.id ?? null;
-      return parkingUnitTypeId.value;
+      childUnitTypeIds.value = {
+        ...childUnitTypeIds.value,
+        [kind]: unitType?.id ?? null,
+      };
+      return childUnitTypeIds.value[kind];
     } catch {
-      parkingUnitTypeId.value = null;
+      childUnitTypeIds.value = {
+        ...childUnitTypeIds.value,
+        [kind]: null,
+      };
       return null;
     }
   }
@@ -154,7 +166,9 @@ export function useHouseDetail() {
         block: detail.blockName,
       };
       people.value = unitPeople;
-      parkings.value = pageResult.items.filter((item) => item.parentUnitId === unitId.value);
+      parkings.value = pageResult.items.filter(
+        (item) => item.parentUnitId === unitId.value && isAllowedChildUnit(item),
+      );
     } catch (loadError) {
       house.value = null;
       people.value = [];
@@ -217,9 +231,13 @@ export function useHouseDetail() {
       throw new Error('Selecciona un condominio válido para agregar el parqueadero.');
     }
 
-    const unitTypeId = await loadParkingUnitType();
+    const unitTypeId = await loadChildUnitType(payload.kind);
     if (!unitTypeId) {
-      throw new Error('No se encontró un tipo de unidad para parqueadero.');
+      throw new Error(
+        payload.kind === 'storage'
+          ? 'No se encontró un tipo de unidad para bodega.'
+          : 'No se encontró un tipo de unidad para parqueadero.',
+      );
     }
 
     savingParking.value = true;
@@ -247,11 +265,56 @@ export function useHouseDetail() {
     return { success: true, message: '' };
   }
 
+  function isAllowedChildUnit(item: UnitListItem) {
+    const normalized = `${item.unitTypeCode} ${item.unitTypeName}`.toLowerCase();
+    return (
+      normalized.includes('parqueadero') ||
+      normalized.includes('parking') ||
+      normalized.includes('estacionamiento') ||
+      normalized.includes('bodega') ||
+      normalized.includes('storage')
+    );
+  }
+
+  async function changeBillingResponsible(personId: number) {
+    if (!condominiumId.value || !unitId.value) {
+      throw new Error('Selecciona un condominio válido para cambiar el responsable.');
+    }
+
+    await setUnitBillingResponsible(condominiumId.value, unitId.value, personId, session.accessToken);
+    await load();
+  }
+
+  async function deactivatePersonRelation(personId: number, disableAccess: boolean) {
+    if (!condominiumId.value || !unitId.value) {
+      throw new Error('Selecciona un condominio válido para desactivar la relación.');
+    }
+
+    await deactivateUnitPerson(
+      condominiumId.value,
+      unitId.value,
+      personId,
+      disableAccess,
+      session.accessToken,
+    );
+    await load();
+  }
+
+  async function sendAccessInvitation(personId: number) {
+    if (!condominiumId.value || !unitId.value) {
+      throw new Error('Selecciona un condominio válido para enviar la invitación.');
+    }
+
+    await createUnitAccessInvitation(condominiumId.value, unitId.value, personId, session.accessToken);
+    await load();
+  }
+
   watch([condominiumId, unitId], () => {
     void load();
   }, { immediate: true });
 
-  void loadParkingUnitType();
+  void loadChildUnitType('parking');
+  void loadChildUnitType('storage');
 
   return {
     condominiumName,
@@ -292,6 +355,9 @@ export function useHouseDetail() {
     peopleCount,
     parkingCount,
     blockName,
+    changeBillingResponsible,
+    deactivatePersonRelation,
+    sendAccessInvitation,
     statusLabel,
     assignmentLabel,
   };

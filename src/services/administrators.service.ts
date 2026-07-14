@@ -1,4 +1,5 @@
 import { buildApiUrl, http } from '@/services/api/http';
+import { useSessionStore } from '@/stores/session.store';
 import { isRecord, toNumber, toText } from '@/utils/api/common';
 
 interface ApiMutationResponse {
@@ -6,6 +7,9 @@ interface ApiMutationResponse {
   message?: unknown;
   data?: unknown;
   meta?: unknown;
+  code?: unknown;
+  error?: unknown;
+  errors?: unknown;
 }
 
 interface ApiListResponse {
@@ -13,33 +17,71 @@ interface ApiListResponse {
   message?: unknown;
   data?: unknown;
   meta?: unknown;
+  code?: unknown;
+  error?: unknown;
+  errors?: unknown;
 }
 
+type ApiErrorCode =
+  | 'access_token_required'
+  | 'access_token_expired'
+  | 'access_token_invalid'
+  | 'user_access_disabled'
+  | 'condominium_forbidden'
+  | 'condominium_inactive'
+  | 'not_found'
+  | 'validation_failed';
+
 export type AdministratorType = 'senior' | 'condominium_admin';
-export type AdministratorStatus = 'pending' | 'active' | 'suspended';
-export type AdministratorAccessStatus = 'Activo' | 'Inactivo';
-export type AdministratorInvitationStatus =
-  | 'Pendiente'
-  | 'Aceptada'
-  | 'Expirada'
-  | 'Cancelada'
-  | 'Sin invitacion';
+
+export class AdministratorServiceError extends Error {
+  status: number;
+  code: string;
+  errors: unknown;
+
+  constructor(message: string, status: number, code = '', errors: unknown = null) {
+    super(message);
+    this.name = 'AdministratorServiceError';
+    this.status = status;
+    this.code = code;
+    this.errors = errors;
+  }
+}
+
+export type AdministratorAccessStatus =
+  | 'active'
+  | 'pending_activation'
+  | 'invitation_expired'
+  | 'invitation_revoked'
+  | 'inactive'
+  | 'Activo'
+  | 'Inactivo';
 
 export interface SaveAdministratorPayload {
   firstName: string;
   lastName: string;
+  email: string;
+  country: string;
   documentTypeId: number;
   documentNumber: string;
-  email: string;
   phone: string;
-  type: AdministratorType;
-  condominiumId: number | null;
+  secondaryPhone?: string;
 }
+
+export type UpdateAdministratorPayload = Partial<SaveAdministratorPayload>;
 
 export interface SaveAdministratorResult {
   success: boolean;
   message: string;
   data: unknown;
+}
+
+export interface AdministratorInvitationInfo {
+  status: string;
+  sentAt: string;
+  expiresAt: string;
+  acceptedAt: string;
+  revokedAt: string;
 }
 
 export interface AdministratorListItem {
@@ -49,7 +91,8 @@ export interface AdministratorListItem {
   type: 'Senior' | 'Administrador de condominio';
   scope: string;
   status: AdministratorAccessStatus;
-  invitationStatus: AdministratorInvitationStatus;
+  invitationStatus: string;
+  invitationInfo: string;
   initials: string;
 }
 
@@ -61,8 +104,50 @@ export interface AdministratorDetail {
   documentNumber: string;
   email: string;
   phone: string;
+  secondaryPhone: string;
+  country: string;
   type: AdministratorType;
   condominiumId: number | null;
+  accessStatus: AdministratorAccessStatus;
+  invitation: AdministratorInvitationInfo | null;
+}
+
+export interface AdministratorsPageResult {
+  items: AdministratorListItem[];
+  page: number;
+  perPage: number;
+  total: number;
+  lastPage: number;
+}
+
+export interface FetchAdministratorsPageParams {
+  condominiumId: number;
+  page: number;
+  perPage: number;
+  search?: string;
+  status?: 'active' | 'inactive';
+}
+
+function administratorBasePath(condominiumId: number) {
+  return `/api/condominiums/${encodeURIComponent(String(condominiumId))}/administrators`;
+}
+
+function administratorPath(condominiumId: number, userId: number) {
+  return `${administratorBasePath(condominiumId)}/${encodeURIComponent(String(userId))}`;
+}
+
+function resolveActiveCondominiumId() {
+  const session = useSessionStore();
+  const id = Number(session.activeCondoId);
+  if (Number.isInteger(id) && id > 0) {
+    return id;
+  }
+
+  throw new AdministratorServiceError(
+    'Selecciona un condominio activo para gestionar administradores.',
+    400,
+    'missing_condominium_context',
+  );
 }
 
 function pickFirstText(record: Record<string, unknown>, keys: string[]) {
@@ -112,11 +197,34 @@ function buildInitials(name: string, email: string) {
     .split(/[.\s_-]+/)
     .map((part) => part.trim())
     .filter(Boolean);
-
   const first = parts[0]?.charAt(0) ?? 'A';
   const second = parts.length > 1 ? (parts[1]?.charAt(0) ?? '') : (parts[0]?.charAt(1) ?? 'D');
 
   return `${first}${second}`.toUpperCase();
+}
+
+function normalizeAccessStatus(record: Record<string, unknown>): AdministratorAccessStatus {
+  const rawStatus = pickFirstText(record, ['access_status', 'accessStatus', 'status', 'state'])
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (rawStatus === 'pending_activation' || rawStatus === 'pending') {
+    return 'pending_activation';
+  }
+  if (rawStatus === 'invitation_expired' || rawStatus === 'expired') {
+    return 'invitation_expired';
+  }
+  if (rawStatus === 'invitation_revoked' || rawStatus === 'revoked' || rawStatus === 'cancelled') {
+    return 'invitation_revoked';
+  }
+  if (rawStatus === 'inactive' || rawStatus === 'disabled' || rawStatus === 'suspended') {
+    return 'inactive';
+  }
+
+  return 'active';
 }
 
 function normalizeAdministratorType(record: Record<string, unknown>) {
@@ -135,90 +243,48 @@ function normalizeAdministratorPayloadType(record: Record<string, unknown>): Adm
   return normalizeAdministratorType(record) === 'Senior' ? 'senior' : 'condominium_admin';
 }
 
-function normalizeAdministratorStatus(record: Record<string, unknown>) {
-  const accessEnabled = record.is_access_enabled ?? record.isAccessEnabled ?? record.access_enabled;
-  const rawStatus = pickFirstText(record, ['status', 'state'])
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '');
+function normalizeInvitation(record: Record<string, unknown>): AdministratorInvitationInfo | null {
+  const invitation = isRecord(record.invitation) ? record.invitation : record;
+  const status = pickFirstText(invitation, [
+    'status',
+    'invitation_status',
+    'invitationStatus',
+    'state',
+  ]);
+  const sentAt = pickFirstText(invitation, ['sent_at', 'sentAt', 'created_at', 'createdAt']);
+  const expiresAt = pickFirstText(invitation, ['expires_at', 'expiresAt', 'expired_at', 'expiredAt']);
+  const acceptedAt = pickFirstText(invitation, ['accepted_at', 'acceptedAt']);
+  const revokedAt = pickFirstText(invitation, ['revoked_at', 'revokedAt', 'cancelled_at']);
 
-  if (
-    ['suspended', 'suspendido', 'inactive', 'inactivo', 'blocked', 'bloqueado'].includes(rawStatus)
-  ) {
-    return 'Inactivo' as const;
+  if (!status && !sentAt && !expiresAt && !acceptedAt && !revokedAt) {
+    return null;
   }
 
-  if (accessEnabled === false) return 'Inactivo' as const;
-  return 'Activo' as const;
+  return { status, sentAt, expiresAt, acceptedAt, revokedAt };
 }
 
-export interface AdministratorsPageResult {
-  items: AdministratorListItem[];
-  page: number;
-  perPage: number;
-  total: number;
-  lastPage: number;
-}
-
-export interface FetchAdministratorsPageParams {
-  page: number;
-  perPage: number;
-  search?: string;
-  status?: 'active' | 'inactive';
-  condominiumId?: number;
-}
-
-function normalizeAdministratorInvitationStatus(
-  record: Record<string, unknown>,
-): AdministratorInvitationStatus {
-  const invitation = isRecord(record.invitation) ? record.invitation : null;
-  const rawStatus = (
-    pickFirstText(record, [
-      'invitation_status',
-      'invitationStatus',
-      'invite_status',
-      'invitation_state',
-    ]) ||
-    pickFirstText(invitation ?? {}, ['status', 'state']) ||
-    pickFirstText(record, ['status', 'state'])
-  )
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '');
-
-  if (['pending', 'pendiente', 'invited', 'invitation_pending', 'sent'].includes(rawStatus)) {
-    return 'Pendiente';
-  }
-  if (['accepted', 'aceptada', 'completed', 'active', 'activo'].includes(rawStatus)) {
-    return 'Aceptada';
-  }
-  if (['expired', 'expirada', 'vencida'].includes(rawStatus)) return 'Expirada';
-  if (['cancelled', 'canceled', 'cancelada', 'revoked'].includes(rawStatus)) return 'Cancelada';
-
-  return 'Sin invitacion';
-}
-
-function normalizeAdministratorScope(
-  record: Record<string, unknown>,
-  type: AdministratorListItem['type'],
-) {
-  if (type === 'Senior') {
-    return 'Vista global';
+function buildInvitationInfo(invitation: AdministratorInvitationInfo | null) {
+  if (!invitation) {
+    return '';
   }
 
+  const parts = [
+    invitation.sentAt ? `Enviada: ${invitation.sentAt}` : '',
+    invitation.expiresAt ? `Expira: ${invitation.expiresAt}` : '',
+    invitation.acceptedAt ? `Aceptada: ${invitation.acceptedAt}` : '',
+    invitation.revokedAt ? `Revocada: ${invitation.revokedAt}` : '',
+  ].filter(Boolean);
+
+  return parts.join(' · ');
+}
+
+function normalizeAdministratorScope(record: Record<string, unknown>) {
   const condominium = isRecord(record.condominium) ? record.condominium : null;
-  const condominiumNames = Array.isArray(record.condominiums)
-    ? record.condominiums
-        .filter(isRecord)
-        .map((item) => pickFirstText(item, ['name', 'title']))
-        .filter(Boolean)
-    : [];
 
   return (
     pickFirstText(record, ['scope', 'condominium_name', 'condo_name']) ||
     pickFirstText(condominium ?? {}, ['name', 'title']) ||
-    condominiumNames.join(', ') ||
-    'Sin condominio asignado'
+    'Condominio activo'
   );
 }
 
@@ -227,7 +293,7 @@ function normalizeAdministratorListItem(item: unknown): AdministratorListItem | 
     return null;
   }
 
-  const id = toNumber(item.id ?? item.user_id ?? item.administrator_id);
+  const id = toNumber(item.id ?? item.user_id ?? item.userId ?? item.administrator_id);
   const email = pickFirstText(item, ['email', 'mail']);
   const name = buildFullName(item);
 
@@ -235,16 +301,17 @@ function normalizeAdministratorListItem(item: unknown): AdministratorListItem | 
     return null;
   }
 
-  const type = normalizeAdministratorType(item);
+  const invitation = normalizeInvitation(item);
 
   return {
     id,
     name,
     email,
-    type,
-    scope: normalizeAdministratorScope(item, type),
-    status: normalizeAdministratorStatus(item),
-    invitationStatus: normalizeAdministratorInvitationStatus(item),
+    type: normalizeAdministratorType(item),
+    scope: normalizeAdministratorScope(item),
+    status: normalizeAccessStatus(item),
+    invitationStatus: invitation?.status || '',
+    invitationInfo: buildInvitationInfo(invitation),
     initials: buildInitials(name, email),
   };
 }
@@ -267,34 +334,23 @@ function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | n
     return null;
   }
 
-  const id = toNumber(record.id ?? record.user_id ?? record.administrator_id);
+  const id = toNumber(record.id ?? record.user_id ?? record.userId ?? record.administrator_id);
   const directFirstName = pickFirstText(record, ['first_name', 'firstName', 'names']);
   const directLastName = pickFirstText(record, ['last_name', 'lastName', 'surnames']);
   const fallbackName = splitName(buildFullName(record));
   const firstName = directFirstName || fallbackName.firstName;
   const lastName = directLastName || fallbackName.lastName;
   const email = pickFirstText(record, ['email', 'mail']);
-
-  if (id === null || !firstName || !email) {
-    return null;
-  }
-
-  const condominium = isRecord(record.condominium) ? record.condominium : null;
-  const firstCondominium = Array.isArray(record.condominiums)
-    ? (record.condominiums.find(isRecord) ?? null)
-    : null;
-  const condominiumId = toNumber(
-    record.condominium_id ??
-      record.condominiumId ??
-      record.condo_id ??
-      condominium?.id ??
-      firstCondominium?.id,
-  );
   const documentType = isRecord(record.document_type)
     ? record.document_type
     : isRecord(record.documentType)
       ? record.documentType
       : null;
+  const condominium = isRecord(record.condominium) ? record.condominium : null;
+
+  if (id === null || !firstName || !email) {
+    return null;
+  }
 
   return {
     id,
@@ -309,8 +365,12 @@ function normalizeAdministratorDetail(payload: unknown): AdministratorDetail | n
     ]),
     email,
     phone: pickFirstText(record, ['phone', 'phone_number', 'mobile']),
+    secondaryPhone: pickFirstText(record, ['secondary_phone', 'secondaryPhone']),
+    country: pickFirstText(record, ['country']) || 'EC',
     type: normalizeAdministratorPayloadType(record),
-    condominiumId,
+    condominiumId: toNumber(record.condominium_id ?? record.condominiumId ?? condominium?.id),
+    accessStatus: normalizeAccessStatus(record),
+    invitation: normalizeInvitation(record),
   };
 }
 
@@ -342,59 +402,143 @@ function extractListItems(payload: unknown): unknown[] {
   return [];
 }
 
-function buildAdministratorBody(payload: SaveAdministratorPayload) {
-  const condominiumIds =
-    payload.type === 'condominium_admin' && payload.condominiumId !== null
-      ? [payload.condominiumId]
-      : [];
+function firstTextValue(value: unknown): string {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
 
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = firstTextValue(item);
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  return '';
+}
+
+function extractErrorCode(data: unknown, responseStatus: number): string {
+  if (!isRecord(data)) {
+    if (responseStatus === 404) return 'not_found';
+    if (responseStatus === 422) return 'validation_failed';
+    return '';
+  }
+
+  const nestedData = isRecord(data.data) ? data.data : null;
+  return (
+    firstTextValue(data.code) ||
+    firstTextValue(data.error) ||
+    firstTextValue(nestedData?.code) ||
+    firstTextValue(nestedData?.error) ||
+    (responseStatus === 404 ? 'not_found' : '') ||
+    (responseStatus === 422 ? 'validation_failed' : '')
+  );
+}
+
+function mapErrorMessage(status: number, code: string, fallback: string) {
+  const normalizedCode = code as ApiErrorCode;
+
+  if (normalizedCode === 'access_token_required') {
+    return 'Tu sesión no fue enviada. Inicia sesión nuevamente.';
+  }
+  if (normalizedCode === 'access_token_expired') {
+    return 'Tu sesión expiró. Inicia sesión nuevamente.';
+  }
+  if (normalizedCode === 'access_token_invalid') {
+    return 'Tu sesión no es válida. Inicia sesión nuevamente.';
+  }
+  if (normalizedCode === 'user_access_disabled') {
+    return 'Tu acceso de usuario está deshabilitado. Contacta a un administrador.';
+  }
+  if (normalizedCode === 'condominium_forbidden') {
+    return 'No tienes permisos para administrar usuarios en este condominio.';
+  }
+  if (normalizedCode === 'condominium_inactive') {
+    return 'El condominio está inactivo. Las acciones de administradores están bloqueadas.';
+  }
+  if (normalizedCode === 'not_found' || status === 404) {
+    return 'No se encontró el administrador solicitado.';
+  }
+  if (normalizedCode === 'validation_failed' || status === 422) {
+    return 'Revisa los campos marcados. El backend rechazó la información enviada.';
+  }
+  if (status === 429) {
+    return 'Hay demasiados intentos. Espera unos minutos antes de volver a intentar.';
+  }
+  if (status >= 500) {
+    return 'El servidor no pudo procesar la solicitud. Intenta nuevamente.';
+  }
+
+  return fallback;
+}
+
+function extractResponseMessage(data: unknown) {
+  if (!isRecord(data)) {
+    return '';
+  }
+
+  const nestedData = isRecord(data.data) ? data.data : null;
+  return firstTextValue(data.message) || firstTextValue(nestedData?.message);
+}
+
+function throwServiceError(response: Response, data: unknown, fallback: string): never {
+  const code = extractErrorCode(data, response.status);
+  const backendMessage = extractResponseMessage(data);
+  const message = backendMessage || mapErrorMessage(response.status, code, fallback);
+  const errors = isRecord(data) ? data.errors : null;
+  throw new AdministratorServiceError(message, response.status, code, errors);
+}
+
+function buildAdministratorBody(payload: SaveAdministratorPayload) {
   return {
-    name: [payload.firstName.trim(), payload.lastName.trim()].filter(Boolean).join(' '),
     first_name: payload.firstName.trim(),
     last_name: payload.lastName.trim(),
-    country: 'EC',
+    email: payload.email.trim().toLowerCase(),
+    country: payload.country.trim().toUpperCase(),
     document_type_id: payload.documentTypeId,
     document_number: payload.documentNumber.trim(),
-    email: payload.email.trim().toLowerCase(),
     phone: payload.phone.trim(),
-    is_access_enabled: false,
-    condominium_ids: condominiumIds,
+    secondary_phone: payload.secondaryPhone?.trim() || null,
   };
 }
 
-function buildAdministratorUpdateBody(payload: SaveAdministratorPayload) {
-  const updateBody = buildAdministratorBody(payload);
-  delete (updateBody as Partial<typeof updateBody>).condominium_ids;
-  delete (updateBody as Partial<typeof updateBody>).is_access_enabled;
-  return updateBody;
+function buildAdministratorUpdateBody(payload: UpdateAdministratorPayload) {
+  const body: Record<string, unknown> = {};
+
+  if (payload.firstName !== undefined) body.first_name = payload.firstName.trim();
+  if (payload.lastName !== undefined) body.last_name = payload.lastName.trim();
+  if (payload.email !== undefined) body.email = payload.email.trim().toLowerCase();
+  if (payload.country !== undefined) body.country = payload.country.trim().toUpperCase();
+  if (payload.documentTypeId !== undefined) body.document_type_id = payload.documentTypeId;
+  if (payload.documentNumber !== undefined) body.document_number = payload.documentNumber.trim();
+  if (payload.phone !== undefined) body.phone = payload.phone.trim();
+  if (payload.secondaryPhone !== undefined) {
+    body.secondary_phone = payload.secondaryPhone.trim() || null;
+  }
+
+  return body;
 }
 
 async function submitAdministratorRequest(
   path: string,
   method: 'POST' | 'PUT',
-  payload: SaveAdministratorPayload,
+  body: Record<string, unknown>,
   token: string | null,
 ): Promise<SaveAdministratorResult> {
-  const requestBody =
-    method === 'POST' ? buildAdministratorBody(payload) : buildAdministratorUpdateBody(payload);
+  const requestOptions = {
+    token,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body,
+  };
   const { response, data, unauthorized } =
     method === 'POST'
-      ? await http.post<ApiMutationResponse>(path, {
-          token,
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: requestBody,
-        })
-      : await http.put<ApiMutationResponse>(path, {
-          token,
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: requestBody,
-        });
+      ? await http.post<ApiMutationResponse>(path, requestOptions)
+      : await http.put<ApiMutationResponse>(path, requestOptions);
 
   if (unauthorized) {
     return {
@@ -405,13 +549,7 @@ async function submitAdministratorRequest(
   }
 
   if (!response.ok) {
-    const responseData = isRecord(data?.data) ? data.data : null;
-    const message =
-      (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof data?.message === 'string' && data.message) ||
-      `No fue posible guardar el administrador (${response.status})`;
-
-    throw new Error(message);
+    throwServiceError(response, data, 'No fue posible guardar el administrador.');
   }
 
   return {
@@ -424,25 +562,20 @@ async function submitAdministratorRequest(
 
 async function submitAdministratorActionRequest(
   path: string,
-  method: 'POST' | 'PATCH' | 'DELETE',
+  method: 'PATCH' | 'DELETE',
   token: string | null,
   fallbackMessage: string,
-  requestBody?: Record<string, unknown>,
 ): Promise<SaveAdministratorResult> {
   const requestOptions = {
     token,
     headers: {
       Accept: 'application/json',
-      ...(requestBody ? { 'Content-Type': 'application/json' } : {}),
     },
-    ...(requestBody ? { body: requestBody } : {}),
   };
   const { response, data, unauthorized } =
-    method === 'POST'
-      ? await http.post<ApiMutationResponse>(path, requestOptions)
-      : method === 'PATCH'
-        ? await http.patch<ApiMutationResponse>(path, requestOptions)
-        : await http.delete<ApiMutationResponse>(path, requestOptions);
+    method === 'PATCH'
+      ? await http.patch<ApiMutationResponse>(path, requestOptions)
+      : await http.delete<ApiMutationResponse>(path, requestOptions);
 
   if (unauthorized) {
     return {
@@ -453,13 +586,7 @@ async function submitAdministratorActionRequest(
   }
 
   if (!response.ok) {
-    const responseData = isRecord(data?.data) ? data.data : null;
-    const message =
-      (responseData && typeof responseData.message === 'string' && responseData.message) ||
-      (typeof data?.message === 'string' && data.message) ||
-      `${fallbackMessage} (${response.status})`;
-
-    throw new Error(message);
+    throwServiceError(response, data, fallbackMessage);
   }
 
   return {
@@ -470,21 +597,28 @@ async function submitAdministratorActionRequest(
 }
 
 export async function createAdministrator(
-  payload: SaveAdministratorPayload,
-  token: string | null,
-): Promise<SaveAdministratorResult> {
-  return submitAdministratorRequest('/api/administrators', 'POST', payload, token);
-}
-
-export async function updateAdministrator(
-  id: number,
+  condominiumId: number,
   payload: SaveAdministratorPayload,
   token: string | null,
 ): Promise<SaveAdministratorResult> {
   return submitAdministratorRequest(
-    `/api/administrators/${encodeURIComponent(String(id))}`,
+    administratorBasePath(condominiumId),
+    'POST',
+    buildAdministratorBody(payload),
+    token,
+  );
+}
+
+export async function updateAdministrator(
+  condominiumId: number,
+  id: number,
+  payload: UpdateAdministratorPayload,
+  token: string | null,
+): Promise<SaveAdministratorResult> {
+  return submitAdministratorRequest(
+    administratorPath(condominiumId, id),
     'PUT',
-    payload,
+    buildAdministratorUpdateBody(payload),
     token,
   );
 }
@@ -493,14 +627,11 @@ export async function fetchAdministratorsPage(
   params: FetchAdministratorsPageParams,
   token: string | null,
 ): Promise<AdministratorsPageResult> {
-  const url = new URL(buildApiUrl('/api/administrators'));
+  const url = new URL(buildApiUrl(administratorBasePath(params.condominiumId)));
   url.searchParams.set('page', String(params.page));
   url.searchParams.set('per_page', String(params.perPage));
   if (params.search?.trim()) url.searchParams.set('search', params.search.trim());
   if (params.status) url.searchParams.set('status', params.status);
-  if (params.condominiumId) {
-    url.searchParams.set('condominium_id', String(params.condominiumId));
-  }
 
   const { response, data, unauthorized } = await http.get<ApiListResponse>(url.toString(), {
     token,
@@ -511,7 +642,7 @@ export async function fetchAdministratorsPage(
   }
 
   if (!response.ok) {
-    throw new Error(`No fue posible cargar los administradores (${response.status})`);
+    throwServiceError(response, data, 'No fue posible cargar los administradores.');
   }
 
   const items = extractListItems(data)
@@ -532,16 +663,32 @@ export async function fetchAdministratorsPage(
 }
 
 export async function fetchAdministrators(token: string | null): Promise<AdministratorListItem[]> {
-  const result = await fetchAdministratorsPage({ page: 1, perPage: 100 }, token);
+  const result = await fetchAdministratorsPage(
+    { condominiumId: resolveActiveCondominiumId(), page: 1, perPage: 100 },
+    token,
+  );
   return result.items;
 }
 
 export async function fetchAdministratorById(
+  condominiumId: number,
   id: number,
   token: string | null,
+): Promise<AdministratorDetail | null>;
+export async function fetchAdministratorById(
+  id: number,
+  token: string | null,
+): Promise<AdministratorDetail | null>;
+export async function fetchAdministratorById(
+  first: number,
+  second: number | string | null,
+  third?: string | null,
 ): Promise<AdministratorDetail | null> {
+  const condominiumId = typeof second === 'number' ? first : resolveActiveCondominiumId();
+  const id = typeof second === 'number' ? second : first;
+  const token = typeof second === 'number' ? (third ?? null) : second;
   const { response, data, unauthorized } = await http.get<unknown>(
-    `/api/administrators/${encodeURIComponent(String(id))}`,
+    administratorPath(condominiumId, id),
     { token },
   );
 
@@ -550,62 +697,83 @@ export async function fetchAdministratorById(
   }
 
   if (!response.ok) {
-    throw new Error(`No fue posible cargar el administrador (${response.status})`);
+    throwServiceError(response, data, 'No fue posible cargar el administrador.');
   }
 
   return normalizeAdministratorDetail(data);
 }
 
-export async function resendAdministratorInvitation(
+export async function suspendAdministrator(
+  condominiumId: number,
   id: number,
   token: string | null,
-): Promise<SaveAdministratorResult> {
-  void id;
-  void token;
-  return Promise.reject(
-    new Error('El contrato Swagger no expone una ruta para reenviar invitaciones.'),
-  );
-}
-
-async function updateAdministratorStatus(
-  id: number,
-  isAccessEnabled: boolean,
-  token: string | null,
-  fallbackMessage: string,
-): Promise<SaveAdministratorResult> {
-  return submitAdministratorActionRequest(
-    `/api/administrators/${encodeURIComponent(String(id))}/status`,
-    'PATCH',
-    token,
-    fallbackMessage,
-    {
-      is_access_enabled: isAccessEnabled,
-    },
-  );
-}
-
+): Promise<SaveAdministratorResult>;
 export async function suspendAdministrator(
   id: number,
   token: string | null,
+): Promise<SaveAdministratorResult>;
+export async function suspendAdministrator(
+  first: number,
+  second: number | string | null,
+  third?: string | null,
 ): Promise<SaveAdministratorResult> {
-  return updateAdministratorStatus(id, false, token, 'Administrador suspendido correctamente.');
+  const condominiumId = typeof second === 'number' ? first : resolveActiveCondominiumId();
+  const id = typeof second === 'number' ? second : first;
+  const token = typeof second === 'number' ? (third ?? null) : second;
+  return submitAdministratorActionRequest(
+    `${administratorPath(condominiumId, id)}/status`,
+    'PATCH',
+    token,
+    'Administrador deshabilitado correctamente.',
+  );
 }
 
 export async function reactivateAdministrator(
+  condominiumId: number,
   id: number,
   token: string | null,
+): Promise<SaveAdministratorResult>;
+export async function reactivateAdministrator(
+  id: number,
+  token: string | null,
+): Promise<SaveAdministratorResult>;
+export async function reactivateAdministrator(
+  first: number,
+  second: number | string | null,
+  third?: string | null,
 ): Promise<SaveAdministratorResult> {
-  return updateAdministratorStatus(id, true, token, 'Administrador reactivado correctamente.');
+  const condominiumId = typeof second === 'number' ? first : resolveActiveCondominiumId();
+  const id = typeof second === 'number' ? second : first;
+  const token = typeof second === 'number' ? (third ?? null) : second;
+  return submitAdministratorActionRequest(
+    `${administratorPath(condominiumId, id)}/status`,
+    'PATCH',
+    token,
+    'Administrador habilitado correctamente.',
+  );
 }
 
 export async function deleteAdministrator(
+  condominiumId: number,
   id: number,
   token: string | null,
+): Promise<SaveAdministratorResult>;
+export async function deleteAdministrator(
+  id: number,
+  token: string | null,
+): Promise<SaveAdministratorResult>;
+export async function deleteAdministrator(
+  first: number,
+  second: number | string | null,
+  third?: string | null,
 ): Promise<SaveAdministratorResult> {
+  const condominiumId = typeof second === 'number' ? first : resolveActiveCondominiumId();
+  const id = typeof second === 'number' ? second : first;
+  const token = typeof second === 'number' ? (third ?? null) : second;
   return submitAdministratorActionRequest(
-    `/api/administrators/${encodeURIComponent(String(id))}`,
+    administratorPath(condominiumId, id),
     'DELETE',
     token,
-    'Administrador eliminado correctamente.',
+    'Administrador desvinculado del condominio correctamente.',
   );
 }

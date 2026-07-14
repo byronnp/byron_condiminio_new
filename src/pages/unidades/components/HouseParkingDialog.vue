@@ -4,9 +4,9 @@
       <q-form ref="formRef" @submit.prevent="handleSubmit">
         <q-card-section class="detail-dialog__header">
           <div class="detail-dialog__eyebrow">Parqueaderos</div>
-          <div class="text-h6">Crear parqueadero</div>
+          <div class="text-h6">Crear unidad hija</div>
           <div class="text-body2 text-grey-7 q-mt-xs">
-            Crea un nuevo parqueadero vinculado a esta vivienda.
+            Crea un parqueadero o bodega vinculado a esta vivienda.
           </div>
         </q-card-section>
 
@@ -18,6 +18,17 @@
           </div>
 
           <div class="detail-dialog__grid q-mt-md">
+            <q-select
+              v-model="form.kind"
+              dense
+              outlined
+              emit-value
+              map-options
+              label="Tipo *"
+              :options="kindOptions"
+              :rules="[requiredTextRule]"
+            />
+
             <q-input
               v-model="form.number"
               dense
@@ -63,7 +74,7 @@
             no-caps
             type="submit"
             :loading="saving"
-            label="Crear parqueadero"
+            label="Crear unidad hija"
           />
         </q-card-actions>
       </q-form>
@@ -77,6 +88,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import type { CreateParkingUnitPayload } from '@/services/units.service';
 
 type ParkingFormModel = {
+  kind: 'parking' | 'storage';
   number: string;
   areaM2: number | null;
 };
@@ -99,9 +111,14 @@ const emit = defineEmits<{
 const formRef = ref<{ validate: () => Promise<boolean> | boolean } | null>(null);
 
 const form = reactive<ParkingFormModel>({
+  kind: 'parking',
   number: '',
   areaM2: null,
 });
+const kindOptions = [
+  { label: 'Parqueadero', value: 'parking' },
+  { label: 'Bodega', value: 'storage' },
+] as const;
 
 const openProxy = computed({
   get: () => props.modelValue,
@@ -113,7 +130,8 @@ const requiredTextRule = (value: unknown) =>
 
 const generatedCode = computed(() => {
   const number = form.number.trim();
-  return number ? `PARQ-${number}`.toUpperCase() : '';
+  const prefix = form.kind === 'storage' ? 'BOD' : 'PARQ';
+  return number ? `${prefix}-${number}`.toUpperCase() : '';
 });
 
 const areaRule = (value: unknown) => {
@@ -136,6 +154,7 @@ watch(
       return;
     }
 
+    form.kind = 'parking';
     form.number = '';
     form.areaM2 = null;
   },
@@ -152,6 +171,7 @@ async function handleSubmit() {
   }
 
   emit('save', {
+    kind: form.kind,
     number: form.number.trim(),
     code: generatedCode.value,
     areaM2: form.areaM2,

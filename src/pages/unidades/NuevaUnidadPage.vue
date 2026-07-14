@@ -170,7 +170,9 @@ async function loadBlocks() {
 }
 
 async function submitForm() {
-  if (!activeCondominiumId.value || !form.unitTypeId || !form.areaM2) return;
+  if (!activeCondominiumId.value || !form.unitTypeId || !form.code.trim() || !form.number.trim()) {
+    return;
+  }
 
   saving.value = true;
   submitError.value = '';

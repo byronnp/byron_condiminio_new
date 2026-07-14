@@ -116,19 +116,14 @@
               </q-input>
 
               <q-input
-                v-model="form.secondaryPhone"
+                v-model="form.country"
                 dense
                 outlined
                 hide-bottom-space
-                type="tel"
-                label="Teléfono secundario"
-                maxlength="24"
-                :rules="[phoneRule]"
-              >
-                <template #prepend>
-                  <q-icon name="phone_android" />
-                </template>
-              </q-input>
+                label="País *"
+                maxlength="2"
+                :rules="[requiredRule, countryRule]"
+              />
             </div>
           </section>
 
@@ -166,15 +161,6 @@
                 hide-bottom-space
                 type="date"
                 label="Inicio de relación"
-              />
-
-              <q-input
-                v-model="form.endedAt"
-                dense
-                outlined
-                hide-bottom-space
-                type="date"
-                label="Fin de relación"
               />
             </div>
 
@@ -235,10 +221,9 @@ interface PersonFormState {
   documentTypeId: number | null;
   documentNumber: string;
   relationshipTypeId: number | null;
+  country: string;
   phone: string;
-  secondaryPhone: string;
   startedAt: string;
-  endedAt: string;
   isPrimary: boolean;
   isBillingResponsible: boolean;
 }
@@ -317,10 +302,9 @@ function createEmptyForm(): PersonFormState {
     documentTypeId: null,
     documentNumber: '',
     relationshipTypeId: null,
+    country: 'EC',
     phone: '',
-    secondaryPhone: '',
     startedAt: '',
-    endedAt: '',
     isPrimary: true,
     isBillingResponsible: false,
   };
@@ -348,13 +332,12 @@ async function saveDialog() {
   emit('save', {
     firstName: form.firstName.trim(),
     lastName: form.lastName.trim(),
+    country: form.country.trim().toUpperCase(),
     documentTypeId: form.documentTypeId ?? 0,
     documentNumber: form.documentNumber.trim(),
     phone: form.phone.trim(),
-    secondaryPhone: form.secondaryPhone.trim(),
     relationshipTypeId: form.relationshipTypeId ?? 0,
     startedAt: form.startedAt,
-    endedAt: form.endedAt,
     isPrimary: form.isPrimary,
     isBillingResponsible: form.isBillingResponsible,
   });
@@ -375,6 +358,11 @@ function phoneRule(value: unknown) {
   }
   const digits = text.replace(/\D/g, '');
   return digits.length >= 7 || 'Ingresa un teléfono válido';
+}
+
+function countryRule(value: unknown) {
+  const text = typeof value === 'string' ? value.trim().toUpperCase() : '';
+  return /^[A-Z]{2}$/.test(text) || 'Usa el código ISO de 2 letras';
 }
 
 function documentNumberRule(value: unknown) {

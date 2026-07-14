@@ -7,6 +7,8 @@ export interface UnitListItem {
   number: string;
   areaM2: number;
   unitTypeId: number | null;
+  unitTypeCode: string;
+  unitTypeName: string;
   blockId: number | null;
   isAssignable: boolean;
   isActive: boolean;
@@ -22,6 +24,7 @@ export interface UnitPersonItem {
   name: string;
   email: string;
   relationship: string;
+  relationshipCode: string;
   isPrimary: boolean;
   isBillingResponsible: boolean;
   isActive: boolean;
@@ -30,29 +33,14 @@ export interface UnitPersonItem {
 export interface CreateUnitPersonPayload {
   firstName: string;
   lastName: string;
+  country: string;
   documentTypeId: number;
   documentNumber: string;
   phone: string;
-  secondaryPhone: string;
   relationshipTypeId: number;
   startedAt: string;
-  endedAt: string;
   isPrimary: boolean;
   isBillingResponsible: boolean;
-}
-
-export interface UnitPersonProfile {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  country: string;
-  documentTypeId: number | null;
-  documentTypeName: string;
-  documentNumber: string;
-  phone: string;
-  secondaryPhone: string;
-  isAccessEnabled: boolean;
 }
 
 export interface UnitsPageResult {
@@ -73,12 +61,15 @@ export interface CreateHousePayload {
   unitTypeId: number;
   number: string;
   code: string;
-  areaM2: number;
+  areaM2: number | null;
   isAssignable: boolean;
   isActive: boolean;
 }
 
+export type UpdateHousePayload = Partial<CreateHousePayload>;
+
 export interface CreateParkingUnitPayload {
+  kind: 'parking' | 'storage';
   number: string;
   code: string;
   areaM2: number | null;
@@ -105,13 +96,20 @@ function normalizeUnitItem(item: unknown): UnitListItem | null {
     : isRecord(item.primary_owner)
       ? item.primary_owner
       : null;
+  const unitType = isRecord(item.unit_type)
+    ? item.unit_type
+    : isRecord(item.unitType)
+      ? item.unitType
+      : null;
   if (id === null || !code) return null;
   return {
     id,
     code,
     number: toText(item.number),
     areaM2: toNumber(item.area_m2) ?? 0,
-    unitTypeId: toNumber(item.unit_type_id),
+    unitTypeId: toNumber(item.unit_type_id) ?? toNumber(unitType?.id),
+    unitTypeCode: toText(unitType?.code ?? item.unit_type_code),
+    unitTypeName: toText(unitType?.name ?? item.unit_type_name),
     blockId:
       toNumber(item.condominium_block_id) ??
       toNumber(item.block_id) ??
@@ -140,12 +138,22 @@ function normalizePersonItem(item: unknown): UnitPersonItem | null {
   if (!isRecord(item)) return null;
   const id = toNumber(item.id);
   const name = toText(item.name);
+  const relationshipType = isRecord(item.relationship_type)
+    ? item.relationship_type
+    : isRecord(item.relationshipType)
+      ? item.relationshipType
+      : null;
+  const relationshipCode =
+    toText(item.relationship_code) || toText(relationshipType?.code) || 'ocupante';
+  const relationship =
+    toText(item.relationship) || toText(relationshipType?.name) || relationshipCode;
   return id !== null && name
     ? {
         id,
         name,
         email: toText(item.email),
-        relationship: toText(item.relationship_code) || 'persona',
+        relationship,
+        relationshipCode,
         isPrimary: item.is_primary === true,
         isBillingResponsible: item.is_billing_responsible === true,
         isActive: item.is_active !== false,
@@ -153,68 +161,43 @@ function normalizePersonItem(item: unknown): UnitPersonItem | null {
     : null;
 }
 
-function normalizePersonProfile(payload: unknown): UnitPersonProfile | null {
-  const item = isRecord(payload) && isRecord(payload.data) ? payload.data : payload;
-  if (!isRecord(item)) return null;
-  const id = toNumber(item.id);
-  if (id === null) return null;
-  const documentType = isRecord(item.document_type) ? item.document_type : null;
-  return {
-    id,
-    firstName: toText(item.first_name ?? item.name),
-    lastName: toText(item.last_name),
-    email: toText(item.email),
-    country: toText(item.country) || 'EC',
-    documentTypeId: toNumber(documentType?.id),
-    documentTypeName: toText(documentType?.name),
-    documentNumber: toText(item.document_number),
-    phone: toText(item.phone),
-    secondaryPhone: toText(item.secondary_phone),
-    isAccessEnabled: item.is_access_enabled === true,
-  };
-}
-
 function buildPersonBody(payload: CreateUnitPersonPayload) {
   return {
-    name: [payload.firstName.trim(), payload.lastName.trim()].filter(Boolean).join(' '),
     first_name: payload.firstName.trim(),
     last_name: payload.lastName.trim(),
-    country: 'EC',
+    country: payload.country.trim().toUpperCase(),
     document_type_id: payload.documentTypeId,
     document_number: payload.documentNumber.trim(),
     phone: payload.phone.trim() || null,
-    secondary_phone: payload.secondaryPhone.trim() || null,
     relationship_type_id: payload.relationshipTypeId,
     started_at: payload.startedAt || null,
-    ended_at: payload.endedAt || null,
     is_primary: payload.isPrimary,
     is_billing_responsible: payload.isBillingResponsible,
   };
 }
 
-function buildHouseCreateBody(payload: CreateHousePayload, parentUnitId: number | null = null) {
+function buildHouseCreateBody(payload: CreateHousePayload) {
   return {
     condominium_block_id: payload.blockId,
-    parent_unit_id: parentUnitId,
     unit_type_id: payload.unitTypeId,
-    number: payload.number.trim(),
     code: payload.code.trim().toUpperCase(),
-    floor: null,
+    number: payload.number.trim(),
     area_m2: payload.areaM2,
     is_assignable: payload.isAssignable,
     is_active: payload.isActive,
-    parking_units: [],
   };
 }
 
-function buildHouseUpdateBody(payload: CreateHousePayload, parentUnitId: number | null = null) {
-  return {
-    ...(parentUnitId !== null ? { parent_unit_id: parentUnitId } : {}),
-    number: payload.number.trim(),
-    area_m2: payload.areaM2,
-    is_assignable: payload.isAssignable,
-    is_active: payload.isActive,
-  };
+function buildHouseUpdateBody(payload: UpdateHousePayload) {
+  const body: Record<string, unknown> = {};
+  if (payload.blockId !== undefined) body.condominium_block_id = payload.blockId;
+  if (payload.unitTypeId !== undefined) body.unit_type_id = payload.unitTypeId;
+  if (payload.code !== undefined) body.code = payload.code.trim().toUpperCase();
+  if (payload.number !== undefined) body.number = payload.number.trim();
+  if (payload.areaM2 !== undefined) body.area_m2 = payload.areaM2;
+  if (payload.isAssignable !== undefined) body.is_assignable = payload.isAssignable;
+  if (payload.isActive !== undefined) body.is_active = payload.isActive;
+  return body;
 }
 
 function extractMeta(payload: unknown, page: number, perPage: number, itemsLength: number) {
@@ -292,15 +275,6 @@ export async function fetchUnitPeople(condominiumId: number, unitId: number, tok
   });
 }
 
-export async function fetchUnitPersonProfile(userId: number, token: string | null) {
-  const { response, data, unauthorized } = await http.get<unknown>(`/api/users/${userId}`, {
-    token,
-  });
-  if (unauthorized) return null;
-  if (!response.ok) throw new Error(`No fue posible cargar la persona (${response.status})`);
-  return normalizePersonProfile(data);
-}
-
 export async function createUnitPerson(
   condominiumId: number,
   unitId: number,
@@ -329,33 +303,6 @@ export async function createUnitPerson(
   return data;
 }
 
-export async function updateUnitPerson(
-  userId: number,
-  payload: CreateUnitPersonPayload,
-  token: string | null,
-) {
-  const { response, data, unauthorized } = await http.put<Record<string, unknown>>(
-    `/api/users/${userId}`,
-    {
-      token,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: buildPersonBody(payload),
-    },
-  );
-  if (unauthorized) throw new Error('Sesión expirada.');
-  if (!response.ok) {
-    throw new Error(
-      typeof data?.message === 'string'
-        ? data.message
-        : `No fue posible actualizar la persona (${response.status})`,
-    );
-  }
-  return data;
-}
-
 export async function createParkingUnit(
   condominiumId: number,
   parentUnitId: number,
@@ -371,18 +318,15 @@ export async function createParkingUnit(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: buildHouseCreateBody(
-        {
-          blockId: null,
-          unitTypeId,
-          number: payload.number,
-          code: payload.code,
-          areaM2: payload.areaM2 ?? 0,
-          isAssignable: false,
-          isActive: true,
-        },
-        parentUnitId,
-      ),
+      body: {
+        parent_unit_id: parentUnitId,
+        unit_type_id: unitTypeId,
+        code: payload.code.trim().toUpperCase(),
+        number: payload.number.trim(),
+        area_m2: payload.areaM2 ?? 0,
+        is_assignable: false,
+        is_active: true,
+      },
     },
   );
   if (unauthorized) throw new Error('Sesión expirada.');
@@ -411,6 +355,33 @@ export async function fetchCondominiumBlocks(condominiumId: number, token: strin
   });
 }
 
+export async function createCondominiumBlock(
+  condominiumId: number,
+  name: string,
+  token: string | null,
+) {
+  const { response, data, unauthorized } = await http.post<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/blocks`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: { name: name.trim() },
+    },
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.message === 'string'
+        ? data.message
+        : `No fue posible crear el bloque (${response.status})`,
+    );
+  }
+  return data;
+}
+
 export async function createHouse(
   condominiumId: number,
   payload: CreateHousePayload,
@@ -424,7 +395,7 @@ export async function createHouse(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: buildHouseCreateBody(payload, null),
+      body: buildHouseCreateBody(payload),
     },
   );
   if (unauthorized) throw new Error('Sesión expirada.');
@@ -441,9 +412,8 @@ export async function createHouse(
 export async function updateHouse(
   condominiumId: number,
   unitId: number,
-  payload: CreateHousePayload,
+  payload: UpdateHousePayload,
   token: string | null,
-  parentUnitId: number | null = null,
 ) {
   const { response, data, unauthorized } = await http.patch<Record<string, unknown>>(
     `/api/condominiums/${condominiumId}/units/${unitId}`,
@@ -453,7 +423,7 @@ export async function updateHouse(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: buildHouseUpdateBody(payload, parentUnitId),
+      body: buildHouseUpdateBody(payload),
     },
   );
   if (unauthorized) throw new Error('Sesión expirada.');
@@ -462,6 +432,91 @@ export async function updateHouse(
       typeof data?.message === 'string'
         ? data.message
         : `No fue posible actualizar la casa (${response.status})`,
+    );
+  }
+  return data;
+}
+
+export async function setUnitBillingResponsible(
+  condominiumId: number,
+  unitId: number,
+  userId: number,
+  token: string | null,
+) {
+  const { response, data, unauthorized } = await http.patch<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/units/${unitId}/users/${userId}/billing-responsible`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: {},
+    },
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.message === 'string'
+        ? data.message
+        : `No fue posible cambiar el responsable de facturación (${response.status})`,
+    );
+  }
+  return data;
+}
+
+export async function deactivateUnitPerson(
+  condominiumId: number,
+  unitId: number,
+  userId: number,
+  disableAccess: boolean,
+  token: string | null,
+) {
+  const { response, data, unauthorized } = await http.patch<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/units/${unitId}/users/${userId}/deactivate`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: { disable_access: disableAccess },
+    },
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.message === 'string'
+        ? data.message
+        : `No fue posible desactivar la relación (${response.status})`,
+    );
+  }
+  return data;
+}
+
+export async function createUnitAccessInvitation(
+  condominiumId: number,
+  unitId: number,
+  userId: number,
+  token: string | null,
+) {
+  const { response, data, unauthorized } = await http.post<Record<string, unknown>>(
+    `/api/condominiums/${condominiumId}/units/${unitId}/users/${userId}/access-invitations`,
+    {
+      token,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: {},
+    },
+  );
+  if (unauthorized) throw new Error('Sesión expirada.');
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.message === 'string'
+        ? data.message
+        : `No fue posible enviar la invitación (${response.status})`,
     );
   }
   return data;

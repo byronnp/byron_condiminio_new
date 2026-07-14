@@ -106,7 +106,12 @@ import { useRoute, useRouter } from 'vue-router';
 
 import HouseForm from './components/HouseForm.vue';
 import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
-import { fetchUnitById, fetchCondominiumBlocks, updateHouse } from '@/services/units.service';
+import {
+  fetchUnitById,
+  fetchCondominiumBlocks,
+  updateHouse,
+  type UpdateHousePayload,
+} from '@/services/units.service';
 import { useSessionStore } from '@/stores/session.store';
 
 const router = useRouter();
@@ -129,6 +134,7 @@ const form = reactive({
   isAssignable: true,
   isActive: true,
 });
+const originalForm = ref({ ...form });
 
 const { options: unitTypes, loadOptions: loadUnitTypes } = useCatalogOptions<{
   label: string;
@@ -188,6 +194,7 @@ async function loadData() {
     form.areaM2 = house.areaM2 ?? null;
     form.isAssignable = house.isAssignable !== false;
     form.isActive = house.isActive !== false;
+    originalForm.value = { ...form };
 
     if (!form.unitTypeId) {
       const houseType = unitTypes.value.find((item) => item.code.toLowerCase().includes('casa'));
@@ -223,10 +230,13 @@ async function submitForm() {
     !activeCondominiumId.value ||
     !unitId.value ||
     !form.unitTypeId ||
-    !form.areaM2
+    !form.code.trim() ||
+    !form.number.trim()
   ) {
     return;
   }
+
+  const payload = buildUpdatePayload();
 
   saving.value = true;
   submitError.value = '';
@@ -235,17 +245,8 @@ async function submitForm() {
     await updateHouse(
       activeCondominiumId.value,
       unitId.value,
-      {
-        blockId: form.blockId,
-        unitTypeId: form.unitTypeId,
-        number: form.number,
-        code: form.code,
-        areaM2: form.areaM2,
-        isAssignable: form.isAssignable,
-        isActive: form.isActive,
-      },
+      payload,
       session.accessToken,
-      null,
     );
 
     Notify.create({
@@ -265,6 +266,25 @@ async function submitForm() {
   } finally {
     saving.value = false;
   }
+}
+
+function buildUpdatePayload(): UpdateHousePayload {
+  const original = originalForm.value;
+  const payload: UpdateHousePayload = {};
+
+  if (form.blockId !== original.blockId) payload.blockId = form.blockId;
+  if (form.unitTypeId !== original.unitTypeId && form.unitTypeId !== null) {
+    payload.unitTypeId = form.unitTypeId;
+  }
+  if (form.number.trim() !== original.number) payload.number = form.number;
+  if (form.code.trim().toUpperCase() !== original.code.trim().toUpperCase()) {
+    payload.code = form.code;
+  }
+  if (form.areaM2 !== original.areaM2) payload.areaM2 = form.areaM2;
+  if (form.isAssignable !== original.isAssignable) payload.isAssignable = form.isAssignable;
+  if (form.isActive !== original.isActive) payload.isActive = form.isActive;
+
+  return payload;
 }
 
 function goBack() {

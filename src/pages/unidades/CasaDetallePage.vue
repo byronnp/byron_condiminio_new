@@ -50,6 +50,7 @@
             <div class="house-hero__actions">
               <div class="hero-actions-grid">
                 <q-btn
+                  v-if="canManageUnits"
                   unelevated
                   color="primary"
                   icon="edit"
@@ -59,6 +60,7 @@
                 />
 
                 <q-btn
+                  v-if="canManageUnits"
                   outline
                   color="primary"
                   icon="person_add"
@@ -68,6 +70,7 @@
                 />
 
                 <q-btn
+                  v-if="canManageUnits"
                   outline
                   color="primary"
                   icon="local_parking"
@@ -127,7 +130,7 @@
     >
       <q-tab name="summary" label="Resumen" />
       <q-tab name="people" label="Personas" />
-      <q-tab name="parking" label="Parqueaderos" />
+      <q-tab name="parking" label="Parqueaderos y bodegas" />
     </q-tabs>
 
     <q-tab-panels v-model="tab" animated class="house-panels">
@@ -268,6 +271,37 @@
                 <q-badge rounded :color="person.isActive ? 'positive' : 'grey-7'">
                   {{ person.isActive ? 'Activa' : 'Inactiva' }}
                 </q-badge>
+                <q-badge v-if="person.isBillingResponsible" rounded color="primary">
+                  Facturación
+                </q-badge>
+                <q-btn
+                  v-if="canManageUnits && !person.isBillingResponsible && person.isActive"
+                  flat
+                  dense
+                  no-caps
+                  icon="receipt_long"
+                  label="Facturación"
+                  @click="handleBillingResponsible(person.id)"
+                />
+                <q-btn
+                  v-if="canManageUnits && person.isActive"
+                  flat
+                  dense
+                  no-caps
+                  icon="mail"
+                  label="Invitar"
+                  @click="handleAccessInvitation(person.id)"
+                />
+                <q-btn
+                  v-if="canManageUnits && person.isActive"
+                  flat
+                  dense
+                  no-caps
+                  color="negative"
+                  icon="person_remove"
+                  label="Desactivar"
+                  @click="requestDeactivatePerson(person)"
+                />
               </div>
             </div>
           </div>
@@ -283,7 +317,7 @@
       <q-tab-panel name="parking">
         <q-card class="detail-card">
           <div class="detail-card__header">
-            <h2>Parqueaderos asociados</h2>
+            <h2>Parqueaderos y bodegas asociados</h2>
             <p>{{ parkingCount }} registros vinculados a esta vivienda</p>
           </div>
 
@@ -291,7 +325,7 @@
             <div v-for="parking in parkings" :key="parking.id" class="entity-row">
               <div class="entity-row__main">
                 <strong>{{ parking.code }}</strong>
-                <span>Parqueadero {{ parking.number }}</span>
+                <span>{{ childUnitTypeLabel(parking) }} {{ parking.number }}</span>
               </div>
               <div class="entity-row__meta">
                 <q-badge outline rounded color="primary">
@@ -306,8 +340,8 @@
 
           <div v-else class="tab-empty">
             <q-icon name="local_parking" size="34px" />
-            <strong>No hay parqueaderos asociados</strong>
-            <span>Usa la acción de gestionar parqueaderos para registrar uno nuevo.</span>
+            <strong>No hay unidades hijas asociadas</strong>
+            <span>Usa la acción de agregar parqueadero para registrar un parqueadero o bodega.</span>
           </div>
         </q-card>
       </q-tab-panel>
@@ -319,16 +353,34 @@
       :saving="savingParking"
       @save="handleSaveParking"
     />
+    <AppConfirmDialog
+      v-model="deactivateDialogOpen"
+      tone="warning"
+      icon="person_remove"
+      title="Desactivar relación"
+      :message="deactivateDialogMessage"
+      confirm-label="Desactivar relación"
+      cancel-label="Cancelar"
+      :loading="deactivatingPerson"
+      @confirm="confirmDeactivatePerson"
+      @cancel="clearDeactivatePerson"
+    />
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Notify } from 'quasar';
 import { useRouter } from 'vue-router';
 
+import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
 import { useHouseDetail } from '@/composables/unidades/useHouseDetail';
-import type { CreateParkingUnitPayload, CreateUnitPersonPayload } from '@/services/units.service';
+import type {
+  CreateParkingUnitPayload,
+  CreateUnitPersonPayload,
+  UnitListItem,
+  UnitPersonItem,
+} from '@/services/units.service';
 import { useSessionStore } from '@/stores/session.store';
 import HouseParkingDialog from './components/HouseParkingDialog.vue';
 import HousePersonDialog from './components/HousePersonDialog.vue';
@@ -351,6 +403,9 @@ const {
   saveParking,
   savingParking,
   savingPerson,
+  changeBillingResponsible,
+  deactivatePersonRelation,
+  sendAccessInvitation,
   ownerName,
   peopleCount,
   parkingCount,
@@ -360,6 +415,17 @@ const {
 } = useHouseDetail();
 
 const editHouseId = computed(() => house.value?.id ?? unitId.value);
+const deactivateDialogOpen = ref(false);
+const deactivatingPerson = ref(false);
+const pendingDeactivatePerson = ref<UnitPersonItem | null>(null);
+const disableAccessOnDeactivate = ref(true);
+const canManageUnits = computed(() => hasPermission('units.manage'));
+const deactivateDialogMessage = computed(() => {
+  const name = pendingDeactivatePerson.value?.name ?? 'esta persona';
+  return disableAccessOnDeactivate.value
+    ? `¿Desactivar la relación de ${name}? También se enviará disable_access=true, lo que puede afectar el acceso global del usuario en todos sus condominios.`
+    : `¿Desactivar la relación de ${name}? El usuario dejará de estar vinculado a esta casa.`;
+});
 
 watch(
   () => session.activeCondoId,
@@ -373,9 +439,88 @@ function goBack() {
 }
 
 function goToEdit() {
+  if (!canManageUnits.value) return;
   if (editHouseId.value) {
     void router.push({ name: 'unidades-editar', params: { id: String(editHouseId.value) } });
   }
+}
+
+function childUnitTypeLabel(unit: UnitListItem) {
+  const normalized = `${unit.unitTypeCode} ${unit.unitTypeName}`.toLowerCase();
+  return normalized.includes('bodega') || normalized.includes('storage') ? 'Bodega' : 'Parqueadero';
+}
+
+async function handleBillingResponsible(personId: number) {
+  try {
+    await changeBillingResponsible(personId);
+    Notify.create({
+      type: 'positive',
+      message: 'Responsable de facturación actualizado.',
+      position: 'top-right',
+    });
+  } catch (error) {
+    Notify.create({
+      type: 'negative',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'No fue posible cambiar el responsable de facturación.',
+      position: 'top-right',
+    });
+  }
+}
+
+async function handleAccessInvitation(personId: number) {
+  try {
+    await sendAccessInvitation(personId);
+    Notify.create({
+      type: 'positive',
+      message: 'Invitación de acceso enviada.',
+      position: 'top-right',
+    });
+  } catch (error) {
+    Notify.create({
+      type: 'negative',
+      message: error instanceof Error ? error.message : 'No fue posible enviar la invitación.',
+      position: 'top-right',
+    });
+  }
+}
+
+function requestDeactivatePerson(person: UnitPersonItem) {
+  pendingDeactivatePerson.value = person;
+  disableAccessOnDeactivate.value = true;
+  deactivateDialogOpen.value = true;
+}
+
+async function confirmDeactivatePerson() {
+  const person = pendingDeactivatePerson.value;
+  if (!person || deactivatingPerson.value) return;
+
+  deactivatingPerson.value = true;
+  try {
+    await deactivatePersonRelation(person.id, disableAccessOnDeactivate.value);
+    Notify.create({
+      type: 'positive',
+      message: 'Relación desactivada correctamente.',
+      position: 'top-right',
+    });
+    deactivateDialogOpen.value = false;
+    clearDeactivatePerson();
+  } catch (error) {
+    Notify.create({
+      type: 'negative',
+      message: error instanceof Error ? error.message : 'No fue posible desactivar la relación.',
+      position: 'top-right',
+    });
+  } finally {
+    deactivatingPerson.value = false;
+  }
+}
+
+function clearDeactivatePerson() {
+  if (deactivatingPerson.value) return;
+  pendingDeactivatePerson.value = null;
 }
 
 async function handleSavePerson(payload: CreateUnitPersonPayload) {
@@ -400,6 +545,15 @@ async function handleSaveParking(payload: CreateParkingUnitPayload) {
       position: 'top-right',
     });
   }
+}
+
+function hasPermission(permission: 'units.manage') {
+  const user = session.user as unknown as { permissions?: unknown };
+  if (!Array.isArray(user?.permissions)) {
+    return true;
+  }
+
+  return user.permissions.includes(permission);
 }
 </script>
 

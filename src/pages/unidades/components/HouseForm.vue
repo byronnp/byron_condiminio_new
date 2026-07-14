@@ -237,6 +237,7 @@ function requiredTextRule(value: unknown) {
 }
 
 function positiveNumberRule(value: unknown) {
+  if (value === null || value === undefined || value === '') return true;
   return Number(value) > 0 || 'Debe ser mayor que cero';
 }
 
@@ -250,7 +251,7 @@ function handleCodeUpdate() {
 }
 
 async function handleSubmit() {
-  if (!form.value.unitTypeId || !form.value.areaM2) return;
+  if (!form.value.unitTypeId) return;
 
   const isValid = await formRef.value?.validate();
   if (!isValid) return;

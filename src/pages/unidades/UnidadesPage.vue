@@ -13,7 +13,7 @@
       :sort-options="sortOptions"
       action-label="Nueva casa"
       action-icon="add_home"
-      :action-disabled="!condominiumId"
+      :action-disabled="!condominiumId || !canManageUnits"
       @cta-click="goToCreate"
     >
       <template #stats>
@@ -113,7 +113,15 @@
               >
                 <q-tooltip>Ver detalle</q-tooltip>
               </q-btn>
-              <q-btn flat round dense icon="edit" class="table-icon" @click="goToEdit(props.row)">
+              <q-btn
+                v-if="canManageUnits"
+                flat
+                round
+                dense
+                icon="edit"
+                class="table-icon"
+                @click="goToEdit(props.row)"
+              >
                 <q-tooltip>Editar casa</q-tooltip>
               </q-btn>
             </q-td>
@@ -215,6 +223,7 @@ const condominiumId = computed(() => {
   const id = Number(session.activeCondoId);
   return Number.isInteger(id) && id > 0 ? id : null;
 });
+const canManageUnits = computed(() => hasPermission('units.manage'));
 
 const subtitle = computed(() =>
   condominiumId.value
@@ -353,6 +362,7 @@ async function load() {
 }
 
 function goToCreate() {
+  if (!canManageUnits.value) return;
   if (condominiumId.value) void router.push('/unidades/nueva');
 }
 
@@ -361,7 +371,17 @@ function goToDetail(row: UnitListItem) {
 }
 
 function goToEdit(row: UnitListItem) {
+  if (!canManageUnits.value) return;
   void router.push({ name: 'unidades-editar', params: { id: String(row.id) } });
+}
+
+function hasPermission(permission: 'units.manage') {
+  const user = session.user as unknown as { permissions?: unknown };
+  if (!Array.isArray(user?.permissions)) {
+    return true;
+  }
+
+  return user.permissions.includes(permission);
 }
 
 watch(
