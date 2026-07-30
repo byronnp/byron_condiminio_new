@@ -57,9 +57,16 @@
           class="list-table"
         >
           <template #loading>
-            <q-inner-loading showing>
-              <q-spinner color="primary" size="32px" />
-            </q-inner-loading>
+            <div class="table-skeleton" role="status" aria-label="Cargando casas">
+              <div v-for="row in 6" :key="row" class="table-skeleton__row">
+                <q-skeleton type="QAvatar" size="38px" />
+                <q-skeleton type="text" width="18%" />
+                <q-skeleton type="text" width="12%" />
+                <q-skeleton type="text" width="16%" />
+                <q-skeleton type="text" width="10%" />
+                <q-skeleton type="QBtn" width="72px" />
+              </div>
+            </div>
           </template>
 
           <template #body-cell-code="props">
@@ -128,17 +135,15 @@
           </template>
 
           <template #no-data>
-            <div class="empty-state">
-              <q-icon name="home_work" size="38px" />
-              <strong>No hay casas para mostrar</strong>
-              <span>
-                {{
-                  hasFilters
-                    ? 'Limpia los filtros para ver más resultados.'
-                    : 'Crea la primera casa de este condominio.'
-                }}
-              </span>
-            </div>
+            <AppEmptyState
+              icon="home_work"
+              :title="hasFilters ? 'No hay casas con esos criterios' : 'Aún no hay casas'"
+              :text="
+                hasFilters
+                  ? 'Ajusta la búsqueda o cambia el estado para ampliar los resultados.'
+                  : 'Registra la primera casa para empezar a administrar personas y unidades asociadas.'
+              "
+            />
           </template>
         </q-table>
       </template>
@@ -202,6 +207,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
+import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppStatsCards from '@/components/shared/AppStatsCards.vue';
 import { fetchUnitsPage, type UnitListItem } from '@/services/units.service';
 import { useSessionStore } from '@/stores/session.store';
@@ -463,6 +469,7 @@ onMounted(() => void load());
   align-items: center;
   display: flex;
   gap: 12px;
+  min-width: 0;
 }
 
 .stat-card__content {
@@ -482,6 +489,7 @@ onMounted(() => void load());
 .house-avatar {
   background: rgba(37, 99, 235, 0.1);
   color: var(--app-primary);
+  flex: 0 0 auto;
 }
 
 .stat-card__label,
@@ -496,7 +504,7 @@ onMounted(() => void load());
   color: var(--app-text);
   font-size: 22px;
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1.05;
   margin-top: 2px;
 }
@@ -519,7 +527,7 @@ onMounted(() => void load());
   font-size: 12px;
   font-weight: 800;
   height: 50px;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .list-table :deep(tbody tr td) {
@@ -529,13 +537,17 @@ onMounted(() => void load());
 }
 
 .list-table :deep(tbody tr:hover td) {
-  background: rgba(37, 99, 235, 0.025);
+  background: rgba(37, 99, 235, 0.035);
 }
 
 .type-badge,
 .status-badge {
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  line-height: 1;
+  min-height: 22px;
+  padding: 3px 8px;
 }
 
 .table-actions {
@@ -546,7 +558,14 @@ onMounted(() => void load());
   border-color: rgba(37, 99, 235, 0.14);
   color: var(--app-primary);
   height: 34px;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
   width: 34px;
+}
+
+.table-icon:hover {
+  background: rgba(37, 99, 235, 0.08);
 }
 
 .table-icon :deep(.q-icon) {
@@ -578,6 +597,14 @@ onMounted(() => void load());
 
 .table-footer__pagination :deep(.q-pagination__content) {
   gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.table-footer__pagination :deep(.q-pagination__content::-webkit-scrollbar) {
+  display: none;
 }
 
 .table-footer__pagination :deep(.q-btn) {
@@ -590,30 +617,32 @@ onMounted(() => void load());
 .house-cell strong {
   display: block;
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.empty-state {
-  align-items: center;
-  background: rgba(248, 250, 252, 0.72);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 16px;
-  color: var(--app-text-muted);
+.table-skeleton {
   display: grid;
-  gap: 7px;
-  justify-items: center;
-  min-height: 220px;
-  padding: 42px;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 14px;
   width: 100%;
 }
 
-.empty-state strong {
-  color: var(--app-text);
-  font-size: 14px;
-}
-
-.empty-state span {
-  max-width: 28rem;
-  text-align: center;
+.table-skeleton__row {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns:
+    42px
+    minmax(160px, 1fr)
+    minmax(100px, 0.7fr)
+    minmax(140px, 0.9fr)
+    minmax(88px, 0.5fr)
+    80px;
+  min-width: 980px;
+  padding: 8px 10px;
 }
 
 @media (max-width: 1180px) {
@@ -648,9 +677,9 @@ onMounted(() => void load());
     line-height: 1.45;
   }
 
-  .empty-state {
-    min-height: 180px;
-    padding: 32px 20px;
+  .table-footer__pagination {
+    max-width: 100%;
+    overflow-x: auto;
   }
 }
 </style>

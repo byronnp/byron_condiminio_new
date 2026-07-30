@@ -23,12 +23,22 @@ export interface UnitPersonItem {
   id: number;
   name: string;
   email: string;
+  phone: string;
   relationship: string;
   relationshipCode: string;
+  accessStatus: UnitPersonAccessStatus;
   isPrimary: boolean;
   isBillingResponsible: boolean;
   isActive: boolean;
 }
+
+export type UnitPersonAccessStatus =
+  | 'active'
+  | 'pending_activation'
+  | 'invitation_expired'
+  | 'invitation_revoked'
+  | 'inactive'
+  | 'unknown';
 
 export interface CreateUnitPersonPayload {
   firstName: string;
@@ -136,8 +146,20 @@ function normalizeUnitDetail(payload: unknown): UnitListItem | null {
 
 function normalizePersonItem(item: unknown): UnitPersonItem | null {
   if (!isRecord(item)) return null;
-  const id = toNumber(item.id);
-  const name = toText(item.name);
+  const user = isRecord(item.user)
+    ? item.user
+    : isRecord(item.person)
+      ? item.person
+      : isRecord(item.resident)
+        ? item.resident
+        : null;
+  const id = toNumber(item.id) ?? toNumber(item.user_id) ?? toNumber(user?.id);
+  const name =
+    toText(item.name) ||
+    toText(user?.name) ||
+    [toText(item.first_name ?? user?.first_name), toText(item.last_name ?? user?.last_name)]
+      .filter(Boolean)
+      .join(' ');
   const relationshipType = isRecord(item.relationship_type)
     ? item.relationship_type
     : isRecord(item.relationshipType)
@@ -151,14 +173,49 @@ function normalizePersonItem(item: unknown): UnitPersonItem | null {
     ? {
         id,
         name,
-        email: toText(item.email),
+        email: toText(item.email ?? user?.email),
+        phone: toText(item.phone ?? item.phone_number ?? item.mobile ?? user?.phone),
         relationship,
         relationshipCode,
+        accessStatus: normalizePersonAccessStatus(item, user),
         isPrimary: item.is_primary === true,
         isBillingResponsible: item.is_billing_responsible === true,
         isActive: item.is_active !== false,
       }
     : null;
+}
+
+function normalizePersonAccessStatus(
+  item: Record<string, unknown>,
+  user: Record<string, unknown> | null,
+): UnitPersonAccessStatus {
+  const rawStatus = toText(
+    item.access_status ??
+      item.accessStatus ??
+      item.user_access_status ??
+      item.status ??
+      user?.access_status ??
+      user?.accessStatus ??
+      user?.status,
+  )
+    .trim()
+    .toLowerCase();
+
+  if (
+    rawStatus === 'active' ||
+    rawStatus === 'pending_activation' ||
+    rawStatus === 'invitation_expired' ||
+    rawStatus === 'invitation_revoked' ||
+    rawStatus === 'inactive'
+  ) {
+    return rawStatus;
+  }
+
+  const accessEnabled = item.is_access_enabled ?? item.isAccessEnabled ?? user?.is_access_enabled;
+  if (accessEnabled === true) return 'active';
+  if (accessEnabled === false) return 'inactive';
+
+  return 'unknown';
 }
 
 function buildPersonBody(payload: CreateUnitPersonPayload) {

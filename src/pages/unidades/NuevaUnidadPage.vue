@@ -242,7 +242,7 @@ function goBack() {
   color: var(--app-text);
   font-size: 26px;
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1.1;
   margin: 4px 0 0;
 }
@@ -270,6 +270,11 @@ function goBack() {
   border-radius: 16px;
 }
 
+.ghost-btn {
+  flex: 0 0 auto;
+  min-height: 36px;
+}
+
 .content-grid {
   display: grid;
   gap: 18px;
@@ -282,6 +287,7 @@ function goBack() {
 
 .summary-card {
   position: sticky;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
   top: 16px;
 }
 
@@ -324,9 +330,10 @@ function goBack() {
   color: var(--app-text);
   font-size: 20px;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   line-height: 1.15;
   margin: 4px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .summary-list {
@@ -344,12 +351,15 @@ function goBack() {
 .summary-list span {
   color: var(--app-text-muted);
   font-size: 11px;
+  font-weight: 700;
 }
 
 .summary-list strong {
   color: var(--app-text);
   font-size: 12px;
   font-weight: 800;
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-align: right;
 }
 
@@ -385,8 +395,22 @@ function goBack() {
     flex-direction: column;
   }
 
+  .ghost-btn {
+    width: 100%;
+  }
+
   .page-header h1 {
     font-size: 24px;
+  }
+
+  .summary-list > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .summary-list strong {
+    text-align: left;
   }
 
   .summary-card__section {

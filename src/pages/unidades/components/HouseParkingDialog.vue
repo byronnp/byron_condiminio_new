@@ -3,10 +3,10 @@
     <q-card class="detail-dialog">
       <q-form ref="formRef" @submit.prevent="handleSubmit">
         <q-card-section class="detail-dialog__header">
-          <div class="detail-dialog__eyebrow">Parqueaderos</div>
-          <div class="text-h6">Crear unidad hija</div>
+          <div class="detail-dialog__eyebrow">Unidades asociadas</div>
+          <div class="text-h6">{{ dialogTitle }}</div>
           <div class="text-body2 text-grey-7 q-mt-xs">
-            Crea un parqueadero o bodega vinculado a esta vivienda.
+            {{ dialogSubtitle }}
           </div>
         </q-card-section>
 
@@ -14,7 +14,7 @@
 
         <q-card-section class="detail-dialog__body">
           <div class="detail-dialog__note">
-            Este registro se crea como una unidad hija de la casa seleccionada.
+            Este registro se administra como una unidad hija de la casa seleccionada.
           </div>
 
           <div class="detail-dialog__grid q-mt-md">
@@ -74,7 +74,7 @@
             no-caps
             type="submit"
             :loading="saving"
-            label="Crear unidad hija"
+            :label="submitLabel"
           />
         </q-card-actions>
       </q-form>
@@ -96,10 +96,14 @@ type ParkingFormModel = {
 const props = withDefaults(
   defineProps<{
     modelValue: boolean;
+    mode?: 'create' | 'edit';
     saving?: boolean;
+    initialValue?: CreateParkingUnitPayload | null;
   }>(),
   {
+    mode: 'create',
     saving: false,
+    initialValue: null,
   },
 );
 
@@ -124,6 +128,17 @@ const openProxy = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 });
+const dialogTitle = computed(() =>
+  props.mode === 'edit' ? 'Editar unidad asociada' : 'Agregar unidad asociada',
+);
+const dialogSubtitle = computed(() =>
+  props.mode === 'edit'
+    ? 'Actualiza el tipo, número o área de la unidad asociada.'
+    : 'Crea un parqueadero o bodega vinculado a esta vivienda.',
+);
+const submitLabel = computed(() =>
+  props.mode === 'edit' ? 'Guardar cambios' : 'Agregar unidad asociada',
+);
 
 const requiredTextRule = (value: unknown) =>
   typeof value === 'string' && value.trim() ? true : 'Campo requerido';
@@ -154,9 +169,9 @@ watch(
       return;
     }
 
-    form.kind = 'parking';
-    form.number = '';
-    form.areaM2 = null;
+    form.kind = props.initialValue?.kind ?? 'parking';
+    form.number = props.initialValue?.number ?? '';
+    form.areaM2 = props.initialValue?.areaM2 ?? null;
   },
 );
 
@@ -182,7 +197,9 @@ async function handleSubmit() {
 <style scoped lang="scss">
 .detail-dialog {
   border-radius: 18px;
-  min-width: min(92vw, 520px);
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.18);
+  max-height: calc(100vh - 32px);
+  width: min(92vw, 520px);
 }
 
 .detail-dialog__header {
@@ -198,9 +215,18 @@ async function handleSubmit() {
   text-transform: uppercase;
 }
 
+.detail-dialog :deep(.text-h6) {
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
 .detail-dialog__body {
   display: grid;
   gap: 12px;
+  overflow-y: auto;
 }
 
 .detail-dialog__note {
@@ -233,11 +259,21 @@ async function handleSubmit() {
 
 @media (max-width: 720px) {
   .detail-dialog {
-    min-width: min(94vw, 520px);
+    width: calc(100vw - 24px);
   }
 
   .detail-dialog__grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detail-dialog__actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+    padding: 0 16px 16px;
+  }
+
+  .detail-dialog__actions :deep(.q-btn) {
+    width: 100%;
   }
 }
 </style>

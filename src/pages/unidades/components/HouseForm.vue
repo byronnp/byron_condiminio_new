@@ -77,10 +77,14 @@
           <q-btn flat dense no-caps label="Reintentar" @click="$emit('reload-blocks')" />
         </div>
 
-        <div v-else-if="!loadingBlocks && !blockOptions.length" class="empty-options-note q-mt-md">
-          <q-icon name="info_outline" size="18px" />
-          <span>{{ emptyBlocksText }}</span>
-        </div>
+        <AppEmptyState
+          v-else-if="!loadingBlocks && !blockOptions.length"
+          tight
+          class="q-mt-md"
+          icon="info_outline"
+          title="No hay bloques disponibles"
+          :text="emptyBlocksText"
+        />
       </q-card-section>
     </q-card>
 
@@ -163,6 +167,8 @@
 import { computed, ref, toRef } from 'vue';
 import { type QForm } from 'quasar';
 
+import AppEmptyState from '@/components/shared/AppEmptyState.vue';
+
 interface HouseFormModel {
   blockId: number | null;
   unitTypeId: number | null;
@@ -227,8 +233,8 @@ const characteristicsHint = computed(() =>
 
 const emptyBlocksText = computed(() =>
   props.mode === 'create'
-    ? 'No hay bloques asignados a este condominio.'
-    : 'No hay bloques asignados a este condominio.',
+    ? 'Puedes crear la casa sin bloque y asignarlo más adelante.'
+    : 'Puedes guardar la casa sin bloque o asignarlo cuando exista en el condominio.',
 );
 const emptyBlockValue = computed(() => 'No hay bloques asignados a este condominio');
 
@@ -316,6 +322,7 @@ async function handleSubmit() {
   font-size: 13px;
   font-weight: 800;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .section-heading {
@@ -344,7 +351,7 @@ async function handleSubmit() {
   color: var(--app-text);
   font-size: 14px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.2;
 }
 
@@ -375,6 +382,15 @@ async function handleSubmit() {
   min-height: 64px;
 }
 
+.switch-list__item :deep(.q-item__label) {
+  line-height: 1.25;
+}
+
+.switch-list__item :deep(.q-item__label--caption) {
+  line-height: 1.4;
+  margin-top: 3px;
+}
+
 .form-actions {
   display: flex;
   gap: 10px;
@@ -387,11 +403,11 @@ async function handleSubmit() {
   color: var(--app-text);
 }
 
-.options-error,
-.empty-options-note {
+.options-error {
   align-items: center;
   border-radius: 12px;
   display: flex;
+  flex-wrap: wrap;
   font-size: 11px;
   gap: 8px;
   min-height: 44px;
@@ -405,11 +421,6 @@ async function handleSubmit() {
 
 .options-error .q-btn {
   margin-left: auto;
-}
-
-.empty-options-note {
-  background: rgba(37, 99, 235, 0.06);
-  color: var(--app-text-muted);
 }
 
 @media (max-width: 650px) {
@@ -426,6 +437,16 @@ async function handleSubmit() {
   }
 
   .form-actions > * {
+    width: 100%;
+  }
+
+  .context-panel {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .options-error .q-btn {
+    margin-left: 0;
     width: 100%;
   }
 }

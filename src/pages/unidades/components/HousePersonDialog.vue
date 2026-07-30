@@ -387,6 +387,10 @@ function documentNumberRule(value: unknown) {
 <style scoped lang="scss">
 .detail-dialog {
   border-radius: 20px;
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
   max-width: 880px;
   width: 100%;
 }
@@ -404,6 +408,7 @@ function documentNumberRule(value: unknown) {
   align-items: flex-start;
   display: flex;
   gap: 15px;
+  min-width: 0;
 }
 
 .detail-dialog__icon {
@@ -421,6 +426,7 @@ function documentNumberRule(value: unknown) {
 .detail-dialog__heading-copy {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
 .detail-dialog__eyebrow {
@@ -436,6 +442,7 @@ function documentNumberRule(value: unknown) {
   font-size: 21px;
   font-weight: 800;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .detail-dialog__subtitle {
@@ -448,6 +455,7 @@ function documentNumberRule(value: unknown) {
 .detail-dialog__body {
   display: grid;
   gap: 16px;
+  overflow-y: auto;
 }
 
 .person-form {
@@ -518,7 +526,13 @@ function documentNumberRule(value: unknown) {
   display: flex;
   gap: 12px;
   justify-content: space-between;
+  min-width: 0;
   width: 100%;
+}
+
+.load-error__content span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .detail-dialog__actions {
@@ -531,7 +545,9 @@ function documentNumberRule(value: unknown) {
 
 @media (max-width: 720px) {
   .detail-dialog {
+    border-radius: 18px;
     max-width: calc(100vw - 24px);
+    width: calc(100vw - 24px);
   }
 
   .form-grid {
@@ -541,6 +557,8 @@ function documentNumberRule(value: unknown) {
   .detail-dialog__header {
     align-items: flex-start;
     flex-direction: column;
+    gap: 12px;
+    padding: 16px;
   }
 
   .detail-dialog__heading {
@@ -552,9 +570,28 @@ function documentNumberRule(value: unknown) {
     height: 48px;
   }
 
+  .detail-dialog__body {
+    padding: 16px;
+  }
+
+  .detail-dialog__title {
+    font-size: 18px;
+  }
+
+  .toggle-grid {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .load-error__content {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .detail-dialog__actions {
     flex-direction: column-reverse;
     gap: 10px;
+    padding: 0 16px 16px;
   }
 
   .detail-dialog__actions :deep(.q-btn) {

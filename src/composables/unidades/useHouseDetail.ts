@@ -10,6 +10,7 @@ import {
   fetchUnitPeople,
   fetchUnitsPage,
   setUnitBillingResponsible,
+  updateHouse,
   type CreateUnitPersonPayload,
   type CreateParkingUnitPayload,
   type UnitListItem,
@@ -228,7 +229,7 @@ export function useHouseDetail() {
 
   async function saveParking(payload: CreateParkingUnitPayload) {
     if (!condominiumId.value || !unitId.value) {
-      throw new Error('Selecciona un condominio válido para agregar el parqueadero.');
+      throw new Error('Selecciona un condominio válido para agregar la unidad asociada.');
     }
 
     const unitTypeId = await loadChildUnitType(payload.kind);
@@ -252,6 +253,66 @@ export function useHouseDetail() {
       );
 
       parkingDialog.value = false;
+      await load();
+      return result;
+    } finally {
+      savingParking.value = false;
+    }
+  }
+
+  async function updateParking(childUnitId: number, payload: CreateParkingUnitPayload) {
+    if (!condominiumId.value) {
+      throw new Error('Selecciona un condominio válido para editar la unidad asociada.');
+    }
+
+    const unitTypeId = await loadChildUnitType(payload.kind);
+    if (!unitTypeId) {
+      throw new Error(
+        payload.kind === 'storage'
+          ? 'No se encontró un tipo de unidad para bodega.'
+          : 'No se encontró un tipo de unidad para parqueadero.',
+      );
+    }
+
+    savingParking.value = true;
+
+    try {
+      const result = await updateHouse(
+        condominiumId.value,
+        childUnitId,
+        {
+          unitTypeId,
+          code: payload.code,
+          number: payload.number,
+          areaM2: payload.areaM2,
+          isAssignable: false,
+        },
+        session.accessToken,
+      );
+
+      parkingDialog.value = false;
+      await load();
+      return result;
+    } finally {
+      savingParking.value = false;
+    }
+  }
+
+  async function setParkingStatus(childUnitId: number, isActive: boolean) {
+    if (!condominiumId.value) {
+      throw new Error('Selecciona un condominio válido para actualizar la unidad asociada.');
+    }
+
+    savingParking.value = true;
+
+    try {
+      const result = await updateHouse(
+        condominiumId.value,
+        childUnitId,
+        { isActive },
+        session.accessToken,
+      );
+
       await load();
       return result;
     } finally {
@@ -358,7 +419,9 @@ export function useHouseDetail() {
     changeBillingResponsible,
     deactivatePersonRelation,
     sendAccessInvitation,
+    setParkingStatus,
     statusLabel,
+    updateParking,
     assignmentLabel,
   };
 }
