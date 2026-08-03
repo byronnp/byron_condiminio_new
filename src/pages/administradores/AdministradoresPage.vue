@@ -49,10 +49,10 @@
               title="No hay administradores para mostrar"
               :text="
                 loadError
-                  ? 'Revisa la conexi?n con el backend e intenta nuevamente.'
+                  ? 'Revisa la conexión con el backend e intenta nuevamente.'
                   : hasActiveFilters
                     ? 'No encontramos resultados con los criterios seleccionados.'
-                    : 'A?n no se han registrado administradores.'
+                    : 'Aún no se han registrado administradores.'
               "
           /></template>
           <template #body-cell-admin="props">
@@ -79,9 +79,7 @@
                 <q-icon :name="props.row.type === 'Senior' ? 'public' : 'apartment'" size="17px" />
                 <div>
                   <div class="scope-cell__title">{{ props.value }}</div>
-                  <div class="scope-cell__hint">
-                    Acceso asignado
-                  </div>
+                  <div class="scope-cell__hint">Acceso asignado</div>
                 </div>
               </div>
             </q-td>
@@ -442,8 +440,7 @@ async function loadAdministrators() {
 watch(
   () => session.activeCondoId,
   () => {
-    const hadActiveFilters =
-      Boolean(search.value.trim()) || statusFilter.value !== 'Todos';
+    const hadActiveFilters = Boolean(search.value.trim()) || statusFilter.value !== 'Todos';
     search.value = '';
     statusFilter.value = 'Todos';
     if (pagination.value.page !== 1) {
@@ -496,7 +493,10 @@ function showAdministratorDetail(row: AdminRow) {
   alertDialogOpen.value = true;
 }
 function requestAdministratorAction(action: AdministratorAction, row: AdminRow) {
-  if ((action === 'delete' && !canDeleteAdministrators.value) || (action !== 'delete' && !canUpdateAdministrators.value)) {
+  if (
+    (action === 'delete' && !canDeleteAdministrators.value) ||
+    (action !== 'delete' && !canUpdateAdministrators.value)
+  ) {
     return;
   }
   pendingAction.value = action;
@@ -537,8 +537,10 @@ function executeAdministratorAction(action: AdministratorAction, administrator: 
     throw new Error('Selecciona un condominio activo para completar la acción.');
   }
 
-  if (action === 'delete') return deleteAdministrator(condominiumId, administrator.id, session.accessToken);
-  if (action === 'suspend') return suspendAdministrator(condominiumId, administrator.id, session.accessToken);
+  if (action === 'delete')
+    return deleteAdministrator(condominiumId, administrator.id, session.accessToken);
+  if (action === 'suspend')
+    return suspendAdministrator(condominiumId, administrator.id, session.accessToken);
   return reactivateAdministrator(condominiumId, administrator.id, session.accessToken);
 }
 function buildActionSuccessMessage(action: AdministratorAction, administrator: AdminRow) {

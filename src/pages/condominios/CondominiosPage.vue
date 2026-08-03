@@ -82,10 +82,10 @@
               title="No hay condominios para mostrar"
               :text="
                 loadError
-                  ? 'Revisa la conexi?n con el backend e intenta nuevamente.'
+                  ? 'Revisa la conexión con el backend e intenta nuevamente.'
                   : hasActiveFilters
                     ? 'No encontramos resultados con los criterios seleccionados.'
-                    : 'A?n no se han registrado condominios en la plataforma.'
+                    : 'Aún no se han registrado condominios en la plataforma.'
               "
           /></template>
           <template #body-cell-condominio="props">
