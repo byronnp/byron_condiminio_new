@@ -23,6 +23,7 @@
       @cta-click="goToNewCondominio"
     >
       <template #stats><AppStatsCards :cards="statsCards" /></template>
+      <template #results>{{ resultsRangeLabel }}</template>
       <template #table>
         <div
           v-if="advancedFiltersOpen"
@@ -104,7 +105,9 @@
           </template>
           <template #body-cell-type="props">
             <q-td :props="props">
-              <q-badge outline color="primary" class="type-badge">{{ props.value }}</q-badge>
+              <q-badge outline :color="colorForLabel(props.value)" class="type-badge">{{
+                props.value
+              }}</q-badge>
             </q-td>
           </template>
           <template #body-cell-status="props">
@@ -141,10 +144,12 @@
                 <q-menu
                   anchor="bottom right"
                   self="top right"
+                  transition-show="scale"
+                  transition-hide="scale"
                   class="table-actions-menu"
                   content-class="table-actions-menu__popup"
                 >
-                  <q-card flat bordered class="table-actions-menu__card">
+                  <q-card flat class="table-actions-menu__card">
                     <q-list class="table-actions-menu__list">
                       <q-item
                         clickable
@@ -153,9 +158,9 @@
                         class="table-actions-menu__item"
                       >
                         <q-item-section avatar>
-                          <q-avatar size="32px" class="table-actions-menu__avatar">
+                          <span class="table-actions-menu__icon">
                             <q-icon name="person_add" size="16px" />
-                          </q-avatar>
+                          </span>
                         </q-item-section>
                         <q-item-section>
                           <q-item-label class="table-actions-menu__name"
@@ -171,12 +176,9 @@
                         class="table-actions-menu__item"
                       >
                         <q-item-section avatar>
-                          <q-avatar
-                            size="32px"
-                            class="table-actions-menu__avatar table-actions-menu__avatar--alt"
-                          >
+                          <span class="table-actions-menu__icon table-actions-menu__icon--alt">
                             <q-icon name="add_home_work" size="16px" />
-                          </q-avatar>
+                          </span>
                         </q-item-section>
                         <q-item-section>
                           <q-item-label class="table-actions-menu__name"
@@ -196,12 +198,9 @@
                         class="table-actions-menu__item table-actions-menu__item--danger"
                       >
                         <q-item-section avatar>
-                          <q-avatar
-                            size="32px"
-                            class="table-actions-menu__avatar table-actions-menu__avatar--danger"
-                          >
+                          <span class="table-actions-menu__icon table-actions-menu__icon--danger">
                             <q-icon name="delete_outline" size="16px" />
-                          </q-avatar>
+                          </span>
                         </q-item-section>
                         <q-item-section>
                           <q-item-label
@@ -270,6 +269,7 @@ import {
   type CondominiumListItem,
 } from '@/services/condominiums.service';
 import { useSessionStore } from '@/stores/session.store';
+import { colorForLabel } from '@/utils/badge-color';
 type CondoRow = {
   id: number;
   name: string;
@@ -306,9 +306,6 @@ const detailDialog = ref({ title: '', message: '' });
 const columns = [
   { name: 'condominio', label: 'Condominio', field: 'name', align: 'left' as const },
   { name: 'type', label: 'Tipo', field: 'type', align: 'left' as const },
-  { name: 'country', label: 'País', field: 'country', align: 'left' as const },
-  { name: 'province', label: 'Provincia', field: 'province', align: 'left' as const },
-  { name: 'city', label: 'Ciudad', field: 'city', align: 'left' as const },
   { name: 'units', label: 'Unidades', field: 'units', align: 'right' as const },
   {
     name: 'principal',
@@ -385,6 +382,15 @@ const sortedRows = computed(() => {
   return filteredRows.value;
 });
 const totalPages = computed(() => serverTotalPages.value);
+const resultsRangeLabel = computed(() => {
+  const total = serverTotalItems.value;
+  if (total === 0) {
+    return 'Sin resultados';
+  }
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage + 1;
+  const end = Math.min(start + pagination.value.rowsPerPage - 1, total);
+  return `Mostrando ${start}-${end} de ${total}`;
+});
 watch(
   () => [search.value, statusFilter.value, typeFilter.value] as const,
   () => {
@@ -603,7 +609,7 @@ const deleteConfirmMessage = computed(() => {
   overflow-x: auto;
 }
 .list-table :deep(table) {
-  min-width: 1180px;
+  min-width: 820px;
 }
 .list-table :deep(thead tr th) {
   color: #334155;
@@ -692,9 +698,14 @@ const deleteConfirmMessage = computed(() => {
   box-shadow: none;
 }
 .table-actions-menu__card {
-  border: 0;
-  border-radius: 22px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  box-shadow:
+    0 20px 44px rgba(15, 23, 42, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.4) inset;
   min-width: 280px;
   overflow: hidden;
 }
@@ -702,32 +713,52 @@ const deleteConfirmMessage = computed(() => {
   padding: 8px;
 }
 .table-actions-menu__item {
-  border-radius: 12px;
+  border-radius: 14px;
   min-height: 52px;
+  transition:
+    background-color 0.16s ease,
+    transform 0.16s ease;
+}
+.table-actions-menu__item:hover,
+.table-actions-menu__item:focus-visible {
+  background: rgba(37, 99, 235, 0.06);
+  transform: translateX(2px);
+}
+.table-actions-menu__item--danger:hover,
+.table-actions-menu__item--danger:focus-visible {
+  background: rgba(239, 68, 68, 0.08);
 }
 .table-actions-menu__item--danger {
   color: var(--q-negative);
 }
-.table-actions-menu__avatar {
-  background: rgba(37, 99, 235, 0.08);
+.table-actions-menu__icon {
+  align-items: center;
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 10px;
   color: var(--app-primary);
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
 }
-.table-actions-menu__avatar--alt {
+.table-actions-menu__icon--alt {
   background: rgba(15, 23, 42, 0.06);
+  color: var(--app-text-muted);
 }
-.table-actions-menu__avatar--danger {
+.table-actions-menu__icon--danger {
   background: rgba(239, 68, 68, 0.1);
   color: var(--q-negative);
 }
 .table-actions-menu__name {
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 750;
 }
 .table-actions-menu__name--danger {
   color: var(--q-negative);
 }
 .table-actions-menu__separator {
   margin: 4px 8px;
+  opacity: 0.6;
 }
 .table-footer__pagination :deep(.q-pagination__content) {
   gap: 6px;
