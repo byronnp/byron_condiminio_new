@@ -18,7 +18,7 @@
         Selecciona un condominio en el layout para editar una casa.
       </q-banner>
 
-      <q-banner v-else-if="loadError" rounded class="context-warning">
+      <q-banner v-else-if="loadError" rounded class="context-error">
         <template #avatar>
           <q-icon name="error_outline" />
         </template>
@@ -32,6 +32,8 @@
         <HouseForm
           :form="form"
           :condominium-name="condominiumName"
+          :unit-type-options="unitTypes"
+          :loading-unit-types="loadingUnitTypes"
           :block-options="blockOptions"
           :loading-blocks="loadingBlocks"
           :blocks-load-error="blocksLoadError"
@@ -89,13 +91,24 @@
               </div>
 
               <q-banner rounded class="next-step q-mt-lg">
-                La edición conserva el mismo patrón visual que la creación.
+                Los cambios se guardan solo cuando presionas "Guardar cambios".
               </q-banner>
             </q-card-section>
           </q-card>
         </aside>
       </div>
     </div>
+
+    <AppConfirmDialog
+      v-model="leaveConfirmOpen"
+      tone="warning"
+      icon="warning"
+      title="¿Descartar los cambios?"
+      message="Tienes cambios sin guardar en esta casa. Si sales ahora, se perderán."
+      confirm-label="Descartar y salir"
+      cancel-label="Seguir editando"
+      @confirm="confirmLeave"
+    />
   </q-page>
 </template>
 
@@ -105,6 +118,7 @@ import { Notify } from 'quasar';
 import { useRoute, useRouter } from 'vue-router';
 
 import HouseForm from './components/HouseForm.vue';
+import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
 import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
 import {
   fetchUnitById,
@@ -124,6 +138,7 @@ const loadError = ref('');
 const submitError = ref('');
 const blocksLoadError = ref('');
 const blockOptions = ref<{ label: string; value: number }[]>([]);
+const leaveConfirmOpen = ref(false);
 
 const form = reactive({
   blockId: null as number | null,
@@ -136,7 +151,11 @@ const form = reactive({
 });
 const originalForm = ref({ ...form });
 
-const { options: unitTypes, loadOptions: loadUnitTypes } = useCatalogOptions<{
+const {
+  options: unitTypes,
+  loading: loadingUnitTypes,
+  loadOptions: loadUnitTypes,
+} = useCatalogOptions<{
   label: string;
   value: number;
   code: string;
@@ -160,6 +179,19 @@ const condominiumName = computed(() => session.activeCondominium?.name ?? 'Sin c
 const selectedBlockName = computed(
   () => blockOptions.value.find((item) => item.value === form.blockId)?.label ?? 'Sin definir',
 );
+
+const hasUnsavedChanges = computed(() => {
+  const original = originalForm.value;
+  return (
+    form.blockId !== original.blockId ||
+    form.unitTypeId !== original.unitTypeId ||
+    form.number.trim() !== original.number ||
+    form.code.trim() !== original.code ||
+    form.areaM2 !== original.areaM2 ||
+    form.isAssignable !== original.isAssignable ||
+    form.isActive !== original.isActive
+  );
+});
 
 onMounted(() => {
   void loadData();
@@ -242,12 +274,7 @@ async function submitForm() {
   submitError.value = '';
 
   try {
-    await updateHouse(
-      activeCondominiumId.value,
-      unitId.value,
-      payload,
-      session.accessToken,
-    );
+    await updateHouse(activeCondominiumId.value, unitId.value, payload, session.accessToken);
 
     Notify.create({
       type: 'positive',
@@ -257,7 +284,8 @@ async function submitForm() {
 
     await router.push({ name: 'unidades-detalle', params: { id: String(unitId.value) } });
   } catch (error) {
-    submitError.value = error instanceof Error ? error.message : 'No fue posible actualizar la casa.';
+    submitError.value =
+      error instanceof Error ? error.message : 'No fue posible actualizar la casa.';
     Notify.create({
       type: 'negative',
       message: submitError.value,
@@ -288,6 +316,20 @@ function buildUpdatePayload(): UpdateHousePayload {
 }
 
 function goBack() {
+  if (hasUnsavedChanges.value) {
+    leaveConfirmOpen.value = true;
+    return;
+  }
+
+  navigateBack();
+}
+
+function confirmLeave() {
+  leaveConfirmOpen.value = false;
+  navigateBack();
+}
+
+function navigateBack() {
   if (unitId.value) {
     void router.push({ name: 'unidades-detalle', params: { id: String(unitId.value) } });
     return;
@@ -460,8 +502,15 @@ function goBack() {
 }
 
 .context-warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #92400e;
+  background: var(--app-warning-soft);
+  border: 1px solid var(--app-warning-border);
+  color: var(--app-warning-text);
+}
+
+.context-error {
+  background: var(--app-danger-soft);
+  border: 1px solid var(--app-danger-border);
+  color: var(--app-danger-text);
 }
 
 @media (max-width: 900px) {

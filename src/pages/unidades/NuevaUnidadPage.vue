@@ -22,6 +22,8 @@
         <HouseForm
           :form="form"
           :condominium-name="condominiumName"
+          :unit-type-options="unitTypes"
+          :loading-unit-types="loadingUnitTypes"
           :block-options="blockOptions"
           :loading-blocks="loadingBlocks"
           :blocks-load-error="blocksLoadError"
@@ -118,7 +120,11 @@ const form = reactive({
   isActive: true,
 });
 
-const { options: unitTypes, loadOptions: loadUnitTypes } = useCatalogOptions<{
+const {
+  options: unitTypes,
+  loading: loadingUnitTypes,
+  loadOptions: loadUnitTypes,
+} = useCatalogOptions<{
   label: string;
   value: number;
   code: string;
@@ -146,7 +152,8 @@ onMounted(async () => {
     const houseType = unitTypes.value.find((item) => item.code.toLowerCase().includes('casa'));
     form.unitTypeId = houseType?.value ?? unitTypes.value[0]?.value ?? null;
   } catch (error) {
-    submitError.value = error instanceof Error ? error.message : 'No fue posible cargar las opciones.';
+    submitError.value =
+      error instanceof Error ? error.message : 'No fue posible cargar las opciones.';
   }
 });
 
@@ -163,7 +170,8 @@ async function loadBlocks() {
   } catch (error) {
     blockOptions.value = [];
     form.blockId = null;
-    blocksLoadError.value = error instanceof Error ? error.message : 'No fue posible cargar los bloques.';
+    blocksLoadError.value =
+      error instanceof Error ? error.message : 'No fue posible cargar los bloques.';
   } finally {
     loadingBlocks.value = false;
   }
@@ -371,8 +379,9 @@ function goBack() {
 }
 
 .context-warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #92400e;
+  background: var(--app-warning-soft);
+  border: 1px solid var(--app-warning-border);
+  color: var(--app-warning-text);
 }
 
 @media (max-width: 900px) {

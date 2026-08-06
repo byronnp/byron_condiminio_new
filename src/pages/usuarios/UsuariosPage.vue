@@ -252,12 +252,12 @@
       @cancel="clearPendingAction"
     />
 
-    <AppAlertDialog
-      v-model="alertDialogOpen"
-      :tone="alertDialog.tone"
-      :icon="alertDialog.icon"
-      :title="alertDialog.title"
-      :message="alertDialog.message"
+    <AppEntityDetailDialog
+      v-model="detailDialogOpen"
+      :tone="detailDialog.tone"
+      :icon="detailDialog.icon"
+      :title="detailDialog.title"
+      :rows="detailDialog.rows"
     />
   </q-page>
 </template>
@@ -267,8 +267,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Notify } from 'quasar';
 import { useRouter } from 'vue-router';
 
-import AppAlertDialog from '@/components/general/AppAlertDialog.vue';
 import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
+import AppEntityDetailDialog from '@/components/general/AppEntityDetailDialog.vue';
 import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import AppStatsCards, { type AppStatsCard } from '@/components/shared/AppStatsCards.vue';
@@ -303,17 +303,17 @@ const confirmDialogOpen = ref(false);
 const pendingAction = ref<UserAction | null>(null);
 const pendingUser = ref<UserRow | null>(null);
 const isProcessingAction = ref(false);
-const alertDialogOpen = ref(false);
-const alertDialog = ref<{
+const detailDialogOpen = ref(false);
+const detailDialog = ref<{
   tone: DialogTone;
   icon: string;
   title: string;
-  message: string;
+  rows: { label: string; value: string }[];
 }>({
   tone: 'primary',
   icon: 'info',
   title: '',
-  message: '',
+  rows: [],
 });
 
 const columns = [
@@ -535,23 +535,22 @@ function clearPendingAction() {
 }
 
 function showUserDetail(row: UserRow) {
-  openAlert({
+  detailDialog.value = {
     tone: 'primary',
     icon: 'admin_panel_settings',
     title: row.name,
-    message: [
-      `Documento: ${[row.documentTypeName, row.documentNumber].filter(Boolean).join(' ') || '-'}.`,
-      `Correo: ${row.email}.`,
-      `Teléfono: ${row.phone || '-'}.`,
-      `Acceso: ${accessStatusLabel(row.accessStatus)}.`,
-      `Invitación: ${invitationStatusLabel(row.invitationStatus)}.`,
-    ].join(' '),
-  });
-}
-
-function openAlert(config: { tone: DialogTone; icon: string; title: string; message: string }) {
-  alertDialog.value = config;
-  alertDialogOpen.value = true;
+    rows: [
+      {
+        label: 'Documento',
+        value: [row.documentTypeName, row.documentNumber].filter(Boolean).join(' ') || '-',
+      },
+      { label: 'Correo', value: row.email },
+      { label: 'Teléfono', value: row.phone || '-' },
+      { label: 'Acceso', value: accessStatusLabel(row.accessStatus) },
+      { label: 'Invitación', value: invitationStatusLabel(row.invitationStatus) },
+    ],
+  };
+  detailDialogOpen.value = true;
 }
 
 function accessStatusLabel(status: PlatformAccessStatus) {

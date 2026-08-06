@@ -249,12 +249,12 @@
       @confirm="confirmAdministratorAction"
       @cancel="clearPendingAction"
     />
-    <AppAlertDialog
-      v-model="alertDialogOpen"
-      :tone="alertDialog.tone"
-      :icon="alertDialog.icon"
-      :title="alertDialog.title"
-      :message="alertDialog.message"
+    <AppEntityDetailDialog
+      v-model="detailDialogOpen"
+      :tone="detailDialog.tone"
+      :icon="detailDialog.icon"
+      :title="detailDialog.title"
+      :rows="detailDialog.rows"
     />
   </q-page>
 </template>
@@ -262,8 +262,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Notify } from 'quasar';
 import { useRouter } from 'vue-router';
-import AppAlertDialog from '@/components/general/AppAlertDialog.vue';
 import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
+import AppEntityDetailDialog from '@/components/general/AppEntityDetailDialog.vue';
 import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import AppStatsCards from '@/components/shared/AppStatsCards.vue';
@@ -297,12 +297,17 @@ const confirmDialogOpen = ref(false);
 const pendingAction = ref<AdministratorAction | null>(null);
 const pendingAdministrator = ref<AdminRow | null>(null);
 const isProcessingAction = ref(false);
-const alertDialogOpen = ref(false);
-const alertDialog = ref<{ tone: DialogTone; icon: string; title: string; message: string }>({
+const detailDialogOpen = ref(false);
+const detailDialog = ref<{
+  tone: DialogTone;
+  icon: string;
+  title: string;
+  rows: { label: string; value: string }[];
+}>({
   tone: 'primary',
   icon: 'info',
   title: '',
-  message: '',
+  rows: [],
 });
 const rows = ref<AdminRow[]>([]);
 const serverTotalPages = ref(1);
@@ -525,15 +530,18 @@ function editAdministrator(row: AdminRow) {
   void router.push({ name: 'administradores-editar', params: { id: String(row.id) } });
 }
 function showAdministratorDetail(row: AdminRow) {
-  alertDialog.value = {
+  detailDialog.value = {
     tone: 'primary',
     icon: 'manage_accounts',
     title: row.name,
-    message: `${row.email}. Asignado a ${row.scope}. Acceso: ${statusLabel(row.status)}.${
-      row.invitationInfo ? ` Invitación: ${row.invitationInfo}.` : ''
-    }`,
+    rows: [
+      { label: 'Correo', value: row.email },
+      { label: 'Alcance', value: row.scope },
+      { label: 'Acceso', value: statusLabel(row.status) },
+      ...(row.invitationInfo ? [{ label: 'Invitación', value: row.invitationInfo }] : []),
+    ],
   };
-  alertDialogOpen.value = true;
+  detailDialogOpen.value = true;
 }
 function requestAdministratorAction(action: AdministratorAction, row: AdminRow) {
   if (

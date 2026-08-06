@@ -246,12 +246,12 @@
       @confirm="confirmDeleteCondominium"
       @cancel="clearDeleteConfirmation"
     />
-    <AppAlertDialog
+    <AppEntityDetailDialog
       v-model="detailDialogOpen"
       tone="primary"
       icon="apartment"
       :title="detailDialog.title"
-      :message="detailDialog.message"
+      :rows="detailDialog.rows"
     />
   </q-page>
 </template>
@@ -260,7 +260,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
-import AppAlertDialog from '@/components/general/AppAlertDialog.vue';
+import AppEntityDetailDialog from '@/components/general/AppEntityDetailDialog.vue';
 import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppStatsCards from '@/components/shared/AppStatsCards.vue';
 import {
@@ -302,7 +302,10 @@ const deleteConfirmOpen = ref(false);
 const pendingDeleteRow = ref<CondoRow | null>(null);
 const loadError = ref('');
 const detailDialogOpen = ref(false);
-const detailDialog = ref({ title: '', message: '' });
+const detailDialog = ref<{ title: string; rows: { label: string; value: string }[] }>({
+  title: '',
+  rows: [],
+});
 const columns = [
   { name: 'condominio', label: 'Condominio', field: 'name', align: 'left' as const },
   { name: 'type', label: 'Tipo', field: 'type', align: 'left' as const },
@@ -507,7 +510,13 @@ function clearAdvancedFilters() {
 function showCondominiumDetail(row: CondoRow) {
   detailDialog.value = {
     title: row.name,
-    message: `${row.city}, ${row.province}, ${row.country}. Tipo: ${row.type}. Unidades: ${row.units}. Administrador principal: ${row.principal}. Estado: ${row.status}.`,
+    rows: [
+      { label: 'Ubicación', value: `${row.city}, ${row.province}, ${row.country}` },
+      { label: 'Tipo', value: row.type },
+      { label: 'Unidades', value: String(row.units) },
+      { label: 'Administrador principal', value: row.principal },
+      { label: 'Estado', value: row.status },
+    ],
   };
   detailDialogOpen.value = true;
 }
