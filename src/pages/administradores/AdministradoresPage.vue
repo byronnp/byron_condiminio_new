@@ -138,42 +138,85 @@
                 :aria-label="`Más acciones para ${props.row.name}`"
               >
                 <q-tooltip>Más acciones</q-tooltip>
-                <q-menu anchor="bottom right" self="top right">
-                  <q-list bordered class="actions-menu">
-                    <q-item
-                      v-if="canUpdateAdministrators && props.row.status === 'active'"
-                      v-close-popup
-                      clickable
-                      @click="requestAdministratorAction('suspend', props.row)"
-                    >
-                      <q-item-section avatar>
-                        <q-icon name="person_off" color="warning" />
-                      </q-item-section>
-                      <q-item-section>Deshabilitar acceso global</q-item-section>
-                    </q-item>
-                    <q-item
-                      v-if="canUpdateAdministrators && props.row.status === 'inactive'"
-                      v-close-popup
-                      clickable
-                      @click="requestAdministratorAction('reactivate', props.row)"
-                    >
-                      <q-item-section avatar>
-                        <q-icon name="how_to_reg" color="positive" />
-                      </q-item-section>
-                      <q-item-section>Habilitar acceso global</q-item-section>
-                    </q-item>
-                    <q-separator v-if="canDeleteAdministrators" />
-                    <q-item
-                      v-if="canDeleteAdministrators"
-                      v-close-popup
-                      clickable
-                      class="text-negative"
-                      @click="requestAdministratorAction('delete', props.row)"
-                    >
-                      <q-item-section avatar> <q-icon name="delete_outline" /> </q-item-section>
-                      <q-item-section>Desvincular administrador del condominio</q-item-section>
-                    </q-item>
-                  </q-list>
+                <q-menu
+                  anchor="bottom right"
+                  self="top right"
+                  transition-show="scale"
+                  transition-hide="scale"
+                  class="table-actions-menu"
+                >
+                  <q-card flat class="table-actions-menu__card">
+                    <q-list class="table-actions-menu__list">
+                      <q-item
+                        v-if="canUpdateAdministrators && props.row.status === 'active'"
+                        v-close-popup
+                        clickable
+                        class="table-actions-menu__item"
+                        @click="requestAdministratorAction('suspend', props.row)"
+                      >
+                        <q-item-section avatar>
+                          <span class="table-actions-menu__icon table-actions-menu__icon--warning">
+                            <q-icon name="person_off" size="16px" />
+                          </span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="table-actions-menu__name"
+                            >Deshabilitar acceso global</q-item-label
+                          >
+                          <q-item-label caption
+                            >Suspende el acceso de este administrador</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-item
+                        v-if="canUpdateAdministrators && props.row.status === 'inactive'"
+                        v-close-popup
+                        clickable
+                        class="table-actions-menu__item"
+                        @click="requestAdministratorAction('reactivate', props.row)"
+                      >
+                        <q-item-section avatar>
+                          <span class="table-actions-menu__icon table-actions-menu__icon--positive">
+                            <q-icon name="how_to_reg" size="16px" />
+                          </span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="table-actions-menu__name"
+                            >Habilitar acceso global</q-item-label
+                          >
+                          <q-item-label caption
+                            >Restaura el acceso de este administrador</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-separator
+                        v-if="canDeleteAdministrators"
+                        class="table-actions-menu__separator"
+                      />
+                      <q-item
+                        v-if="canDeleteAdministrators"
+                        v-close-popup
+                        clickable
+                        class="table-actions-menu__item table-actions-menu__item--danger"
+                        @click="requestAdministratorAction('delete', props.row)"
+                      >
+                        <q-item-section avatar>
+                          <span class="table-actions-menu__icon table-actions-menu__icon--danger">
+                            <q-icon name="delete_outline" size="16px" />
+                          </span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label
+                            class="table-actions-menu__name table-actions-menu__name--danger"
+                            >Desvincular administrador del condominio</q-item-label
+                          >
+                          <q-item-label caption
+                            >Quita el acceso a este condominio específico</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-card>
                 </q-menu>
               </q-btn>
             </q-td>
@@ -603,23 +646,14 @@ function hasPermission(permission: PermissionCode) {
   line-height: 1.05;
   margin-top: 2px;
 }
-.list-table :deep(.q-table__middle) {
-  overflow-x: auto;
-}
 .list-table :deep(table) {
   min-width: 760px;
 }
-.list-table :deep(thead tr th),
 .entity-cell__title,
 .scope-cell__title {
   color: var(--app-text);
   font-size: 12px;
   font-weight: 800;
-}
-.list-table :deep(tbody tr td) {
-  color: var(--app-text);
-  font-size: 12px;
-  height: 60px;
 }
 .admin-error-banner {
   background: rgba(254, 242, 242, 0.96);
@@ -698,15 +732,6 @@ function hasPermission(permission: PermissionCode) {
 }
 .table-actions {
   white-space: nowrap;
-}
-.table-icon {
-  height: 34px;
-  width: 34px;
-}
-.actions-menu {
-  border-radius: 14px;
-  min-width: 250px;
-  padding: 6px;
 }
 .table-footer__pagination :deep(.q-pagination__content) {
   gap: 6px;

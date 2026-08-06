@@ -144,8 +144,14 @@
                 :aria-label="`Más acciones para ${props.row.name}`"
               >
                 <q-tooltip>Más acciones</q-tooltip>
-                <q-menu anchor="bottom right" self="top right" class="table-actions-menu">
-                  <q-card flat bordered class="table-actions-menu__card">
+                <q-menu
+                  anchor="bottom right"
+                  self="top right"
+                  transition-show="scale"
+                  transition-hide="scale"
+                  class="table-actions-menu"
+                >
+                  <q-card flat class="table-actions-menu__card">
                     <q-list class="table-actions-menu__list">
                       <q-item
                         v-if="props.row.accessStatus === 'active'"
@@ -155,12 +161,9 @@
                         @click="requestUserAction('deactivate', props.row)"
                       >
                         <q-item-section avatar>
-                          <q-avatar
-                            size="32px"
-                            class="table-actions-menu__avatar table-actions-menu__avatar--warning"
-                          >
+                          <span class="table-actions-menu__icon table-actions-menu__icon--warning">
                             <q-icon name="person_off" size="16px" />
-                          </q-avatar>
+                          </span>
                         </q-item-section>
                         <q-item-section>
                           <q-item-label class="table-actions-menu__name">
@@ -178,12 +181,9 @@
                         @click="requestUserAction('activate', props.row)"
                       >
                         <q-item-section avatar>
-                          <q-avatar
-                            size="32px"
-                            class="table-actions-menu__avatar table-actions-menu__avatar--positive"
-                          >
+                          <span class="table-actions-menu__icon table-actions-menu__icon--positive">
                             <q-icon name="how_to_reg" size="16px" />
-                          </q-avatar>
+                          </span>
                         </q-item-section>
                         <q-item-section>
                           <q-item-label class="table-actions-menu__name">
@@ -202,12 +202,9 @@
                         @click="requestUserAction('delete', props.row)"
                       >
                         <q-item-section avatar>
-                          <q-avatar
-                            size="32px"
-                            class="table-actions-menu__avatar table-actions-menu__avatar--danger"
-                          >
+                          <span class="table-actions-menu__icon table-actions-menu__icon--danger">
                             <q-icon name="delete_outline" size="16px" />
-                          </q-avatar>
+                          </span>
                         </q-item-section>
                         <q-item-section>
                           <q-item-label
@@ -632,30 +629,8 @@ function buildActionSuccessMessage(action: UserAction, user: UserRow) {
   max-width: 100%;
 }
 
-.list-table :deep(.q-table__middle) {
-  overflow-x: auto;
-}
-
 .list-table :deep(table) {
   min-width: 1080px;
-}
-
-.list-table :deep(thead tr th) {
-  color: #334155;
-  font-size: 12px;
-  font-weight: 800;
-  height: 50px;
-  letter-spacing: -0.01em;
-}
-
-.list-table :deep(tbody tr td) {
-  color: var(--app-text);
-  font-size: 12px;
-  height: 60px;
-}
-
-.list-table :deep(tbody tr:hover td) {
-  background: rgba(37, 99, 235, 0.025);
 }
 
 .user-error-banner {
@@ -711,71 +686,6 @@ function buildActionSuccessMessage(action: UserAction, user: UserRow) {
 
 .table-actions {
   white-space: nowrap;
-}
-
-.table-icon {
-  border-color: rgba(37, 99, 235, 0.14);
-  color: var(--app-primary);
-  height: 34px;
-  width: 34px;
-}
-
-.table-icon :deep(.q-icon) {
-  font-size: 16px;
-}
-
-.table-actions-menu__card {
-  border: 0;
-  border-radius: 22px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-  min-width: 300px;
-  overflow: hidden;
-}
-
-.table-actions-menu__list {
-  padding: 8px;
-}
-
-.table-actions-menu__item {
-  border-radius: 12px;
-  min-height: 54px;
-}
-
-.table-actions-menu__item--danger {
-  color: var(--q-negative);
-}
-
-.table-actions-menu__avatar {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--app-primary);
-}
-
-.table-actions-menu__avatar--warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: #d97706;
-}
-
-.table-actions-menu__avatar--positive {
-  background: rgba(34, 197, 94, 0.12);
-  color: #16a34a;
-}
-
-.table-actions-menu__avatar--danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--q-negative);
-}
-
-.table-actions-menu__name {
-  color: var(--app-text);
-  font-weight: 800;
-}
-
-.table-actions-menu__name--danger {
-  color: var(--q-negative);
-}
-
-.table-actions-menu__separator {
-  margin: 4px 8px;
 }
 
 .table-footer__pagination :deep(.q-pagination__content) {

@@ -602,29 +602,8 @@ const deleteConfirmMessage = computed(() => {
   font-size: 11px;
   margin-top: 1px;
 }
-.list-table :deep(.q-table__container) {
-  border-radius: 16px;
-}
-.list-table :deep(.q-table__middle) {
-  overflow-x: auto;
-}
 .list-table :deep(table) {
   min-width: 820px;
-}
-.list-table :deep(thead tr th) {
-  color: #334155;
-  font-size: 12px;
-  font-weight: 800;
-  height: 50px;
-  letter-spacing: -0.01em;
-}
-.list-table :deep(tbody tr td) {
-  color: var(--app-text);
-  font-size: 12px;
-  height: 60px;
-}
-.list-table :deep(tbody tr:hover td) {
-  background: rgba(37, 99, 235, 0.025);
 }
 .condo-error-banner {
   background: rgba(254, 242, 242, 0.96);
@@ -683,82 +662,10 @@ const deleteConfirmMessage = computed(() => {
 .table-actions {
   white-space: nowrap;
 }
-.table-icon {
-  border-color: rgba(37, 99, 235, 0.14);
-  color: var(--app-primary);
-  height: 34px;
-  width: 34px;
-}
-.table-icon :deep(.q-icon) {
-  font-size: 16px;
-}
 .table-actions-menu__popup {
   background: transparent;
   border-radius: 0;
   box-shadow: none;
-}
-.table-actions-menu__card {
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 20px;
-  box-shadow:
-    0 20px 44px rgba(15, 23, 42, 0.16),
-    0 1px 0 rgba(255, 255, 255, 0.4) inset;
-  min-width: 280px;
-  overflow: hidden;
-}
-.table-actions-menu__list {
-  padding: 8px;
-}
-.table-actions-menu__item {
-  border-radius: 14px;
-  min-height: 52px;
-  transition:
-    background-color 0.16s ease,
-    transform 0.16s ease;
-}
-.table-actions-menu__item:hover,
-.table-actions-menu__item:focus-visible {
-  background: rgba(37, 99, 235, 0.06);
-  transform: translateX(2px);
-}
-.table-actions-menu__item--danger:hover,
-.table-actions-menu__item--danger:focus-visible {
-  background: rgba(239, 68, 68, 0.08);
-}
-.table-actions-menu__item--danger {
-  color: var(--q-negative);
-}
-.table-actions-menu__icon {
-  align-items: center;
-  background: rgba(37, 99, 235, 0.1);
-  border-radius: 10px;
-  color: var(--app-primary);
-  display: inline-flex;
-  height: 32px;
-  justify-content: center;
-  width: 32px;
-}
-.table-actions-menu__icon--alt {
-  background: rgba(15, 23, 42, 0.06);
-  color: var(--app-text-muted);
-}
-.table-actions-menu__icon--danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--q-negative);
-}
-.table-actions-menu__name {
-  color: var(--app-text);
-  font-weight: 750;
-}
-.table-actions-menu__name--danger {
-  color: var(--q-negative);
-}
-.table-actions-menu__separator {
-  margin: 4px 8px;
-  opacity: 0.6;
 }
 .table-footer__pagination :deep(.q-pagination__content) {
   gap: 6px;

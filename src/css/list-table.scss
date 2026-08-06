@@ -1,0 +1,37 @@
+.list-table .q-table__container {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.list-table .q-table__middle {
+  overflow-x: auto;
+}
+
+.list-table thead tr th {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  height: 50px;
+  letter-spacing: -0.01em;
+}
+
+.list-table tbody tr td {
+  color: var(--app-text);
+  font-size: 12px;
+  height: 60px;
+}
+
+.list-table tbody tr:hover td {
+  background: rgba(37, 99, 235, 0.025);
+}
+
+.table-icon {
+  border-color: rgba(37, 99, 235, 0.14);
+  color: var(--app-primary);
+  height: 34px;
+  width: 34px;
+}
+
+.table-icon .q-icon {
+  font-size: 16px;
+}
