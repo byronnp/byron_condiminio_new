@@ -77,6 +77,8 @@ Use short, imperative commit messages such as `feat: update login layout` or `fi
 
 ## Agent Instructions
 Do not reintroduce condo selection in the login screen. The backend determines role and tenant context after authentication.
+
+`session.store.ts` holds only reactive state and actions. `localStorage`/`sessionStorage` read-write, payload validation, and state normalization belong in `session-storage.ts`. The demo condominium list (`condoCatalog`) lives in `src/config/condo-catalog.ts` and is a placeholder fallback, not real tenant data — replace it once a real condo-switching endpoint exists rather than growing it further.
 Backend documentation: `http://localhost:8001/api/documentation`
 
 - Senior users can see all condominiums and switch context.
