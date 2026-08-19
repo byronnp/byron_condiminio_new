@@ -10,7 +10,7 @@
             </div>
 
             <div class="auth-hero__copy">
-              <h1 class="auth-hero__title">Administra tus condominios desde un solo lugar.</h1>
+              <h1 class="auth-hero__title">Sistema de Administración Financiera de Condominios</h1>
               <p class="auth-hero__subtitle">
                 Centraliza viviendas, administradores y operaciones con una experiencia clara,
                 segura y organizada.
@@ -225,12 +225,12 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 
 .auth-hero__overlay {
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.44)),
+    linear-gradient(180deg, var(--app-overlay-top), var(--app-overlay-bottom)),
     linear-gradient(
       90deg,
-      rgba(15, 23, 42, 0.76),
-      rgba(15, 23, 42, 0.28) 58%,
-      rgba(15, 23, 42, 0.12)
+      var(--app-overlay-side-start),
+      var(--app-overlay-side-mid) 58%,
+      var(--app-overlay-side-end)
     );
   inset: 0;
   position: absolute;
@@ -240,10 +240,10 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   color: #fff;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: var(--app-space-7);
   height: 100%;
   justify-content: flex-end;
-  padding: 36px;
+  padding: var(--app-space-9);
   position: relative;
   z-index: 1;
 }
@@ -251,10 +251,10 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 .auth-hero__brand {
   align-items: center;
   display: inline-flex;
-  gap: 12px;
-  left: 36px;
+  gap: var(--app-space-3);
+  left: var(--app-space-9);
   position: absolute;
-  top: 36px;
+  top: var(--app-space-9);
 }
 
 .auth-hero__logo {
@@ -270,7 +270,7 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 }
 
 .auth-hero__title {
-  font-size: clamp(30px, 3vw, 42px);
+  font-size: var(--app-font-size-hero);
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.1;
@@ -279,15 +279,15 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 
 .auth-hero__subtitle {
   color: rgba(255, 255, 255, 0.86);
-  font-size: 16px;
+  font-size: var(--app-font-size-lg);
   line-height: 1.55;
-  margin: 16px 0 0;
+  margin: var(--app-space-4) 0 0;
   max-width: 500px;
 }
 
 .auth-benefits {
   display: grid;
-  gap: 10px;
+  gap: var(--app-space-3);
   max-width: 540px;
 }
 
@@ -295,11 +295,11 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   align-items: flex-start;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 16px;
+  border-radius: var(--app-radius-lg);
   backdrop-filter: blur(8px);
   display: flex;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--app-space-3);
+  padding: var(--app-space-4);
 }
 
 .auth-benefit__icon {
@@ -315,16 +315,16 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 }
 
 .auth-benefit__title {
-  font-size: 13px;
+  font-size: var(--app-font-size-sm);
   font-weight: 800;
   line-height: 1.25;
 }
 
 .auth-benefit__text {
   color: rgba(255, 255, 255, 0.78);
-  font-size: 12px;
+  font-size: var(--app-font-size-xs);
   line-height: 1.45;
-  margin-top: 4px;
+  margin-top: var(--app-space-1);
 }
 
 .auth-panel {
@@ -335,7 +335,7 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   justify-content: space-between;
   min-height: 100svh;
   min-width: 0;
-  padding: 28px;
+  padding: var(--app-space-7);
 }
 
 .auth-panel__card {
@@ -351,58 +351,50 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 .auth-panel__brand {
   align-items: center;
   display: flex;
-  height: var(--login-logo-slot, 190px);
   justify-content: center;
-  overflow: visible;
-  position: relative;
-  text-align: center;
+  min-height: var(--login-logo-slot, 230px);
 }
 
 .auth-panel__logo {
   display: block;
   height: auto;
-  left: 50%;
-  max-height: none;
   object-fit: contain;
-  position: absolute;
-  top: var(--login-logo-y, 51%);
-  transform: translate(-50%, -50%);
-  width: min(var(--login-logo-width, 520px), var(--login-logo-max-vw, 82vw));
+  width: min(var(--login-logo-width, 340px), var(--login-logo-max-vw, 60vw));
 }
 
 .auth-panel__heading {
-  margin-top: 30px;
+  margin-top: var(--app-space-8);
 }
 
 .auth-panel__eyebrow {
-  color: var(--app-primary, #2563eb);
-  font-size: 11px;
+  color: var(--app-primary);
+  font-size: var(--app-font-size-2xs);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .auth-panel__title {
-  color: var(--app-text, #1e293b);
-  font-size: 27px;
+  color: var(--app-text);
+  font-size: var(--app-font-size-2xl);
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.15;
-  margin-top: 6px;
+  margin-top: var(--app-space-1);
 }
 
 .auth-panel__subtitle {
-  color: var(--app-text-muted, #64748b);
-  font-size: 13px;
+  color: var(--app-text-muted);
+  font-size: var(--app-font-size-sm);
   line-height: 1.5;
-  margin-top: 8px;
+  margin-top: var(--app-space-2);
   max-width: 360px;
 }
 
 .auth-form {
   display: grid;
-  gap: 15px;
-  margin-top: 24px;
+  gap: var(--app-space-4);
+  margin-top: var(--app-space-6);
 }
 
 .auth-form :deep(.q-field__control) {
@@ -414,57 +406,57 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 }
 
 .auth-form :deep(.q-field__label) {
-  font-size: 12px;
+  font-size: var(--app-font-size-xs);
   font-weight: 700;
 }
 
 .auth-form__meta {
   align-items: center;
   display: flex;
-  gap: 16px;
+  gap: var(--app-space-4);
   justify-content: space-between;
 }
 
 .auth-form__support {
-  color: var(--app-text-muted, #64748b);
-  font-size: 11px;
+  color: var(--app-text-muted);
+  font-size: var(--app-font-size-2xs);
   font-weight: 700;
   line-height: 1.35;
   text-align: right;
 }
 
 .auth-form__error {
-  background: rgba(220, 38, 38, 0.08);
-  border: 1px solid rgba(220, 38, 38, 0.18);
-  border-radius: 14px;
-  color: #b91c1c;
-  font-size: 12px;
+  background: var(--app-danger-soft);
+  border: 1px solid var(--app-danger-border);
+  border-radius: var(--app-radius-md);
+  color: var(--app-danger-text);
+  font-size: var(--app-font-size-xs);
   line-height: 1.45;
 }
 
 .auth-form__success {
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.18);
-  border-radius: 14px;
-  color: #166534;
-  font-size: 12px;
+  background: var(--app-success-soft);
+  border: 1px solid var(--app-success-border);
+  border-radius: var(--app-radius-md);
+  color: var(--app-success-text);
+  font-size: var(--app-font-size-xs);
   line-height: 1.45;
 }
 
 .auth-form__submit {
-  font-size: 15px;
+  font-size: var(--app-font-size-md);
   font-weight: 800;
-  margin-top: 2px;
+  margin-top: var(--app-space-1);
   min-height: 48px;
   width: 100%;
 }
 
 .auth-form__security {
   align-items: center;
-  color: var(--app-text-muted, #64748b);
+  color: var(--app-text-muted);
   display: flex;
-  gap: 12px;
-  margin-top: 6px;
+  gap: var(--app-space-3);
+  margin-top: var(--app-space-2);
 }
 
 .auth-form__security-line {
@@ -474,16 +466,16 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
 .auth-form__security-text {
   align-items: center;
   display: inline-flex;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--app-space-2);
+  font-size: var(--app-font-size-sm);
   font-weight: 600;
   white-space: nowrap;
 }
 
 .auth-footer {
-  color: var(--app-text-muted, #64748b);
-  font-size: 12px;
-  margin-top: 20px;
+  color: var(--app-text-muted);
+  font-size: var(--app-font-size-xs);
+  margin-top: var(--app-space-5);
   text-align: center;
 }
 
@@ -506,12 +498,12 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   }
 
   .auth-hero__content {
-    padding: 28px;
+    padding: var(--app-space-7);
   }
 
   .auth-hero__brand {
-    left: 28px;
-    top: 28px;
+    left: var(--app-space-7);
+    top: var(--app-space-7);
   }
 
   .auth-hero__title {
@@ -526,7 +518,7 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   .auth-panel {
     min-height: auto;
     order: 1;
-    padding: 24px;
+    padding: var(--app-space-6);
   }
 
   .auth-panel__card {
@@ -534,10 +526,9 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   }
 
   .auth-panel__brand {
-    --login-logo-max-vw: 74vw;
-    --login-logo-slot: 150px;
-    --login-logo-width: 410px;
-    --login-logo-y: 49%;
+    --login-logo-max-vw: 55vw;
+    --login-logo-slot: 200px;
+    --login-logo-width: 300px;
   }
 }
 
@@ -568,7 +559,7 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
     display: flex;
     justify-content: center;
     min-height: 100svh;
-    padding: 34px 18px 18px;
+    padding: 34px var(--app-space-4) var(--app-space-4);
     width: 100%;
   }
 
@@ -579,18 +570,17 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   }
 
   .auth-panel__brand {
-    --login-logo-max-vw: 86vw;
-    --login-logo-slot: 124px;
-    --login-logo-width: 318px;
-    --login-logo-y: 58%;
+    --login-logo-max-vw: 62vw;
+    --login-logo-slot: 150px;
+    --login-logo-width: 230px;
   }
 
   .auth-panel__heading {
-    margin-top: 30px;
+    margin-top: var(--app-space-7);
   }
 
   .auth-panel__title {
-    font-size: 26px;
+    font-size: var(--app-font-size-2xl);
   }
 
   .auth-panel__subtitle {
@@ -600,12 +590,12 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   .auth-form__meta {
     align-items: flex-start;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--app-space-2);
   }
 
   .auth-form {
-    gap: 14px;
-    margin-top: 22px;
+    gap: var(--app-space-4);
+    margin-top: var(--app-space-5);
   }
 
   .auth-form :deep(.q-field__control) {
@@ -621,27 +611,27 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   }
 
   .auth-form__security {
-    gap: 10px;
+    gap: var(--app-space-3);
   }
 
   .auth-form__security-text {
-    font-size: 12px;
+    font-size: var(--app-font-size-xs);
     white-space: normal;
   }
 
   .auth-footer {
-    font-size: 11px;
-    margin-top: 28px;
+    font-size: var(--app-font-size-2xs);
+    margin-top: var(--app-space-7);
   }
 }
 
 @media (max-width: 420px) {
   .auth-panel {
-    padding: 32px 16px 16px;
+    padding: var(--app-space-8) var(--app-space-4) var(--app-space-4);
   }
 
   .auth-panel__heading {
-    margin-top: 28px;
+    margin-top: var(--app-space-7);
   }
 
   .auth-panel__title {
@@ -664,21 +654,20 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   }
 
   .auth-panel__brand {
-    --login-logo-slot: 96px;
-    --login-logo-width: 262px;
-    --login-logo-y: 56%;
+    --login-logo-slot: 100px;
+    --login-logo-width: 155px;
   }
 
   .auth-panel__heading {
-    margin-top: 22px;
+    margin-top: var(--app-space-6);
   }
 
   .auth-form {
-    margin-top: 18px;
+    margin-top: var(--app-space-4);
   }
 
   .auth-footer {
-    margin-top: 18px;
+    margin-top: var(--app-space-4);
   }
 }
 
@@ -693,7 +682,7 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   }
 
   .auth-panel {
-    padding: 18px;
+    padding: var(--app-space-4);
   }
 
   .auth-panel__card {
@@ -701,17 +690,16 @@ const emailRule = (value: string) => /.+@.+\..+/.test(value) || 'Ingresa un corr
   }
 
   .auth-panel__brand {
-    --login-logo-slot: 138px;
-    --login-logo-width: 390px;
-    --login-logo-y: 48%;
+    --login-logo-slot: 170px;
+    --login-logo-width: 260px;
   }
 
   .auth-panel__heading {
-    margin-top: 22px;
+    margin-top: var(--app-space-6);
   }
 
   .auth-form {
-    margin-top: 18px;
+    margin-top: var(--app-space-4);
   }
 }
 </style>

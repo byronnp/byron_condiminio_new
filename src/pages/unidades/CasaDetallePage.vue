@@ -1,10 +1,6 @@
 ﻿<template>
   <q-page class="house-detail-page">
     <div class="detail-topbar">
-      <div>
-        <div class="detail-path">Casa / Detalle</div>
-      </div>
-
       <q-btn flat icon="arrow_back" label="Volver" class="detail-back-btn" @click="goBack" />
     </div>
 
@@ -45,448 +41,536 @@
     </div>
 
     <template v-else>
-    <q-card class="house-hero">
-      <div class="house-hero__main">
-        <section class="house-hero__identity" aria-label="Resumen de vivienda">
-          <div class="house-hero__icon">
-            <q-icon name="home" />
-          </div>
-
-          <div class="house-hero__content">
-            <div class="house-hero__eyebrow">Vivienda</div>
-            <h1>{{ house?.code || 'CASA' }}</h1>
-
-            <div class="house-hero__meta">
-              <span>
-                <q-icon name="grid_view" />
-                {{ blockName }}
-              </span>
-              <span v-if="house?.number">Casa {{ house.number }}</span>
+      <q-card class="house-hero">
+        <div class="house-hero__main">
+          <section class="house-hero__identity" aria-label="Resumen de vivienda">
+            <div class="house-hero__icon">
+              <q-icon name="home" />
             </div>
 
-            <div class="house-hero__badges">
-              <q-badge rounded :color="house?.isActive === false ? 'grey-7' : 'positive'">
-                {{ statusLabel }}
-              </q-badge>
-            </div>
-          </div>
-        </section>
+            <div class="house-hero__content">
+              <div class="house-hero__eyebrow">Vivienda</div>
 
-        <section class="house-hero__facts" aria-label="Indicadores de vivienda">
-          <div class="house-hero__metrics">
-            <div class="hero-metric">
-              <q-avatar color="green-1" text-color="positive" icon="square_foot" />
-              <div>
-                <span>Área</span>
-                <strong>{{ house?.areaM2 || 0 }} m²</strong>
-              </div>
-            </div>
-
-            <div class="hero-metric">
-              <q-avatar color="blue-1" text-color="primary" icon="person" />
-              <div>
-                <span>Propietario principal</span>
-                <strong>{{ ownerName }}</strong>
-              </div>
-            </div>
-
-            <div class="hero-metric">
-              <q-avatar color="orange-1" text-color="orange" icon="groups" />
-              <div>
-                <span>Personas activas</span>
-                <strong>{{ activePeopleCount }}</strong>
-              </div>
-            </div>
-
-            <div class="hero-metric">
-              <q-avatar color="purple-1" text-color="purple" icon="local_parking" />
-              <div>
-                <span>Unidades asociadas</span>
-                <strong>{{ parkingCount }}</strong>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section v-if="canManageUnits" class="house-hero__actions" aria-label="Acciones rápidas">
-          <q-btn
-            unelevated
-            color="primary"
-            icon="edit"
-            label="Editar vivienda"
-            class="hero-action hero-action--primary"
-            @click="goToEdit"
-          />
-
-          <q-btn
-            outline
-            color="primary"
-            icon="person_add"
-            label="Agregar persona"
-            class="hero-action"
-            @click="openPersonDialog"
-          />
-
-          <q-btn
-            outline
-            color="primary"
-            icon="local_parking"
-            label="Agregar unidad asociada"
-            class="hero-action"
-            @click="openAssociatedUnitDialog"
-          />
-        </section>
-      </div>
-    </q-card>
-
-    <q-tabs
-      v-model="tab"
-      class="house-tabs"
-      active-color="primary"
-      indicator-color="primary"
-      align="left"
-    >
-      <q-tab name="summary" label="Resumen" />
-      <q-tab name="people" label="Personas" />
-      <q-tab name="parking" label="Unidades asociadas" />
-    </q-tabs>
-
-    <q-tab-panels v-model="tab" animated class="house-panels">
-      <q-tab-panel name="summary">
-        <div class="summary-tech-grid">
-          <q-card class="detail-card summary-tech-card">
-            <div class="detail-card__header">
-              <h2>Ficha técnica</h2>
-              <p>Datos técnicos y administrativos de la unidad</p>
-            </div>
-
-            <div class="summary-section-grid">
-              <section class="summary-section">
-                <div class="summary-section__header">
-                  <q-icon name="home_work" />
-                  <h3>Información General</h3>
-                </div>
-
-                <div class="summary-fields">
-                  <div class="summary-field">
-                    <span>Tipo de unidad</span>
-                    <strong>{{ house?.unitTypeName || '-' }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Código de tipo</span>
-                    <strong>{{ house?.unitTypeCode || '-' }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Fecha de creación</span>
-                    <strong>{{ house?.created_at || '-' }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Última actualización</span>
-                    <strong>{{ house?.updated_at || '-' }}</strong>
-                  </div>
-                </div>
-              </section>
-
-              <section class="summary-section">
-                <div class="summary-section__header">
-                  <q-icon name="location_on" />
-                  <h3>Ubicación</h3>
-                </div>
-
-                <div class="summary-fields">
-                  <div class="summary-field">
-                    <span>Bloque / sector</span>
-                    <strong>{{ blockName }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>ID de bloque</span>
-                    <strong>{{ house?.blockId || '-' }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Unidad principal</span>
-                    <strong>{{ house?.parentUnitId ? `#${house.parentUnitId}` : 'No aplica' }}</strong>
-                  </div>
-                </div>
-              </section>
-
-              <section class="summary-section">
-                <div class="summary-section__header">
-                  <q-icon name="tune" />
-                  <h3>Características</h3>
-                </div>
-
-                <div class="summary-fields">
-                  <div class="summary-field">
-                    <span>Área registrada</span>
-                    <strong>{{ house?.areaM2 || 0 }} m²</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Asignación</span>
-                    <strong>{{ assignmentLabel }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Descripción</span>
-                    <strong>{{ house?.description || 'Sin descripción' }}</strong>
-                  </div>
-                </div>
-              </section>
-
-              <section class="summary-section">
-                <div class="summary-section__header">
-                  <q-icon name="settings" />
-                  <h3>Configuración</h3>
-                </div>
-
-                <div class="summary-fields">
-                  <div class="summary-field">
-                    <span>Estado operativo</span>
-                    <strong>{{ statusLabel }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Creado por</span>
-                    <strong>{{ house?.created_by || 'Administrador Senior' }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Actualizado por</span>
-                    <strong>{{ house?.updated_by || 'Administrador Senior' }}</strong>
-                  </div>
-                  <div class="summary-field">
-                    <span>Notas</span>
-                    <strong>{{ house?.notes || 'Sin notas' }}</strong>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </q-card>
-        </div>
-      </q-tab-panel>
-
-      <q-tab-panel name="people">
-        <q-card class="detail-card">
-          <div class="detail-card__header">
-            <h2>Personas asociadas</h2>
-            <p>{{ peopleCount }} registros vinculados a esta vivienda</p>
-          </div>
-
-          <div v-if="people.length" class="people-list">
-            <div v-for="person in people" :key="person.id" class="person-row">
-              <div class="person-row__identity">
-                <q-avatar class="person-row__avatar" size="38px">
-                  {{ personInitials(person.name) }}
-                </q-avatar>
-
-                <div class="person-row__name">
-                  <strong>{{ person.name }}</strong>
-                  <span>{{ person.relationship || 'Persona vinculada' }}</span>
-                </div>
-              </div>
-
-              <div class="person-row__cell">
-                <span>Teléfono</span>
-                <strong>{{ person.phone || 'Sin teléfono' }}</strong>
-              </div>
-
-              <div class="person-row__cell person-row__badges">
-                <span>Facturación</span>
+              <div class="house-hero__title-row">
+                <h1>{{ house?.code || 'CASA' }}</h1>
                 <q-badge
                   rounded
-                  :color="person.isBillingResponsible ? 'primary' : 'grey-6'"
-                  :outline="!person.isBillingResponsible"
+                  class="house-hero__status"
+                  :color="house?.isActive === false ? 'grey-7' : 'positive'"
                 >
-                  {{ person.isBillingResponsible ? 'Responsable' : 'No responsable' }}
+                  {{ statusLabel }}
                 </q-badge>
               </div>
 
-              <div class="person-row__cell person-row__badges">
-                <span>Acceso</span>
-                <q-badge rounded :color="accessStatusColor(person.accessStatus)">
-                  {{ accessStatusLabel(person.accessStatus) }}
-                </q-badge>
+              <div class="house-hero__meta">
+                <span>
+                  <q-icon name="grid_view" />
+                  {{ blockName }}
+                </span>
+                <span v-if="house?.number">Casa {{ house.number }}</span>
               </div>
+            </div>
+          </section>
 
-              <div class="person-row__cell person-row__badges">
-                <span>Relación</span>
-                <div class="person-row__status">
-                  <q-badge outline rounded color="primary">
-                    {{ person.isPrimary ? 'Titular' : 'Relacionado' }}
-                  </q-badge>
-                  <q-badge rounded :color="person.isActive ? 'positive' : 'grey-7'">
-                    {{ person.isActive ? 'Activa' : 'Inactiva' }}
-                  </q-badge>
+          <section class="house-hero__facts" aria-label="Indicadores de vivienda">
+            <div class="house-hero__metrics">
+              <div class="hero-metric">
+                <q-avatar color="blue-1" text-color="primary" icon="square_foot" />
+                <div>
+                  <span>Área</span>
+                  <strong>{{ house?.areaM2 || 0 }} m²</strong>
                 </div>
               </div>
 
-              <div class="person-row__actions">
-                <q-btn
-                  v-if="canManageUnits"
-                  flat
-                  round
-                  dense
-                  icon="more_horiz"
-                  aria-label="Acciones de persona"
-                >
-                  <q-menu class="person-actions-menu" anchor="bottom right" self="top right">
-                    <q-list dense style="min-width: 238px">
-                      <q-item
-                        v-if="!person.isBillingResponsible && person.isActive"
-                        v-close-popup
-                        clickable
-                        @click="handleBillingResponsible(person.id)"
-                      >
-                        <q-item-section avatar>
-                          <q-icon name="receipt_long" />
-                        </q-item-section>
-                        <q-item-section>Establecer responsable</q-item-section>
-                      </q-item>
+              <div
+                class="hero-metric hero-metric--clickable"
+                role="button"
+                tabindex="0"
+                aria-label="Ir a la pestaña Personas"
+                @click="tab = 'people'"
+                @keyup.enter="tab = 'people'"
+              >
+                <q-avatar color="blue-1" text-color="primary" icon="person" />
+                <div>
+                  <span>Propietario principal</span>
+                  <strong>{{ ownerName }}</strong>
+                </div>
+              </div>
 
-                      <q-item
-                        v-if="person.isActive"
-                        v-close-popup
-                        clickable
-                        @click="handleAccessInvitation(person.id)"
-                      >
-                        <q-item-section avatar>
-                          <q-icon name="mail" />
-                        </q-item-section>
-                        <q-item-section>Enviar invitación</q-item-section>
-                      </q-item>
+              <div class="hero-metric">
+                <q-avatar color="blue-1" text-color="primary" icon="groups" />
+                <div>
+                  <span>Personas activas</span>
+                  <strong>{{ activePeopleCount }}</strong>
+                </div>
+              </div>
 
-                      <q-separator v-if="person.isActive" />
-
-                      <q-item
-                        v-if="person.isActive"
-                        v-close-popup
-                        clickable
-                        class="person-actions-menu__danger"
-                        @click="requestDeactivatePerson(person)"
-                      >
-                        <q-item-section avatar>
-                          <q-icon name="person_remove" />
-                        </q-item-section>
-                        <q-item-section>Inactivar relación</q-item-section>
-                      </q-item>
-
-                      <q-item v-if="!person.isActive">
-                        <q-item-section avatar>
-                          <q-icon name="block" />
-                        </q-item-section>
-                        <q-item-section>Sin acciones disponibles</q-item-section>
-                      </q-item>
-                    </q-list>
-                  </q-menu>
-                </q-btn>
+              <div class="hero-metric">
+                <q-avatar color="blue-1" text-color="primary" icon="local_parking" />
+                <div>
+                  <span>Unidades asociadas</span>
+                  <strong>{{ parkingCount }}</strong>
+                </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <AppEmptyState
-            v-else
-            tight
-            icon="group_off"
-            title="Aún no hay personas asociadas"
-            text="Agrega un propietario, inquilino o residente para vincularlo con esta vivienda."
-          />
-        </q-card>
-      </q-tab-panel>
-
-      <q-tab-panel name="parking">
-        <q-card class="detail-card">
-          <div class="detail-card__header">
-            <h2>Unidades asociadas</h2>
-            <p>{{ parkingCount }} registros vinculados a esta vivienda</p>
-          </div>
-
-          <div v-if="canManageUnits" class="associated-unit-toolbar">
+          <section v-if="canManageUnits" class="house-hero__actions" aria-label="Acciones rápidas">
             <q-btn
               unelevated
               color="primary"
-              icon="add"
+              icon="edit"
+              label="Editar vivienda"
+              class="hero-action hero-action--primary"
+              @click="goToEdit"
+            />
+
+            <q-btn
+              outline
+              color="primary"
+              icon="person_add"
+              label="Agregar persona"
+              class="hero-action"
+              @click="openPersonDialog"
+            />
+
+            <q-btn
+              outline
+              color="primary"
+              icon="local_parking"
               label="Agregar unidad asociada"
-              no-caps
+              class="hero-action"
               @click="openAssociatedUnitDialog"
             />
-          </div>
+          </section>
+        </div>
+      </q-card>
 
-          <div v-if="parkings.length" class="associated-unit-grid">
-            <div v-for="parking in parkings" :key="parking.id" class="associated-unit-card">
-              <div class="associated-unit-card__icon">
-                <q-icon :name="childUnitIcon(parking)" />
+      <q-tabs
+        v-model="tab"
+        class="house-tabs"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+      >
+        <q-tab name="summary" label="Resumen" />
+        <q-tab name="people" label="Personas" />
+        <q-tab name="parking" label="Unidades asociadas" />
+      </q-tabs>
+
+      <q-tab-panels v-model="tab" animated class="house-panels">
+        <q-tab-panel name="summary">
+          <div class="summary-tech-grid">
+            <q-card class="detail-card summary-tech-card">
+              <div class="detail-card__header">
+                <h2>Ficha técnica</h2>
+                <p>Datos técnicos y administrativos de la unidad</p>
               </div>
 
-              <div class="associated-unit-card__content">
-                <div class="associated-unit-card__header">
-                  <div>
-                    <span>{{ childUnitTypeLabel(parking) }}</span>
-                    <strong>{{ parking.code }}</strong>
+              <div class="summary-section-grid">
+                <section class="summary-section">
+                  <div class="summary-section__header">
+                    <q-icon name="home_work" />
+                    <h3>Información General</h3>
                   </div>
 
+                  <div class="summary-fields">
+                    <div class="summary-field">
+                      <span>Tipo de unidad</span>
+                      <strong>{{ house?.unitTypeName || '-' }}</strong>
+                    </div>
+                    <div class="summary-field">
+                      <span>Código de tipo</span>
+                      <strong>{{ house?.unitTypeCode || '-' }}</strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="summary-section">
+                  <div class="summary-section__header">
+                    <q-icon name="location_on" />
+                    <h3>Ubicación</h3>
+                  </div>
+
+                  <div class="summary-fields">
+                    <div class="summary-field">
+                      <span>Bloque / sector</span>
+                      <strong>{{ blockName }}</strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="summary-section">
+                  <div class="summary-section__header">
+                    <q-icon name="tune" />
+                    <h3>Características</h3>
+                  </div>
+
+                  <div class="summary-fields">
+                    <div class="summary-field">
+                      <span>Área registrada</span>
+                      <strong>{{ house?.areaM2 || 0 }} m²</strong>
+                    </div>
+                    <div class="summary-field">
+                      <span>Asignación</span>
+                      <strong>{{ assignmentLabel }}</strong>
+                    </div>
+                    <div class="summary-field">
+                      <span>Descripción</span>
+                      <strong>{{ house?.description || 'Sin descripción' }}</strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="summary-section">
+                  <div class="summary-section__header">
+                    <q-icon name="settings" />
+                    <h3>Configuración</h3>
+                  </div>
+
+                  <div class="summary-fields">
+                    <div class="summary-field">
+                      <span>Estado operativo</span>
+                      <strong>{{ statusLabel }}</strong>
+                    </div>
+                    <div class="summary-field">
+                      <span>Notas</span>
+                      <strong>{{ house?.notes || 'Sin notas' }}</strong>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div class="summary-audit">
+                Creado el {{ house?.created_at || '-' }} por
+                {{ house?.created_by || 'Sin registrar' }} · Actualizado el
+                {{ house?.updated_at || '-' }} por {{ house?.updated_by || 'Sin registrar' }}
+              </div>
+            </q-card>
+          </div>
+        </q-tab-panel>
+
+        <q-tab-panel name="people">
+          <q-card class="detail-card">
+            <div class="detail-card__header">
+              <h2>Personas asociadas</h2>
+              <p>{{ peopleCount }} personas vinculadas · {{ activePeopleCount }} activas</p>
+            </div>
+
+            <div v-if="canManageUnits" class="associated-unit-toolbar">
+              <q-btn
+                unelevated
+                color="primary"
+                icon="person_add"
+                label="Agregar persona"
+                no-caps
+                @click="openPersonDialog"
+              />
+            </div>
+
+            <div v-if="people.length" class="people-list">
+              <div v-for="person in people" :key="person.id" class="person-row">
+                <div class="person-row__identity">
+                  <q-avatar class="person-row__avatar" size="38px">
+                    {{ personInitials(person.name) }}
+                  </q-avatar>
+
+                  <div class="person-row__name">
+                    <strong>{{ person.name }}</strong>
+                    <span>{{ person.relationship || 'Persona vinculada' }}</span>
+                  </div>
+                </div>
+
+                <div class="person-row__cell">
+                  <span>Teléfono</span>
+                  <strong>{{ person.phone || 'Sin teléfono' }}</strong>
+                </div>
+
+                <div class="person-row__cell person-row__badges">
+                  <span>Facturación</span>
+                  <q-badge v-if="person.isBillingResponsible" rounded color="primary">
+                    Responsable
+                  </q-badge>
+                  <strong v-else class="person-row__muted">—</strong>
+                </div>
+
+                <div class="person-row__cell person-row__badges">
+                  <span>Acceso</span>
+                  <q-badge rounded :color="accessStatusColor(person.accessStatus)">
+                    {{ accessStatusLabel(person.accessStatus) }}
+                  </q-badge>
+                </div>
+
+                <div class="person-row__cell person-row__badges">
+                  <span>Relación</span>
+                  <div class="person-row__status">
+                    <q-badge outline rounded color="primary">
+                      {{ person.isPrimary ? 'Titular' : 'Relacionado' }}
+                    </q-badge>
+                    <q-badge rounded :color="person.isActive ? 'positive' : 'grey-7'">
+                      {{ person.isActive ? 'Activa' : 'Inactiva' }}
+                    </q-badge>
+                  </div>
+                </div>
+
+                <div class="person-row__actions">
                   <q-btn
                     v-if="canManageUnits"
                     flat
                     round
                     dense
                     icon="more_horiz"
-                    aria-label="Acciones de unidad asociada"
+                    aria-label="Acciones de persona"
                   >
-                    <q-menu class="associated-unit-actions-menu" anchor="bottom right" self="top right">
-                      <q-list dense style="min-width: 210px">
-                        <q-item v-close-popup clickable @click="requestEditAssociatedUnit(parking)">
-                          <q-item-section avatar>
-                            <q-icon name="edit" />
-                          </q-item-section>
-                          <q-item-section>Editar</q-item-section>
-                        </q-item>
+                    <q-menu
+                      anchor="bottom right"
+                      self="top right"
+                      transition-show="scale"
+                      transition-hide="scale"
+                      class="table-actions-menu"
+                    >
+                      <q-card flat class="table-actions-menu__card">
+                        <q-list class="table-actions-menu__list">
+                          <q-item
+                            v-if="!person.isBillingResponsible && person.isActive"
+                            v-close-popup
+                            clickable
+                            class="table-actions-menu__item"
+                            @click="handleBillingResponsible(person.id)"
+                          >
+                            <q-item-section avatar>
+                              <span class="table-actions-menu__icon">
+                                <q-icon name="receipt_long" size="16px" />
+                              </span>
+                            </q-item-section>
+                            <q-item-section>
+                              <q-item-label class="table-actions-menu__name"
+                                >Establecer responsable</q-item-label
+                              >
+                              <q-item-label caption
+                                >Marca a esta persona como responsable de facturación</q-item-label
+                              >
+                            </q-item-section>
+                          </q-item>
 
-                        <q-item
-                          v-close-popup
-                          clickable
-                          @click="requestAssociatedUnitStatus(parking, !parking.isActive)"
-                        >
-                          <q-item-section avatar>
-                            <q-icon :name="parking.isActive ? 'toggle_off' : 'toggle_on'" />
-                          </q-item-section>
-                          <q-item-section>
-                            {{ parking.isActive ? 'Inactivar' : 'Activar' }}
-                          </q-item-section>
-                        </q-item>
-                      </q-list>
+                          <q-item
+                            v-if="person.isActive"
+                            v-close-popup
+                            clickable
+                            class="table-actions-menu__item"
+                            @click="handleAccessInvitation(person.id)"
+                          >
+                            <q-item-section avatar>
+                              <span class="table-actions-menu__icon">
+                                <q-icon name="mail" size="16px" />
+                              </span>
+                            </q-item-section>
+                            <q-item-section>
+                              <q-item-label class="table-actions-menu__name"
+                                >Enviar invitación</q-item-label
+                              >
+                              <q-item-label caption
+                                >Envía las credenciales de acceso por correo</q-item-label
+                              >
+                            </q-item-section>
+                          </q-item>
+
+                          <q-separator
+                            v-if="person.isActive"
+                            class="table-actions-menu__separator"
+                          />
+
+                          <q-item
+                            v-if="person.isActive"
+                            v-close-popup
+                            clickable
+                            class="table-actions-menu__item table-actions-menu__item--danger"
+                            @click="requestDeactivatePerson(person)"
+                          >
+                            <q-item-section avatar>
+                              <span
+                                class="table-actions-menu__icon table-actions-menu__icon--danger"
+                              >
+                                <q-icon name="person_remove" size="16px" />
+                              </span>
+                            </q-item-section>
+                            <q-item-section>
+                              <q-item-label
+                                class="table-actions-menu__name table-actions-menu__name--danger"
+                                >Inactivar relación</q-item-label
+                              >
+                              <q-item-label caption
+                                >Retira a esta persona de la vivienda</q-item-label
+                              >
+                            </q-item-section>
+                          </q-item>
+
+                          <q-item v-if="!person.isActive" class="table-actions-menu__item">
+                            <q-item-section avatar>
+                              <span class="table-actions-menu__icon table-actions-menu__icon--alt">
+                                <q-icon name="block" size="16px" />
+                              </span>
+                            </q-item-section>
+                            <q-item-section>
+                              <q-item-label class="table-actions-menu__name"
+                                >Sin acciones disponibles</q-item-label
+                              >
+                            </q-item-section>
+                          </q-item>
+                        </q-list>
+                      </q-card>
                     </q-menu>
                   </q-btn>
                 </div>
+              </div>
+            </div>
 
-                <div class="associated-unit-card__details">
-                  <div>
-                    <span>Número</span>
-                    <strong>{{ parking.number || '-' }}</strong>
-                  </div>
-                  <div>
-                    <span>Área</span>
-                    <strong>{{ parking.areaM2 || 0 }} m²</strong>
-                  </div>
+            <AppEmptyState
+              v-else
+              tight
+              icon="group_off"
+              title="Aún no hay personas asociadas"
+              text="Agrega un propietario, inquilino o residente para vincularlo con esta vivienda."
+            />
+          </q-card>
+        </q-tab-panel>
+
+        <q-tab-panel name="parking">
+          <q-card class="detail-card">
+            <div class="detail-card__header">
+              <h2>Unidades asociadas</h2>
+              <p>{{ parkingCount }} registros vinculados a esta vivienda</p>
+            </div>
+
+            <div v-if="canManageUnits" class="associated-unit-toolbar">
+              <q-btn
+                unelevated
+                color="primary"
+                icon="add"
+                label="Agregar unidad asociada"
+                no-caps
+                @click="openAssociatedUnitDialog"
+              />
+            </div>
+
+            <div v-if="parkings.length" class="associated-unit-grid">
+              <div v-for="parking in parkings" :key="parking.id" class="associated-unit-card">
+                <div class="associated-unit-card__icon">
+                  <q-icon :name="childUnitIcon(parking)" />
                 </div>
 
-                <div class="associated-unit-card__footer">
-                  <q-badge outline rounded color="primary">
-                    {{ parking.blockName || 'Sin bloque' }}
-                  </q-badge>
-                  <q-badge rounded :color="parking.isActive ? 'positive' : 'grey-7'">
-                    {{ parking.isActive ? 'Activa' : 'Inactiva' }}
-                  </q-badge>
+                <div class="associated-unit-card__content">
+                  <div class="associated-unit-card__header">
+                    <div>
+                      <span>{{ childUnitTypeLabel(parking) }}</span>
+                      <strong>{{ parking.code }}</strong>
+                    </div>
+
+                    <q-btn
+                      v-if="canManageUnits"
+                      flat
+                      round
+                      dense
+                      icon="more_horiz"
+                      aria-label="Acciones de unidad asociada"
+                    >
+                      <q-menu
+                        anchor="bottom right"
+                        self="top right"
+                        transition-show="scale"
+                        transition-hide="scale"
+                        class="table-actions-menu"
+                      >
+                        <q-card flat class="table-actions-menu__card">
+                          <q-list class="table-actions-menu__list">
+                            <q-item
+                              v-close-popup
+                              clickable
+                              class="table-actions-menu__item"
+                              @click="requestEditAssociatedUnit(parking)"
+                            >
+                              <q-item-section avatar>
+                                <span class="table-actions-menu__icon">
+                                  <q-icon name="edit" size="16px" />
+                                </span>
+                              </q-item-section>
+                              <q-item-section>
+                                <q-item-label class="table-actions-menu__name">Editar</q-item-label>
+                                <q-item-label caption
+                                  >Modifica los datos de esta unidad asociada</q-item-label
+                                >
+                              </q-item-section>
+                            </q-item>
+
+                            <q-item
+                              v-close-popup
+                              clickable
+                              class="table-actions-menu__item"
+                              @click="requestAssociatedUnitStatus(parking, !parking.isActive)"
+                            >
+                              <q-item-section avatar>
+                                <span
+                                  class="table-actions-menu__icon"
+                                  :class="
+                                    parking.isActive
+                                      ? 'table-actions-menu__icon--warning'
+                                      : 'table-actions-menu__icon--positive'
+                                  "
+                                >
+                                  <q-icon
+                                    :name="parking.isActive ? 'toggle_off' : 'toggle_on'"
+                                    size="16px"
+                                  />
+                                </span>
+                              </q-item-section>
+                              <q-item-section>
+                                <q-item-label class="table-actions-menu__name">
+                                  {{ parking.isActive ? 'Inactivar' : 'Activar' }}
+                                </q-item-label>
+                                <q-item-label caption
+                                  >Cambia el estado de esta unidad asociada</q-item-label
+                                >
+                              </q-item-section>
+                            </q-item>
+                          </q-list>
+                        </q-card>
+                      </q-menu>
+                    </q-btn>
+                  </div>
+
+                  <div class="associated-unit-card__details">
+                    <div>
+                      <span>Número</span>
+                      <strong>{{ parking.number || '-' }}</strong>
+                    </div>
+                    <div>
+                      <span>Área</span>
+                      <strong>{{ parking.areaM2 || 0 }} m²</strong>
+                    </div>
+                  </div>
+
+                  <div class="associated-unit-card__footer">
+                    <q-badge outline rounded color="primary">
+                      {{ parking.blockName || 'Sin bloque' }}
+                    </q-badge>
+                    <q-badge rounded :color="parking.isActive ? 'positive' : 'grey-7'">
+                      {{ parking.isActive ? 'Activa' : 'Inactiva' }}
+                    </q-badge>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <AppEmptyState
-            v-else
-            tight
-            icon="local_parking"
-            title="Aún no hay unidades asociadas"
-            text="Agrega un parqueadero o bodega para dejarlo vinculado a esta vivienda."
-          />
-        </q-card>
-      </q-tab-panel>
-    </q-tab-panels>
+            <AppEmptyState
+              v-else
+              tight
+              icon="local_parking"
+              title="Aún no hay unidades asociadas"
+              text="Agrega un parqueadero o bodega para dejarlo vinculado a esta vivienda."
+            />
+          </q-card>
+        </q-tab-panel>
+      </q-tab-panels>
     </template>
 
     <HousePersonDialog v-model="personDialog" :saving="savingPerson" @save="handleSavePerson" />
@@ -683,9 +767,7 @@ async function confirmAssociatedUnitStatus() {
     Notify.create({
       type: 'negative',
       message:
-        error instanceof Error
-          ? error.message
-          : 'No fue posible actualizar la unidad asociada.',
+        error instanceof Error ? error.message : 'No fue posible actualizar la unidad asociada.',
       position: 'top-right',
     });
   }
@@ -870,7 +952,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .detail-path {
-  color: #2563eb;
+  color: var(--app-primary);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -929,7 +1011,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 18px;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
   padding: 20px;
@@ -966,7 +1048,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero__eyebrow {
-  color: #2563eb;
+  color: var(--app-primary);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -976,7 +1058,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero__content h1 {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 0;
@@ -987,7 +1069,7 @@ function hasPermission(permission: 'units.manage') {
 
 .house-hero__meta {
   align-items: center;
-  color: #64748b;
+  color: var(--app-text-muted);
   display: flex;
   flex-wrap: wrap;
   font-size: 12px;
@@ -1004,14 +1086,27 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero__meta .q-icon {
-  color: #2563eb;
+  color: var(--app-primary);
   font-size: 15px;
 }
 
-.house-hero__badges {
+.house-hero__title-row {
+  align-items: center;
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.house-hero__title-row h1 {
+  margin: 0;
+}
+
+.house-hero__title-row :deep(.q-badge) {
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 26px;
+  padding: 5px 12px;
 }
 
 .house-hero__facts {
@@ -1040,6 +1135,24 @@ function hasPermission(permission: 'units.manage') {
   padding: 10px;
 }
 
+.hero-metric--clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.hero-metric--clickable:hover,
+.hero-metric--clickable:focus-visible {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.hero-metric--clickable:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
 .hero-metric :deep(.q-avatar) {
   flex: 0 0 auto;
   font-size: 19px;
@@ -1063,7 +1176,7 @@ function hasPermission(permission: 'units.manage') {
 
 .section-label {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
   margin-bottom: 0;
   font-size: 12px;
   letter-spacing: 0.01em;
@@ -1073,19 +1186,17 @@ function hasPermission(permission: 'units.manage') {
 .hero-metric span {
   display: block;
   font-size: 12px;
-  color: #64748b;
+  color: var(--app-text-muted);
   line-height: 1.2;
 }
 
 .hero-metric strong {
-  color: #0f172a;
+  color: var(--app-text);
   display: block;
   font-size: 14px;
   font-weight: 800;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .hero-actions-grid {
@@ -1097,7 +1208,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-tabs {
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--app-border);
   margin-top: 8px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1157,7 +1268,7 @@ function hasPermission(permission: 'units.manage') {
   align-items: center;
   background: #eff6ff;
   border-radius: 10px;
-  color: #2563eb;
+  color: var(--app-primary);
   display: inline-flex;
   font-size: 17px;
   height: 30px;
@@ -1166,7 +1277,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .summary-section__header h3 {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
@@ -1186,22 +1297,31 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .summary-field span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .summary-field strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
+.summary-audit {
+  border-top: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
 .detail-card {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 16px;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
   padding: 18px 18px 16px;
@@ -1216,7 +1336,7 @@ function hasPermission(permission: 'units.manage') {
 
 .detail-card__header p {
   margin: 4px 0 14px;
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -1227,7 +1347,7 @@ function hasPermission(permission: 'units.manage') {
 
 .entity-row {
   align-items: center;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 12px;
   display: flex;
   justify-content: space-between;
@@ -1241,13 +1361,13 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .entity-row__main strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
 }
 
 .entity-row__main span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
 }
 
@@ -1267,7 +1387,7 @@ function hasPermission(permission: 'units.manage') {
 .person-row {
   align-items: center;
   background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 12px;
   display: grid;
   gap: 12px;
@@ -1298,7 +1418,7 @@ function hasPermission(permission: 'units.manage') {
 
 .person-row__avatar {
   background: #eff6ff;
-  color: #2563eb;
+  color: var(--app-primary);
   flex: 0 0 auto;
   font-size: 12px;
   font-weight: 800;
@@ -1312,7 +1432,7 @@ function hasPermission(permission: 'units.manage') {
 
 .person-row__name strong,
 .person-row__cell strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
@@ -1327,10 +1447,16 @@ function hasPermission(permission: 'units.manage') {
 
 .person-row__name span,
 .person-row__cell span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.person-row__muted {
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .person-row__cell {
@@ -1371,7 +1497,7 @@ function hasPermission(permission: 'units.manage') {
 .associated-unit-card {
   align-items: flex-start;
   background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 14px;
   display: flex;
   gap: 12px;
@@ -1391,7 +1517,7 @@ function hasPermission(permission: 'units.manage') {
   align-items: center;
   background: #eff6ff;
   border-radius: 12px;
-  color: #2563eb;
+  color: var(--app-primary);
   display: inline-flex;
   flex: 0 0 38px;
   height: 38px;
@@ -1427,7 +1553,7 @@ function hasPermission(permission: 'units.manage') {
 
 .associated-unit-card__header span,
 .associated-unit-card__details span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
@@ -1435,7 +1561,7 @@ function hasPermission(permission: 'units.manage') {
 
 .associated-unit-card__header strong,
 .associated-unit-card__details strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
@@ -1671,10 +1797,6 @@ function hasPermission(permission: 'units.manage') {
   white-space: nowrap;
 }
 
-:deep(.person-actions-menu__danger) {
-  color: #b91c1c;
-}
-
 @media (min-width: 1200px) {
   .house-hero__main {
     grid-template-columns: minmax(270px, 0.92fr) minmax(0, 1.35fr) max-content;
@@ -1706,7 +1828,6 @@ function hasPermission(permission: 'units.manage') {
     justify-content: end;
     min-width: 188px;
   }
-
 }
 
 @media (max-width: 767px) {

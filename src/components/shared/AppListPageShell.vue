@@ -65,6 +65,7 @@
             class="rows-select"
           />
           <span>registros</span>
+          <span class="table-controls__results"><slot name="results" /></span>
         </div>
         <div v-if="showSort" class="table-controls__right">
           <span>Ordenar por:</span>
@@ -252,6 +253,19 @@ const emit = defineEmits<{
 
 .rows-select {
   width: 86px;
+}
+
+.table-controls__results {
+  border-left: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 4px;
+  padding-left: 12px;
+}
+
+.table-controls__results:empty {
+  display: none;
 }
 
 .order-select {
