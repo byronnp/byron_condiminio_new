@@ -3,7 +3,6 @@
     <div class="page-shell">
       <header class="page-header">
         <div class="page-header__copy">
-          <div class="eyebrow">Módulo / Casas</div>
           <h1>Nueva casa</h1>
           <p>Registra los datos esenciales. Personas y parqueaderos se agregan después.</p>
         </div>

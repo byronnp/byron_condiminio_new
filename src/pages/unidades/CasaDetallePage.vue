@@ -1,10 +1,6 @@
 ﻿<template>
   <q-page class="house-detail-page">
     <div class="detail-topbar">
-      <div>
-        <div class="detail-path">Casa / Detalle</div>
-      </div>
-
       <q-btn flat icon="arrow_back" label="Volver" class="detail-back-btn" @click="goBack" />
     </div>
 
@@ -54,7 +50,17 @@
 
             <div class="house-hero__content">
               <div class="house-hero__eyebrow">Vivienda</div>
-              <h1>{{ house?.code || 'CASA' }}</h1>
+
+              <div class="house-hero__title-row">
+                <h1>{{ house?.code || 'CASA' }}</h1>
+                <q-badge
+                  rounded
+                  class="house-hero__status"
+                  :color="house?.isActive === false ? 'grey-7' : 'positive'"
+                >
+                  {{ statusLabel }}
+                </q-badge>
+              </div>
 
               <div class="house-hero__meta">
                 <span>
@@ -63,26 +69,27 @@
                 </span>
                 <span v-if="house?.number">Casa {{ house.number }}</span>
               </div>
-
-              <div class="house-hero__badges">
-                <q-badge rounded :color="house?.isActive === false ? 'grey-7' : 'positive'">
-                  {{ statusLabel }}
-                </q-badge>
-              </div>
             </div>
           </section>
 
           <section class="house-hero__facts" aria-label="Indicadores de vivienda">
             <div class="house-hero__metrics">
               <div class="hero-metric">
-                <q-avatar color="green-1" text-color="positive" icon="square_foot" />
+                <q-avatar color="blue-1" text-color="primary" icon="square_foot" />
                 <div>
                   <span>Área</span>
                   <strong>{{ house?.areaM2 || 0 }} m²</strong>
                 </div>
               </div>
 
-              <div class="hero-metric">
+              <div
+                class="hero-metric hero-metric--clickable"
+                role="button"
+                tabindex="0"
+                aria-label="Ir a la pestaña Personas"
+                @click="tab = 'people'"
+                @keyup.enter="tab = 'people'"
+              >
                 <q-avatar color="blue-1" text-color="primary" icon="person" />
                 <div>
                   <span>Propietario principal</span>
@@ -91,7 +98,7 @@
               </div>
 
               <div class="hero-metric">
-                <q-avatar color="orange-1" text-color="orange" icon="groups" />
+                <q-avatar color="blue-1" text-color="primary" icon="groups" />
                 <div>
                   <span>Personas activas</span>
                   <strong>{{ activePeopleCount }}</strong>
@@ -99,7 +106,7 @@
               </div>
 
               <div class="hero-metric">
-                <q-avatar color="purple-1" text-color="purple" icon="local_parking" />
+                <q-avatar color="blue-1" text-color="primary" icon="local_parking" />
                 <div>
                   <span>Unidades asociadas</span>
                   <strong>{{ parkingCount }}</strong>
@@ -176,14 +183,6 @@
                       <span>Código de tipo</span>
                       <strong>{{ house?.unitTypeCode || '-' }}</strong>
                     </div>
-                    <div class="summary-field">
-                      <span>Fecha de creación</span>
-                      <strong>{{ house?.created_at || '-' }}</strong>
-                    </div>
-                    <div class="summary-field">
-                      <span>Última actualización</span>
-                      <strong>{{ house?.updated_at || '-' }}</strong>
-                    </div>
                   </div>
                 </section>
 
@@ -197,16 +196,6 @@
                     <div class="summary-field">
                       <span>Bloque / sector</span>
                       <strong>{{ blockName }}</strong>
-                    </div>
-                    <div class="summary-field">
-                      <span>ID de bloque</span>
-                      <strong>{{ house?.blockId || '-' }}</strong>
-                    </div>
-                    <div class="summary-field">
-                      <span>Unidad principal</span>
-                      <strong>{{
-                        house?.parentUnitId ? `#${house.parentUnitId}` : 'No aplica'
-                      }}</strong>
                     </div>
                   </div>
                 </section>
@@ -245,19 +234,17 @@
                       <strong>{{ statusLabel }}</strong>
                     </div>
                     <div class="summary-field">
-                      <span>Creado por</span>
-                      <strong>{{ house?.created_by || 'Administrador Senior' }}</strong>
-                    </div>
-                    <div class="summary-field">
-                      <span>Actualizado por</span>
-                      <strong>{{ house?.updated_by || 'Administrador Senior' }}</strong>
-                    </div>
-                    <div class="summary-field">
                       <span>Notas</span>
                       <strong>{{ house?.notes || 'Sin notas' }}</strong>
                     </div>
                   </div>
                 </section>
+              </div>
+
+              <div class="summary-audit">
+                Creado el {{ house?.created_at || '-' }} por
+                {{ house?.created_by || 'Sin registrar' }} · Actualizado el
+                {{ house?.updated_at || '-' }} por {{ house?.updated_by || 'Sin registrar' }}
               </div>
             </q-card>
           </div>
@@ -267,7 +254,18 @@
           <q-card class="detail-card">
             <div class="detail-card__header">
               <h2>Personas asociadas</h2>
-              <p>{{ peopleCount }} registros vinculados a esta vivienda</p>
+              <p>{{ peopleCount }} personas vinculadas · {{ activePeopleCount }} activas</p>
+            </div>
+
+            <div v-if="canManageUnits" class="associated-unit-toolbar">
+              <q-btn
+                unelevated
+                color="primary"
+                icon="person_add"
+                label="Agregar persona"
+                no-caps
+                @click="openPersonDialog"
+              />
             </div>
 
             <div v-if="people.length" class="people-list">
@@ -290,13 +288,10 @@
 
                 <div class="person-row__cell person-row__badges">
                   <span>Facturación</span>
-                  <q-badge
-                    rounded
-                    :color="person.isBillingResponsible ? 'primary' : 'grey-6'"
-                    :outline="!person.isBillingResponsible"
-                  >
-                    {{ person.isBillingResponsible ? 'Responsable' : 'No responsable' }}
+                  <q-badge v-if="person.isBillingResponsible" rounded color="primary">
+                    Responsable
                   </q-badge>
+                  <strong v-else class="person-row__muted">—</strong>
                 </div>
 
                 <div class="person-row__cell person-row__badges">
@@ -957,7 +952,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .detail-path {
-  color: #2563eb;
+  color: var(--app-primary);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -1016,7 +1011,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 18px;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
   padding: 20px;
@@ -1053,7 +1048,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero__eyebrow {
-  color: #2563eb;
+  color: var(--app-primary);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1063,7 +1058,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero__content h1 {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 0;
@@ -1074,7 +1069,7 @@ function hasPermission(permission: 'units.manage') {
 
 .house-hero__meta {
   align-items: center;
-  color: #64748b;
+  color: var(--app-text-muted);
   display: flex;
   flex-wrap: wrap;
   font-size: 12px;
@@ -1091,14 +1086,27 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-hero__meta .q-icon {
-  color: #2563eb;
+  color: var(--app-primary);
   font-size: 15px;
 }
 
-.house-hero__badges {
+.house-hero__title-row {
+  align-items: center;
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.house-hero__title-row h1 {
+  margin: 0;
+}
+
+.house-hero__title-row :deep(.q-badge) {
+  font-size: 12px;
+  font-weight: 800;
+  min-height: 26px;
+  padding: 5px 12px;
 }
 
 .house-hero__facts {
@@ -1127,6 +1135,24 @@ function hasPermission(permission: 'units.manage') {
   padding: 10px;
 }
 
+.hero-metric--clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.hero-metric--clickable:hover,
+.hero-metric--clickable:focus-visible {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+
+.hero-metric--clickable:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
 .hero-metric :deep(.q-avatar) {
   flex: 0 0 auto;
   font-size: 19px;
@@ -1150,7 +1176,7 @@ function hasPermission(permission: 'units.manage') {
 
 .section-label {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--app-text);
   margin-bottom: 0;
   font-size: 12px;
   letter-spacing: 0.01em;
@@ -1160,19 +1186,17 @@ function hasPermission(permission: 'units.manage') {
 .hero-metric span {
   display: block;
   font-size: 12px;
-  color: #64748b;
+  color: var(--app-text-muted);
   line-height: 1.2;
 }
 
 .hero-metric strong {
-  color: #0f172a;
+  color: var(--app-text);
   display: block;
   font-size: 14px;
   font-weight: 800;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .hero-actions-grid {
@@ -1184,7 +1208,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .house-tabs {
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--app-border);
   margin-top: 8px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1244,7 +1268,7 @@ function hasPermission(permission: 'units.manage') {
   align-items: center;
   background: #eff6ff;
   border-radius: 10px;
-  color: #2563eb;
+  color: var(--app-primary);
   display: inline-flex;
   font-size: 17px;
   height: 30px;
@@ -1253,7 +1277,7 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .summary-section__header h3 {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
@@ -1273,22 +1297,31 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .summary-field span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .summary-field strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
+.summary-audit {
+  border-top: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
 .detail-card {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 16px;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
   padding: 18px 18px 16px;
@@ -1303,7 +1336,7 @@ function hasPermission(permission: 'units.manage') {
 
 .detail-card__header p {
   margin: 4px 0 14px;
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -1314,7 +1347,7 @@ function hasPermission(permission: 'units.manage') {
 
 .entity-row {
   align-items: center;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 12px;
   display: flex;
   justify-content: space-between;
@@ -1328,13 +1361,13 @@ function hasPermission(permission: 'units.manage') {
 }
 
 .entity-row__main strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
 }
 
 .entity-row__main span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
 }
 
@@ -1354,7 +1387,7 @@ function hasPermission(permission: 'units.manage') {
 .person-row {
   align-items: center;
   background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 12px;
   display: grid;
   gap: 12px;
@@ -1385,7 +1418,7 @@ function hasPermission(permission: 'units.manage') {
 
 .person-row__avatar {
   background: #eff6ff;
-  color: #2563eb;
+  color: var(--app-primary);
   flex: 0 0 auto;
   font-size: 12px;
   font-weight: 800;
@@ -1399,7 +1432,7 @@ function hasPermission(permission: 'units.manage') {
 
 .person-row__name strong,
 .person-row__cell strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
@@ -1414,10 +1447,16 @@ function hasPermission(permission: 'units.manage') {
 
 .person-row__name span,
 .person-row__cell span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.person-row__muted {
+  color: var(--app-text-soft);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .person-row__cell {
@@ -1458,7 +1497,7 @@ function hasPermission(permission: 'units.manage') {
 .associated-unit-card {
   align-items: flex-start;
   background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--app-border);
   border-radius: 14px;
   display: flex;
   gap: 12px;
@@ -1478,7 +1517,7 @@ function hasPermission(permission: 'units.manage') {
   align-items: center;
   background: #eff6ff;
   border-radius: 12px;
-  color: #2563eb;
+  color: var(--app-primary);
   display: inline-flex;
   flex: 0 0 38px;
   height: 38px;
@@ -1514,7 +1553,7 @@ function hasPermission(permission: 'units.manage') {
 
 .associated-unit-card__header span,
 .associated-unit-card__details span {
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
@@ -1522,7 +1561,7 @@ function hasPermission(permission: 'units.manage') {
 
 .associated-unit-card__header strong,
 .associated-unit-card__details strong {
-  color: #0f172a;
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
