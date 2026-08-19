@@ -15,10 +15,6 @@
       action-icon="add_home_work"
       :filters-label="filtersButtonLabel"
       :filters-expanded="advancedFiltersOpen"
-      :show-search="false"
-      :show-status-filter="false"
-      :show-filters="false"
-      :show-sort="false"
       @filters-click="toggleAdvancedFilters"
       @cta-click="goToNewCondominio"
     >
@@ -66,7 +62,7 @@
         <q-table
           flat
           bordered
-          :rows="sortedRows"
+          :rows="pagedRows"
           :columns="columns"
           row-key="id"
           :pagination="{ rowsPerPage: 0 }"
@@ -265,7 +261,7 @@ import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppStatsCards from '@/components/shared/AppStatsCards.vue';
 import {
   deleteCondominium,
-  fetchCondominiumsPage,
+  fetchCondominiums,
   type CondominiumListItem,
 } from '@/services/condominiums.service';
 import { useSessionStore } from '@/stores/session.store';
@@ -293,9 +289,7 @@ const advancedFiltersOpen = ref(false);
 const sortBy = ref<SortOption>('recent');
 const rowsPerPageOptions = [5, 10, 15, 20, 25] as const;
 const pagination = ref({ page: 1, rowsPerPage: 10 });
-const rows = ref<CondoRow[]>([]);
-const serverTotalItems = ref(0);
-const serverTotalPages = ref(1);
+const allRows = ref<CondoRow[]>([]);
 const isLoadingRows = ref(false);
 const deletingCondominiumId = ref<number | null>(null);
 const deleteConfirmOpen = ref(false);
@@ -320,10 +314,10 @@ const columns = [
   { name: 'actions', label: 'Acciones', field: 'actions', align: 'right' as const },
 ];
 const statsCards = computed(() => {
-  const total = serverTotalItems.value;
-  const active = rows.value.filter((row) => row.status === 'Activo').length;
-  const inactive = rows.value.filter((row) => row.status === 'Inactivo').length;
-  const units = rows.value.reduce((total, row) => total + row.units, 0);
+  const total = allRows.value.length;
+  const active = allRows.value.filter((row) => row.status === 'Activo').length;
+  const inactive = allRows.value.filter((row) => row.status === 'Inactivo').length;
+  const units = allRows.value.reduce((total, row) => total + row.units, 0);
   const palette = [
     { bg: 'rgba(37, 99, 235, 0.12)', fg: '#2563eb' },
     { bg: 'rgba(34, 197, 94, 0.12)', fg: '#16a34a' },
@@ -364,7 +358,7 @@ const statusOptions = [
 ];
 const typeFilterOptions = computed(() => [
   { label: 'Tipo: Todos', value: 'Todos' },
-  ...[...new Set(rows.value.map((row) => row.type).filter(Boolean))]
+  ...[...new Set(allRows.value.map((row) => row.type).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b))
     .map((type) => ({ label: type, value: type })),
 ]);
@@ -373,20 +367,61 @@ const sortOptions = [
   { label: 'Mas antiguos', value: 'oldest' },
   { label: 'Nombre A-Z', value: 'name' },
 ] as const;
+const normalizedSearch = computed(() => search.value.trim().toLowerCase());
 const filteredRows = computed(() => {
-  return rows.value;
+  return allRows.value.filter((row) => {
+    if (statusFilter.value !== 'Todos' && row.status !== statusFilter.value) {
+      return false;
+    }
+    if (typeFilter.value !== 'Todos' && row.type !== typeFilter.value) {
+      return false;
+    }
+    if (normalizedSearch.value) {
+      const haystack = `${row.name} ${row.location} ${row.principal}`.toLowerCase();
+      if (!haystack.includes(normalizedSearch.value)) {
+        return false;
+      }
+    }
+    return true;
+  });
 });
-const hasActiveFilters = computed(() => false);
-const activeFiltersCount = computed(() => 0);
+const hasActiveFilters = computed(
+  () =>
+    normalizedSearch.value.length > 0 ||
+    statusFilter.value !== 'Todos' ||
+    typeFilter.value !== 'Todos',
+);
+const activeFiltersCount = computed(
+  () =>
+    [
+      normalizedSearch.value.length > 0,
+      statusFilter.value !== 'Todos',
+      typeFilter.value !== 'Todos',
+    ].filter(Boolean).length,
+);
 const filtersButtonLabel = computed(() =>
   activeFiltersCount.value ? `Filtros (${activeFiltersCount.value})` : 'Filtros',
 );
 const sortedRows = computed(() => {
-  return filteredRows.value;
+  const source = [...filteredRows.value];
+  if (sortBy.value === 'name') {
+    return source.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  if (sortBy.value === 'oldest') {
+    return source.reverse();
+  }
+  return source;
 });
-const totalPages = computed(() => serverTotalPages.value);
+const totalItems = computed(() => sortedRows.value.length);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(totalItems.value / pagination.value.rowsPerPage)),
+);
+const pagedRows = computed(() => {
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+  return sortedRows.value.slice(start, start + pagination.value.rowsPerPage);
+});
 const resultsRangeLabel = computed(() => {
-  const total = serverTotalItems.value;
+  const total = totalItems.value;
   if (total === 0) {
     return 'Sin resultados';
   }
@@ -395,21 +430,16 @@ const resultsRangeLabel = computed(() => {
   return `Mostrando ${start}-${end} de ${total}`;
 });
 watch(
-  () => [search.value, statusFilter.value, typeFilter.value] as const,
+  () => [search.value, statusFilter.value, typeFilter.value, pagination.value.rowsPerPage] as const,
   () => {
     pagination.value.page = 1;
   },
 );
-watch(
-  () => [pagination.value.page, pagination.value.rowsPerPage] as const,
-  ([page, rowsPerPage], previous) => {
-    if (previous && rowsPerPage !== previous[1] && page !== 1) {
-      pagination.value.page = 1;
-      return;
-    }
-    void loadCondominiums();
-  },
-);
+watch(totalPages, (pages) => {
+  if (pagination.value.page > pages) {
+    pagination.value.page = pages;
+  }
+});
 function mapCondominiumRow(item: CondominiumListItem): CondoRow {
   return {
     id: item.id,
@@ -427,23 +457,16 @@ function mapCondominiumRow(item: CondominiumListItem): CondoRow {
 }
 async function loadCondominiums() {
   if (!session.accessToken) {
-    rows.value = [];
+    allRows.value = [];
     return;
   }
   isLoadingRows.value = true;
   loadError.value = '';
   try {
-    const result = await fetchCondominiumsPage(
-      pagination.value.page,
-      pagination.value.rowsPerPage,
-      session.accessToken,
-    );
-    rows.value = result.items.map(mapCondominiumRow);
-    serverTotalItems.value = result.total;
-    serverTotalPages.value = result.lastPage;
-    if (pagination.value.page !== result.page) pagination.value.page = result.page;
+    const items = await fetchCondominiums(session.accessToken);
+    allRows.value = items.map(mapCondominiumRow);
   } catch (error) {
-    rows.value = [];
+    allRows.value = [];
     loadError.value =
       error instanceof Error ? error.message : 'No fue posible cargar los condominios.';
   } finally {
@@ -491,10 +514,7 @@ watch(
     search.value = '';
     statusFilter.value = 'Todos';
     typeFilter.value = 'Todos';
-    if (pagination.value.page !== 1) {
-      pagination.value.page = 1;
-      return;
-    }
+    pagination.value.page = 1;
     void loadCondominiums();
   },
 );
