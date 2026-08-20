@@ -41,7 +41,10 @@ export interface CondominiumWizardInput {
   form: CondominiumFormData;
   location: CondominiumLocationData;
   config: CondominiumConfigData;
-  administrator: CondominiumAdministratorData;
+  // The wizard no longer collects an administrator during creation or editing.
+  // Kept optional so this builder can still be reused by a future standalone
+  // "add administrator" flow without changing its shape.
+  administrator?: CondominiumAdministratorData;
 }
 
 export function buildCondominiumPayload(
@@ -49,6 +52,7 @@ export function buildCondominiumPayload(
   options: { includeAdministrator?: boolean } = {},
 ): CreateCondominiumPayload {
   const includeAdministrator = options.includeAdministrator ?? true;
+  const admin = includeAdministrator ? administrator : undefined;
 
   return {
     name: form.name.trim(),
@@ -70,13 +74,13 @@ export function buildCondominiumPayload(
     totalUnits: config.totalUnits,
     isActive: form.status === 'Activo',
     characteristics: [...config.characteristics],
-    adminName: includeAdministrator ? administrator.name.trim() : '',
-    adminLastName: includeAdministrator ? administrator.lastName.trim() : '',
-    adminDocumentType: includeAdministrator ? administrator.documentType.trim() : '',
-    adminIdNumber: includeAdministrator ? administrator.idNumber.trim() : '',
-    adminEmail: includeAdministrator ? administrator.email.trim() : '',
-    adminPhone: includeAdministrator ? administrator.phone.trim() : '',
-    adminStatus: includeAdministrator ? administrator.status : '',
+    adminName: admin?.name.trim() ?? '',
+    adminLastName: admin?.lastName.trim() ?? '',
+    adminDocumentType: admin?.documentType.trim() ?? '',
+    adminIdNumber: admin?.idNumber.trim() ?? '',
+    adminEmail: admin?.email.trim() ?? '',
+    adminPhone: admin?.phone.trim() ?? '',
+    adminStatus: admin?.status ?? '',
     logo: config.logo,
   };
 }

@@ -62,110 +62,6 @@
                     @clear-features="clearFeatures"
                     @toggle-feature="toggleFeature"
                 /></q-form>
-                <q-form
-                  v-else-if="!isEditMode && activeStep === 'admin'"
-                  ref="adminFormRef"
-                  class="wizard-form"
-                >
-                  <div class="step-panel">
-                    <div class="section-title">Administrador principal</div>
-                    <div class="section-subtitle">
-                      Define quién administrará el acceso y la operación inicial.
-                    </div>
-                    <div class="admin-layout q-mt-md">
-                      <div
-                        class="field-group location-layout__panel location-panel admin-panel admin-panel--single"
-                      >
-                        <div class="location-panel__header">
-                          <div class="location-panel__heading">
-                            <q-icon name="badge" size="18px" />
-                            <span>Datos del administrador</span>
-                          </div>
-                          <div class="location-panel__hint">
-                            Captura la información del usuario que gestionará el condominio.
-                          </div>
-                        </div>
-                        <div class="step-grid">
-                          <q-input
-                            v-model="administrator.name"
-                            class="step-field"
-                            dense
-                            outlined
-                            hide-bottom-space
-                            label="Nombres *"
-                            :rules="[requiredRule]"
-                          />
-                          <q-input
-                            v-model="administrator.lastName"
-                            class="step-field"
-                            dense
-                            outlined
-                            hide-bottom-space
-                            label="Apellidos *"
-                            :rules="[requiredRule]"
-                          />
-                          <q-select
-                            v-model="administrator.documentType"
-                            class="step-field"
-                            dense
-                            outlined
-                            hide-bottom-space
-                            :options="documentTypeOptions"
-                            :loading="documentTypeOptionsLoading"
-                            label="Tipo de documento *"
-                            :rules="[requiredRule]"
-                          />
-                          <q-input
-                            v-model="administrator.idNumber"
-                            class="step-field"
-                            dense
-                            outlined
-                            hide-bottom-space
-                            label="Número de documento *"
-                            :rules="[requiredRule]"
-                          />
-                          <q-input
-                            v-model="administrator.email"
-                            class="step-field"
-                            dense
-                            outlined
-                            hide-bottom-space
-                            type="email"
-                            label="Correo electrónico *"
-                            :rules="[requiredRule, emailRule]"
-                          />
-                          <q-input
-                            v-model="administrator.phone"
-                            class="step-field"
-                            dense
-                            outlined
-                            hide-bottom-space
-                            label="Teléfono"
-                            :rules="[phoneRule]"
-                          />
-                          <div class="step-field step-field--status">
-                            <div class="field-label">Estado *</div>
-                            <q-option-group
-                              v-model="administrator.status"
-                              :options="statusRadioOptions"
-                              color="primary"
-                              inline
-                              dense
-                              type="radio"
-                            />
-                          </div>
-                        </div>
-                        <div class="admin-mail-note">
-                          <q-icon name="mark_email_read" size="18px" />
-                          <span>
-                            Las credenciales de acceso se enviarán automáticamente al correo
-                            registrado.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </q-form>
                 <div v-else class="wizard-form">
                   <div class="step-panel step-panel--airy">
                     <div class="review-header">
@@ -328,35 +224,6 @@
                           </div>
                         </q-card-section>
                       </q-card>
-                      <q-card v-if="!isEditMode" flat bordered class="review-card">
-                        <q-card-section>
-                          <div class="review-card__title">
-                            <q-icon name="admin_panel_settings" size="18px" />
-                            <span>Administrador principal</span>
-                          </div>
-                          <div class="review-card__list">
-                            <div class="review-card__row">
-                              <span>Nombre</span><strong>{{ adminFullName }}</strong>
-                            </div>
-                            <div class="review-card__row">
-                              <span>Tipo de documento</span
-                              ><strong>{{ administrator.documentType || 'Sin tipo' }}</strong>
-                            </div>
-                            <div class="review-card__row">
-                              <span>Número de documento</span
-                              ><strong>{{ administrator.idNumber || 'Sin documento' }}</strong>
-                            </div>
-                            <div class="review-card__row review-card__row--stacked">
-                              <span>Correo</span
-                              ><strong>{{ administrator.email || 'Sin correo' }}</strong>
-                            </div>
-                            <div class="review-card__row">
-                              <span>Estado</span
-                              ><strong>{{ administrator.status || 'Activo' }}</strong>
-                            </div>
-                          </div>
-                        </q-card-section>
-                      </q-card>
                     </div>
                   </div>
                 </div>
@@ -459,7 +326,7 @@ import { fetchCities, fetchCountries, fetchProvinces } from '@/services/location
 import { useSessionStore } from '@/stores/session.store';
 import CondominioCreatedDialog from './CondominioCreatedDialog.vue';
 const props = withDefaults(defineProps<{ mode?: 'create' | 'edit' }>(), { mode: 'create' });
-type StepName = 'info' | 'location' | 'config' | 'admin' | 'review';
+type StepName = 'info' | 'location' | 'config' | 'review';
 type ValidatableForm = { validate: () => Promise<boolean> | boolean };
 type CondoForm = {
   name: string;
@@ -485,29 +352,20 @@ type ConfigForm = {
   logo: File | null;
   characteristics: number[];
 };
-type AdministratorForm = {
-  name: string;
-  lastName: string;
-  documentType: string;
-  idNumber: string;
-  email: string;
-  phone: string;
-  status: string;
-};
 type StepDefinition = { name: StepName; label: string; description?: string; icon?: string };
 const router = useRouter();
 const route = useRoute();
 const session = useSessionStore();
+// The wizard no longer asks for an administrator, in creation or in editing:
+// administrators are managed separately from the condominium list ("Agregar
+// administrador" row action) and from the Administradores module.
 const baseSteps: StepDefinition[] = [
   { name: 'info', label: 'Información' },
   { name: 'location', label: 'Ubicación' },
   { name: 'config', label: 'Configuración' },
-  { name: 'admin', label: 'Administrador' },
   { name: 'review', label: 'Resumen' },
 ];
-const steps = computed(() =>
-  isEditMode.value ? baseSteps.filter((step) => step.name !== 'admin') : baseSteps,
-);
+const steps = computed(() => baseSteps);
 const stepIndexByName = computed(
   () =>
     Object.fromEntries(steps.value.map((step, index) => [step.name, index])) as Record<
@@ -522,7 +380,6 @@ const isLoadingCondominium = ref(false);
 const submitError = ref('');
 const infoFormRef = ref<ValidatableForm | null>(null);
 const configFormRef = ref<ValidatableForm | null>(null);
-const adminFormRef = ref<ValidatableForm | null>(null);
 const form = reactive<CondoForm>({
   name: '',
   ruc: '',
@@ -546,15 +403,6 @@ const config = reactive<ConfigForm>({
   totalUnits: '',
   logo: null,
   characteristics: [],
-});
-const administrator = reactive<AdministratorForm>({
-  name: '',
-  lastName: '',
-  documentType: '',
-  idNumber: '',
-  email: '',
-  phone: '',
-  status: 'Activo',
 });
 const fallbackTypeOptions: string[] = [];
 const statusRadioOptions = [
@@ -590,7 +438,6 @@ const provinceOptionsLoading = ref(false);
 const cityOptions = ref<{ label: string; value: number }[]>([]);
 const cityOptionsLoading = ref(false);
 const currencyOptions = ['USD', 'EUR', 'MXN'];
-const fallbackDocumentTypeOptions: string[] = [];
 const {
   options: typeOptions,
   loading: typeOptionsLoading,
@@ -610,17 +457,6 @@ const { options: characteristicOptions, loadOptions: loadCharacteristicOptions }
       return { id: item.id, value: label, label, icon: featureIconForLabel(label) };
     },
   });
-const {
-  options: documentTypeOptions,
-  loading: documentTypeOptionsLoading,
-  loadOptions: loadDocumentTypeOptions,
-} = useCatalogOptions<string>('document_types', {
-  fallback: fallbackDocumentTypeOptions,
-  mapItem: (item) => item.name.trim() || item.code.trim() || null,
-});
-const adminFullName = computed(
-  () => `${administrator.name} ${administrator.lastName}`.trim() || 'Administrador principal',
-);
 const logoFileName = computed(() => config.logo?.name ?? 'Sin archivo');
 const logoPreviewUrl = ref<string | null>(null);
 const isHydratingCondominium = ref(false);
@@ -779,7 +615,6 @@ async function loadCondominiumForEdit() {
 }
 onMounted(() => {
   void loadTypeOptions(session.accessToken);
-  void loadDocumentTypeOptions(session.accessToken);
   void loadCharacteristicOptions(session.accessToken);
   void loadCountryOptions();
   void loadCondominiumForEdit();
@@ -931,17 +766,6 @@ function selectStep(step: string | number) {
 function requiredRule(value: unknown) {
   return toText(value).trim() ? true : 'Campo requerido';
 }
-function emailRule(value: unknown) {
-  const text = toText(value).trim();
-  return /^\S+@\S+\.\S+$/.test(text) ? true : 'Ingresa un correo válido';
-}
-function phoneRule(value: unknown) {
-  const text = toText(value).trim();
-  if (!text) {
-    return true;
-  }
-  return /^[0-9+()\-\s]{7,20}$/.test(text) ? true : 'Ingresa un teléfono válido';
-}
 function integerMinRule(min: number) {
   return (value: unknown) => {
     const text = toText(value).trim();
@@ -969,28 +793,11 @@ function isLocationValid() {
 function isConfigValid() {
   return Boolean(config.currency && config.towers && config.houses && config.totalUnits);
 }
-function isAdminValid() {
-  return Boolean(
-    administrator.name &&
-    administrator.lastName &&
-    administrator.documentType &&
-    administrator.idNumber &&
-    administrator.email &&
-    administrator.status,
-  );
-}
-const isReviewReady = computed(
-  () =>
-    isInfoValid() &&
-    isLocationValid() &&
-    isConfigValid() &&
-    (isEditMode.value ? true : isAdminValid()),
-);
+const isReviewReady = computed(() => isInfoValid() && isLocationValid() && isConfigValid());
 const stepValidators: Partial<Record<Exclude<StepName, 'review'>, () => boolean>> = {
   info: isInfoValid,
   location: isLocationValid,
   config: isConfigValid,
-  admin: () => (isEditMode.value ? true : isAdminValid()),
 };
 const incompleteSteps = computed(() =>
   steps.value.filter((step) => step.name !== 'review' && !(stepValidators[step.name]?.() ?? true)),
@@ -1009,7 +816,7 @@ async function validateStep(step: StepName) {
   }
   const formRefMap: Partial<
     Record<Exclude<StepName, 'review'>, { value: ValidatableForm | null }>
-  > = { info: infoFormRef, config: configFormRef, admin: adminFormRef };
+  > = { info: infoFormRef, config: configFormRef };
   const refValue = formRefMap[step]?.value;
   if (refValue) {
     const result = await refValue.validate();
@@ -1021,9 +828,6 @@ async function validateStep(step: StepName) {
   if (step === 'location') {
     return isLocationValid();
   }
-  if (step === 'admin') {
-    return isEditMode.value ? true : isAdminValid();
-  }
   return step === 'config' ? isConfigValid() : true;
 }
 async function submitCondominium() {
@@ -1033,10 +837,7 @@ async function submitCondominium() {
   isSubmitting.value = true;
   submitError.value = '';
   try {
-    const payload = buildCondominiumPayload(
-      { form, location, config, administrator },
-      { includeAdministrator: !isEditMode.value },
-    );
+    const payload = buildCondominiumPayload({ form, location, config });
     const id = condominiumId.value;
     const result = isEditMode.value
       ? await (async () => {
@@ -1158,40 +959,6 @@ function goToCondominio() {
 .step-panel > .section-subtitle,
 .step-panel > .field-group {
   width: 100%;
-}
-.admin-layout {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1fr);
-  width: 100%;
-}
-.admin-panel {
-  min-width: 0;
-}
-.admin-panel--single {
-  align-content: start;
-  grid-column: 1 / -1;
-}
-.admin-mail-note {
-  align-items: center;
-  background: rgba(37, 99, 235, 0.06);
-  border: 1px solid rgba(37, 99, 235, 0.12);
-  border-radius: 14px;
-  color: var(--app-text);
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-  padding: 12px 14px;
-}
-.admin-mail-note .q-icon {
-  color: var(--app-primary);
-  flex: 0 0 auto;
-}
-.admin-mail-note span {
-  color: var(--app-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
 }
 .review-grid {
   display: grid;

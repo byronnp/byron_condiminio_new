@@ -776,10 +776,11 @@ function handleSignOut() {
   color: var(--app-text);
   display: inline-flex;
   gap: 8px;
+  max-width: 320px;
   min-height: 40px;
   padding: 6px 10px;
   text-align: left;
-  width: 184px;
+  width: auto;
 }
 .toolbar-condo-switcher :deep(.q-btn__content) {
   align-items: center;
@@ -900,7 +901,7 @@ function handleSignOut() {
     order: 10;
   }
   .toolbar-condo-switcher {
-    width: 176px;
+    max-width: 220px;
   }
 }
 @media (max-width: 767px) {
@@ -954,10 +955,11 @@ function handleSignOut() {
     border-radius: 13px;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
     flex: 0 1 auto;
+    max-width: 100%;
     min-height: 44px;
     order: 5;
     padding: 7px 10px;
-    width: min(100%, 220px);
+    width: auto;
   }
   .toolbar-condo-switcher :deep(.q-btn__content) {
     gap: 8px;
