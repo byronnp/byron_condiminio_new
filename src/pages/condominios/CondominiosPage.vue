@@ -150,45 +150,6 @@
                       <q-item
                         clickable
                         v-close-popup
-                        @click="goToNewAdministrator(props.row)"
-                        class="table-actions-menu__item"
-                      >
-                        <q-item-section avatar>
-                          <span class="table-actions-menu__icon">
-                            <q-icon name="person_add" size="16px" />
-                          </span>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label class="table-actions-menu__name"
-                            >Agregar administrador</q-item-label
-                          >
-                          <q-item-label caption>Registrar acceso para este condominio</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                      <q-item
-                        clickable
-                        v-close-popup
-                        @click="goToNewUnit(props.row)"
-                        class="table-actions-menu__item"
-                      >
-                        <q-item-section avatar>
-                          <span class="table-actions-menu__icon table-actions-menu__icon--alt">
-                            <q-icon name="add_home_work" size="16px" />
-                          </span>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label class="table-actions-menu__name"
-                            >Agregar unidades</q-item-label
-                          >
-                          <q-item-label caption
-                            >Crear nuevas unidades en este condominio</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <q-separator class="table-actions-menu__separator" />
-                      <q-item
-                        clickable
-                        v-close-popup
                         :disable="deletingCondominiumId === props.row.id"
                         @click="handleDeleteCondominium(props.row)"
                         class="table-actions-menu__item table-actions-menu__item--danger"
@@ -545,18 +506,6 @@ function goToNewCondominio() {
 }
 function goToEditCondominium(row: CondoRow) {
   void router.push({ name: 'condominios-editar', params: { id: String(row.id) } });
-}
-function goToNewAdministrator(row: CondoRow) {
-  void router.push({
-    path: '/administradores/nuevo',
-    query: { condominioId: String(row.id), condominio: row.name },
-  });
-}
-function goToNewUnit(row: CondoRow) {
-  void router.push({
-    path: '/unidades/nueva',
-    query: { condominioId: String(row.id), condominio: row.name },
-  });
 }
 const deleteConfirmMessage = computed(() => {
   const condoName = pendingDeleteRow.value?.name ?? 'este condominio';
