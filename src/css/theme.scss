@@ -33,6 +33,41 @@
   --app-container-width: 1440px;
   --app-content-width: 1320px;
   --app-font-family: 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --app-font-size-2xs: 11px;
+  --app-font-size-xs: 12px;
+  --app-font-size-sm: 13px;
+  --app-font-size-md: 15px;
+  --app-font-size-lg: 16px;
+  --app-font-size-xl: 20px;
+  --app-font-size-2xl: 26px;
+  --app-font-size-hero: clamp(30px, 3vw, 42px);
+
+  --app-space-1: 4px;
+  --app-space-2: 8px;
+  --app-space-3: 12px;
+  --app-space-4: 16px;
+  --app-space-5: 20px;
+  --app-space-6: 24px;
+  --app-space-7: 28px;
+  --app-space-8: 32px;
+  --app-space-9: 36px;
+
+  --app-danger-soft: rgba(239, 68, 68, 0.08);
+  --app-danger-border: rgba(239, 68, 68, 0.18);
+  --app-danger-text: #b91c1c;
+  --app-success-soft: rgba(16, 185, 129, 0.08);
+  --app-success-border: rgba(16, 185, 129, 0.18);
+  --app-success-text: #166534;
+  --app-warning-soft: rgba(245, 158, 11, 0.1);
+  --app-warning-border: rgba(245, 158, 11, 0.2);
+  --app-warning-text: #92400e;
+
+  --app-overlay-top: rgba(15, 23, 42, 0.08);
+  --app-overlay-bottom: rgba(15, 23, 42, 0.44);
+  --app-overlay-side-start: rgba(15, 23, 42, 0.76);
+  --app-overlay-side-mid: rgba(15, 23, 42, 0.28);
+  --app-overlay-side-end: rgba(15, 23, 42, 0.12);
 }
 
 body .text-primary {

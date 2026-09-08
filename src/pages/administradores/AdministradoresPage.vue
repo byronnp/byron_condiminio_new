@@ -49,10 +49,10 @@
               title="No hay administradores para mostrar"
               :text="
                 loadError
-                  ? 'Revisa la conexi?n con el backend e intenta nuevamente.'
+                  ? 'Revisa la conexión con el backend e intenta nuevamente.'
                   : hasActiveFilters
                     ? 'No encontramos resultados con los criterios seleccionados.'
-                    : 'A?n no se han registrado administradores.'
+                    : 'Aún no se han registrado administradores.'
               "
           /></template>
           <template #body-cell-admin="props">
@@ -79,9 +79,7 @@
                 <q-icon :name="props.row.type === 'Senior' ? 'public' : 'apartment'" size="17px" />
                 <div>
                   <div class="scope-cell__title">{{ props.value }}</div>
-                  <div class="scope-cell__hint">
-                    Acceso asignado
-                  </div>
+                  <div class="scope-cell__hint">Acceso asignado</div>
                 </div>
               </div>
             </q-td>
@@ -140,42 +138,85 @@
                 :aria-label="`Más acciones para ${props.row.name}`"
               >
                 <q-tooltip>Más acciones</q-tooltip>
-                <q-menu anchor="bottom right" self="top right">
-                  <q-list bordered class="actions-menu">
-                    <q-item
-                      v-if="canUpdateAdministrators && props.row.status === 'active'"
-                      v-close-popup
-                      clickable
-                      @click="requestAdministratorAction('suspend', props.row)"
-                    >
-                      <q-item-section avatar>
-                        <q-icon name="person_off" color="warning" />
-                      </q-item-section>
-                      <q-item-section>Deshabilitar acceso global</q-item-section>
-                    </q-item>
-                    <q-item
-                      v-if="canUpdateAdministrators && props.row.status === 'inactive'"
-                      v-close-popup
-                      clickable
-                      @click="requestAdministratorAction('reactivate', props.row)"
-                    >
-                      <q-item-section avatar>
-                        <q-icon name="how_to_reg" color="positive" />
-                      </q-item-section>
-                      <q-item-section>Habilitar acceso global</q-item-section>
-                    </q-item>
-                    <q-separator v-if="canDeleteAdministrators" />
-                    <q-item
-                      v-if="canDeleteAdministrators"
-                      v-close-popup
-                      clickable
-                      class="text-negative"
-                      @click="requestAdministratorAction('delete', props.row)"
-                    >
-                      <q-item-section avatar> <q-icon name="delete_outline" /> </q-item-section>
-                      <q-item-section>Desvincular administrador del condominio</q-item-section>
-                    </q-item>
-                  </q-list>
+                <q-menu
+                  anchor="bottom right"
+                  self="top right"
+                  transition-show="scale"
+                  transition-hide="scale"
+                  class="table-actions-menu"
+                >
+                  <q-card flat class="table-actions-menu__card">
+                    <q-list class="table-actions-menu__list">
+                      <q-item
+                        v-if="canUpdateAdministrators && props.row.status === 'active'"
+                        v-close-popup
+                        clickable
+                        class="table-actions-menu__item"
+                        @click="requestAdministratorAction('suspend', props.row)"
+                      >
+                        <q-item-section avatar>
+                          <span class="table-actions-menu__icon table-actions-menu__icon--warning">
+                            <q-icon name="person_off" size="16px" />
+                          </span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="table-actions-menu__name"
+                            >Deshabilitar acceso global</q-item-label
+                          >
+                          <q-item-label caption
+                            >Suspende el acceso de este administrador</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-item
+                        v-if="canUpdateAdministrators && props.row.status === 'inactive'"
+                        v-close-popup
+                        clickable
+                        class="table-actions-menu__item"
+                        @click="requestAdministratorAction('reactivate', props.row)"
+                      >
+                        <q-item-section avatar>
+                          <span class="table-actions-menu__icon table-actions-menu__icon--positive">
+                            <q-icon name="how_to_reg" size="16px" />
+                          </span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="table-actions-menu__name"
+                            >Habilitar acceso global</q-item-label
+                          >
+                          <q-item-label caption
+                            >Restaura el acceso de este administrador</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                      <q-separator
+                        v-if="canDeleteAdministrators"
+                        class="table-actions-menu__separator"
+                      />
+                      <q-item
+                        v-if="canDeleteAdministrators"
+                        v-close-popup
+                        clickable
+                        class="table-actions-menu__item table-actions-menu__item--danger"
+                        @click="requestAdministratorAction('delete', props.row)"
+                      >
+                        <q-item-section avatar>
+                          <span class="table-actions-menu__icon table-actions-menu__icon--danger">
+                            <q-icon name="delete_outline" size="16px" />
+                          </span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label
+                            class="table-actions-menu__name table-actions-menu__name--danger"
+                            >Desvincular administrador del condominio</q-item-label
+                          >
+                          <q-item-label caption
+                            >Quita el acceso a este condominio específico</q-item-label
+                          >
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-card>
                 </q-menu>
               </q-btn>
             </q-td>
@@ -208,12 +249,12 @@
       @confirm="confirmAdministratorAction"
       @cancel="clearPendingAction"
     />
-    <AppAlertDialog
-      v-model="alertDialogOpen"
-      :tone="alertDialog.tone"
-      :icon="alertDialog.icon"
-      :title="alertDialog.title"
-      :message="alertDialog.message"
+    <AppEntityDetailDialog
+      v-model="detailDialogOpen"
+      :tone="detailDialog.tone"
+      :icon="detailDialog.icon"
+      :title="detailDialog.title"
+      :rows="detailDialog.rows"
     />
   </q-page>
 </template>
@@ -221,8 +262,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Notify } from 'quasar';
 import { useRouter } from 'vue-router';
-import AppAlertDialog from '@/components/general/AppAlertDialog.vue';
 import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
+import AppEntityDetailDialog from '@/components/general/AppEntityDetailDialog.vue';
 import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import AppStatsCards from '@/components/shared/AppStatsCards.vue';
@@ -256,12 +297,17 @@ const confirmDialogOpen = ref(false);
 const pendingAction = ref<AdministratorAction | null>(null);
 const pendingAdministrator = ref<AdminRow | null>(null);
 const isProcessingAction = ref(false);
-const alertDialogOpen = ref(false);
-const alertDialog = ref<{ tone: DialogTone; icon: string; title: string; message: string }>({
+const detailDialogOpen = ref(false);
+const detailDialog = ref<{
+  tone: DialogTone;
+  icon: string;
+  title: string;
+  rows: { label: string; value: string }[];
+}>({
   tone: 'primary',
   icon: 'info',
   title: '',
-  message: '',
+  rows: [],
 });
 const rows = ref<AdminRow[]>([]);
 const serverTotalPages = ref(1);
@@ -442,8 +488,7 @@ async function loadAdministrators() {
 watch(
   () => session.activeCondoId,
   () => {
-    const hadActiveFilters =
-      Boolean(search.value.trim()) || statusFilter.value !== 'Todos';
+    const hadActiveFilters = Boolean(search.value.trim()) || statusFilter.value !== 'Todos';
     search.value = '';
     statusFilter.value = 'Todos';
     if (pagination.value.page !== 1) {
@@ -485,18 +530,24 @@ function editAdministrator(row: AdminRow) {
   void router.push({ name: 'administradores-editar', params: { id: String(row.id) } });
 }
 function showAdministratorDetail(row: AdminRow) {
-  alertDialog.value = {
+  detailDialog.value = {
     tone: 'primary',
     icon: 'manage_accounts',
     title: row.name,
-    message: `${row.email}. Asignado a ${row.scope}. Acceso: ${statusLabel(row.status)}.${
-      row.invitationInfo ? ` Invitación: ${row.invitationInfo}.` : ''
-    }`,
+    rows: [
+      { label: 'Correo', value: row.email },
+      { label: 'Alcance', value: row.scope },
+      { label: 'Acceso', value: statusLabel(row.status) },
+      ...(row.invitationInfo ? [{ label: 'Invitación', value: row.invitationInfo }] : []),
+    ],
   };
-  alertDialogOpen.value = true;
+  detailDialogOpen.value = true;
 }
 function requestAdministratorAction(action: AdministratorAction, row: AdminRow) {
-  if ((action === 'delete' && !canDeleteAdministrators.value) || (action !== 'delete' && !canUpdateAdministrators.value)) {
+  if (
+    (action === 'delete' && !canDeleteAdministrators.value) ||
+    (action !== 'delete' && !canUpdateAdministrators.value)
+  ) {
     return;
   }
   pendingAction.value = action;
@@ -537,8 +588,10 @@ function executeAdministratorAction(action: AdministratorAction, administrator: 
     throw new Error('Selecciona un condominio activo para completar la acción.');
   }
 
-  if (action === 'delete') return deleteAdministrator(condominiumId, administrator.id, session.accessToken);
-  if (action === 'suspend') return suspendAdministrator(condominiumId, administrator.id, session.accessToken);
+  if (action === 'delete')
+    return deleteAdministrator(condominiumId, administrator.id, session.accessToken);
+  if (action === 'suspend')
+    return suspendAdministrator(condominiumId, administrator.id, session.accessToken);
   return reactivateAdministrator(condominiumId, administrator.id, session.accessToken);
 }
 function buildActionSuccessMessage(action: AdministratorAction, administrator: AdminRow) {
@@ -601,23 +654,14 @@ function hasPermission(permission: PermissionCode) {
   line-height: 1.05;
   margin-top: 2px;
 }
-.list-table :deep(.q-table__middle) {
-  overflow-x: auto;
-}
 .list-table :deep(table) {
   min-width: 760px;
 }
-.list-table :deep(thead tr th),
 .entity-cell__title,
 .scope-cell__title {
   color: var(--app-text);
   font-size: 12px;
   font-weight: 800;
-}
-.list-table :deep(tbody tr td) {
-  color: var(--app-text);
-  font-size: 12px;
-  height: 60px;
 }
 .admin-error-banner {
   background: rgba(254, 242, 242, 0.96);
@@ -696,15 +740,6 @@ function hasPermission(permission: PermissionCode) {
 }
 .table-actions {
   white-space: nowrap;
-}
-.table-icon {
-  height: 34px;
-  width: 34px;
-}
-.actions-menu {
-  border-radius: 14px;
-  min-width: 250px;
-  padding: 6px;
 }
 .table-footer__pagination :deep(.q-pagination__content) {
   gap: 6px;

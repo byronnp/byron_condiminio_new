@@ -65,7 +65,9 @@
         </div>
       </div>
 
-      <div class="field-group location-layout__panel location-panel config-panel config-panel--visual">
+      <div
+        class="field-group location-layout__panel location-panel config-panel config-panel--visual"
+      >
         <div class="location-panel__header">
           <div class="location-panel__heading">
             <q-icon name="palette" size="18px" />
@@ -128,7 +130,9 @@
         </div>
       </div>
 
-      <div class="field-group location-layout__panel location-panel config-panel config-panel--features">
+      <div
+        class="field-group location-layout__panel location-panel config-panel config-panel--features"
+      >
         <div class="location-panel__header">
           <div class="location-panel__heading">
             <q-icon name="widgets" size="18px" />
@@ -211,11 +215,7 @@
             </span>
             <span class="feature-toggle__label">{{ feature.label }}</span>
             <q-icon
-              :name="
-                isFeatureSelected(feature.value)
-                  ? 'check_circle'
-                  : 'radio_button_unchecked'
-              "
+              :name="isFeatureSelected(feature.value) ? 'check_circle' : 'radio_button_unchecked'"
               class="feature-toggle__check"
               size="18px"
             />
@@ -237,11 +237,11 @@ type CharacteristicOption = {
 const props = defineProps<{
   config: {
     currency: string;
-  towers: string;
-  houses: string;
-  totalUnits: string;
-  logo: File | null;
-  characteristics: number[];
+    towers: string;
+    houses: string;
+    totalUnits: string;
+    logo: File | null;
+    characteristics: number[];
   };
   currencyOptions: string[];
   characteristicOptions: CharacteristicOption[];
@@ -266,52 +266,11 @@ function isFeatureSelected(value: string) {
 </script>
 
 <style scoped>
-.step-panel {
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 18px;
-  box-sizing: border-box;
-  overflow: hidden;
-  padding: 20px;
-  width: 100%;
-}
-
-.step-panel--airy {
-  padding: 24px;
-}
-
-.section-title {
-  color: var(--app-text);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.section-subtitle {
-  color: var(--app-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .config-layout {
   display: grid;
   gap: 16px;
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   width: 100%;
-}
-
-.field-group {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.86)),
-    rgba(248, 250, 252, 0.72);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 16px;
-  padding: 16px;
-}
-
-.location-layout__panel {
-  min-width: 0;
 }
 
 .config-panel {
@@ -327,42 +286,8 @@ function isFeatureSelected(value: string) {
   grid-column: 1 / -1;
 }
 
-.location-panel__header {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.location-panel__heading {
-  align-items: center;
-  color: var(--app-text);
-  display: inline-flex;
-  font-size: 13px;
-  font-weight: 800;
-  gap: 8px;
-  letter-spacing: -0.01em;
-}
-
-.location-panel__heading :deep(.q-icon) {
-  color: var(--app-primary);
-}
-
-.location-panel__hint {
-  color: var(--app-text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-  max-width: 38rem;
-}
-
 .step-grid {
-  display: grid;
-  gap: 14px;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  width: 100%;
-}
-
-.step-field {
-  width: 100%;
 }
 
 .logo-upload {
@@ -659,12 +584,6 @@ function isFeatureSelected(value: string) {
 }
 
 @media (max-width: 720px) {
-  .step-panel,
-  .field-group {
-    padding: 14px;
-  }
-
-  .step-grid,
   .feature-grid {
     grid-template-columns: minmax(0, 1fr);
   }

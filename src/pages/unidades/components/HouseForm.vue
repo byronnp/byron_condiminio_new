@@ -27,6 +27,17 @@
         </div>
 
         <div class="form-grid q-mt-md">
+          <q-select
+            v-model="form.unitTypeId"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="Tipo de unidad *"
+            :options="unitTypeOptions"
+            :loading="loadingUnitTypes"
+            :rules="[requiredValueRule]"
+          />
           <template v-if="blockOptions.length">
             <q-select
               v-model="form.blockId"
@@ -77,14 +88,10 @@
           <q-btn flat dense no-caps label="Reintentar" @click="$emit('reload-blocks')" />
         </div>
 
-        <AppEmptyState
-          v-else-if="!loadingBlocks && !blockOptions.length"
-          tight
-          class="q-mt-md"
-          icon="info_outline"
-          title="No hay bloques disponibles"
-          :text="emptyBlocksText"
-        />
+        <div v-else-if="!loadingBlocks && !blockOptions.length" class="options-hint q-mt-md">
+          <q-icon name="info_outline" size="18px" />
+          <span>{{ emptyBlocksText }}</span>
+        </div>
       </q-card-section>
     </q-card>
 
@@ -167,8 +174,6 @@
 import { computed, ref, toRef } from 'vue';
 import { type QForm } from 'quasar';
 
-import AppEmptyState from '@/components/shared/AppEmptyState.vue';
-
 interface HouseFormModel {
   blockId: number | null;
   unitTypeId: number | null;
@@ -179,7 +184,7 @@ interface HouseFormModel {
   isActive: boolean;
 }
 
-interface BlockOption {
+interface SelectOption {
   label: string;
   value: number;
 }
@@ -188,7 +193,9 @@ const props = withDefaults(
   defineProps<{
     form: HouseFormModel;
     condominiumName: string;
-    blockOptions: BlockOption[];
+    blockOptions: SelectOption[];
+    unitTypeOptions: SelectOption[];
+    loadingUnitTypes?: boolean;
     loadingBlocks?: boolean;
     blocksLoadError?: string;
     loadingHouse?: boolean;
@@ -200,6 +207,7 @@ const props = withDefaults(
     autoSuggestCode?: boolean;
   }>(),
   {
+    loadingUnitTypes: false,
     loadingBlocks: false,
     blocksLoadError: '',
     loadingHouse: false,
@@ -240,6 +248,10 @@ const emptyBlockValue = computed(() => 'No hay bloques asignados a este condomin
 
 function requiredTextRule(value: unknown) {
   return typeof value === 'string' && value.trim() ? true : 'Campo requerido';
+}
+
+function requiredValueRule(value: unknown) {
+  return value !== null && value !== undefined && value !== '' ? true : 'Campo requerido';
 }
 
 function positiveNumberRule(value: unknown) {
@@ -403,7 +415,8 @@ async function handleSubmit() {
   color: var(--app-text);
 }
 
-.options-error {
+.options-error,
+.options-hint {
   align-items: center;
   border-radius: 12px;
   display: flex;
@@ -417,6 +430,15 @@ async function handleSubmit() {
 .options-error {
   background: rgba(239, 68, 68, 0.07);
   color: #b91c1c;
+}
+
+.options-hint {
+  background: rgba(37, 99, 235, 0.06);
+  color: var(--app-text-muted);
+}
+
+.options-hint .q-icon {
+  color: var(--app-primary);
 }
 
 .options-error .q-btn {

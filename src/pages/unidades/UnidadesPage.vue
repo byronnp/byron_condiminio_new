@@ -345,8 +345,9 @@ async function load() {
 
   try {
     const firstPage = await fetchUnitsPage(condoId, 1, 100, session.accessToken);
-    const extraPages = Array.from({ length: Math.max(0, firstPage.lastPage - 1) }, (_, index) =>
-      index + 2,
+    const extraPages = Array.from(
+      { length: Math.max(0, firstPage.lastPage - 1) },
+      (_, index) => index + 2,
     );
     const extraResults = extraPages.length
       ? await Promise.all(
@@ -358,7 +359,10 @@ async function load() {
     const combinedItems = [firstPage, ...extraResults].flatMap((result) => result.items);
     rows.value = combinedItems.filter((unit) => unit.parentUnitId == null);
     serverTotal.value = rows.value.length;
-    serverLastPage.value = Math.max(1, Math.ceil(rows.value.length / Math.max(1, rowsPerPage.value)));
+    serverLastPage.value = Math.max(
+      1,
+      Math.ceil(rows.value.length / Math.max(1, rowsPerPage.value)),
+    );
     if (page.value > serverLastPage.value) page.value = serverLastPage.value;
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No fue posible cargar las casas.';
@@ -509,35 +513,8 @@ onMounted(() => void load());
   margin-top: 2px;
 }
 
-.list-table :deep(.q-table__container) {
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.list-table :deep(.q-table__middle) {
-  overflow-x: auto;
-}
-
 .list-table :deep(table) {
   min-width: 1120px;
-}
-
-.list-table :deep(thead tr th) {
-  color: #334155;
-  font-size: 12px;
-  font-weight: 800;
-  height: 50px;
-  letter-spacing: 0;
-}
-
-.list-table :deep(tbody tr td) {
-  color: var(--app-text);
-  font-size: 12px;
-  height: 60px;
-}
-
-.list-table :deep(tbody tr:hover td) {
-  background: rgba(37, 99, 235, 0.035);
 }
 
 .type-badge,
@@ -555,21 +532,13 @@ onMounted(() => void load());
 }
 
 .table-icon {
-  border-color: rgba(37, 99, 235, 0.14);
-  color: var(--app-primary);
-  height: 34px;
   transition:
     background-color 0.18s ease,
     color 0.18s ease;
-  width: 34px;
 }
 
 .table-icon:hover {
   background: rgba(37, 99, 235, 0.08);
-}
-
-.table-icon :deep(.q-icon) {
-  font-size: 16px;
 }
 
 .table-primary {

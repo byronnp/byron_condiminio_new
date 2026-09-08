@@ -1,1 +1,4 @@
-<template>   <CondominioWizardForm mode="create" /> </template>  <script setup lang="ts"> import CondominioWizardForm from './components/CondominioWizardForm.vue'; </script>
+<template><CondominioWizardForm mode="create" /></template>
+<script setup lang="ts">
+import CondominioWizardForm from './components/CondominioWizardForm.vue';
+</script>

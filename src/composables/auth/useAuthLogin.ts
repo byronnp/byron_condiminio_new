@@ -7,41 +7,28 @@ export interface SubmitLoginPayload extends LoginCredentials {
   rememberMe: boolean;
   redirectTo?: string;
 }
-
-function resolveSafeRedirect(redirectTo: string | undefined) {
-  if (!redirectTo || !redirectTo.startsWith('/') || redirectTo.startsWith('//')) {
-    return '/dashboard';
-  }
-
-  return redirectTo;
-}
-
 export function useAuthLogin() {
   const router = useRouter();
   const session = useSessionStore();
   const { loadAuthMenu } = useAuthMenu();
   const isSubmitting = ref(false);
   const errorMessage = ref('');
-
   async function submitLogin(payload: SubmitLoginPayload) {
     if (isSubmitting.value) {
       return false;
     }
-
     isSubmitting.value = true;
     errorMessage.value = '';
-
     try {
       const authSession = await loginRequest({
         email: payload.email.trim(),
         password: payload.password,
       });
-
       const persistMode: SessionPersistenceMode = payload.rememberMe ? 'local' : 'session';
       session.signInFromApi(authSession, persistMode);
       await loadAuthMenu(authSession.accessToken);
-
-      await router.push(resolveSafeRedirect(payload.redirectTo));
+      const redirect = payload.redirectTo ?? '/dashboard';
+      await router.push(redirect);
       return true;
     } catch (error) {
       errorMessage.value =
@@ -51,6 +38,5 @@ export function useAuthLogin() {
       isSubmitting.value = false;
     }
   }
-
   return { isSubmitting, errorMessage, submitLogin };
 }

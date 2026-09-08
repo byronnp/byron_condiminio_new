@@ -125,6 +125,36 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'roles',
+        name: 'roles',
+        component: () => import('@/pages/roles/RolesPage.vue'),
+        meta: {
+          title: 'Roles',
+          subtitle: 'Gestión de roles disponibles por condominio',
+          requiresCondoContext: true,
+        },
+      },
+      {
+        path: 'roles/nuevo',
+        name: 'roles-nuevo',
+        component: () => import('@/pages/roles/NuevoRolPage.vue'),
+        meta: {
+          title: 'Nuevo rol',
+          subtitle: 'Registro de un nuevo rol y sus permisos',
+          requiresCondoContext: true,
+        },
+      },
+      {
+        path: 'roles/:id/editar',
+        name: 'roles-editar',
+        component: () => import('@/pages/roles/EditarRolPage.vue'),
+        meta: {
+          title: 'Editar rol',
+          subtitle: 'Actualización de información y permisos del rol',
+          requiresCondoContext: true,
+        },
+      },
+      {
         path: 'unidades',
         name: 'unidades',
         component: () => import('@/pages/unidades/UnidadesPage.vue'),

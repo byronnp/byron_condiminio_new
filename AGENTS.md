@@ -10,7 +10,8 @@ This is a Quasar + Vue 3 + TypeScript SPA for multi-condominium administration.
 - `src/layouts/`: `AuthLayout.vue` for public access and `MainLayout.vue` for authenticated views
 - `src/composables/`: reactive logic grouped by module
 - `src/services/`: API and data access
-- `src/stores/`: Pinia state, including session and tenant context
+- `src/stores/`: Pinia state only (actions and computed state). Persistence and normalization logic lives alongside each store in a `*-storage.ts` module (e.g. `session.store.ts` + `session-storage.ts`), not inside the store itself.
+- `src/config/`: static/reference data and navigation config, e.g. `navigation.ts` and `condo-catalog.ts` (demo condominium fixture used until the real condo-switching API exists)
 - `src/css/`: centralized theme, tokens, and global styles
 - `src/referencias/`: design reference images only
 
@@ -56,6 +57,8 @@ Use Vue 3 `<script setup lang="ts">` and Composition API. Prefer ASCII unless an
 
 Keep global styles in `src/css/`. Use scoped styles only for page-specific layout details. Prefer Quasar `dense`, `rounded-borders`, `flat`, and `unelevated` variants to match the current UI.
 
+Always run `npm run lint` (or at least Prettier) on files you create or edit before finishing a task. Several files in this repo were previously found saved with stripped line breaks (an entire file collapsed onto one physical line); always verify a file wasn't left in that state after an edit.
+
 ## Testing Guidelines
 There is no separate unit test suite yet. Before merging UI or logic changes, run:
 
@@ -74,6 +77,8 @@ Use short, imperative commit messages such as `feat: update login layout` or `fi
 
 ## Agent Instructions
 Do not reintroduce condo selection in the login screen. The backend determines role and tenant context after authentication.
+
+`session.store.ts` holds only reactive state and actions. `localStorage`/`sessionStorage` read-write, payload validation, and state normalization belong in `session-storage.ts`. The demo condominium list (`condoCatalog`) lives in `src/config/condo-catalog.ts` and is a placeholder fallback, not real tenant data — replace it once a real condo-switching endpoint exists rather than growing it further.
 Backend documentation: `http://localhost:8001/api/documentation`
 
 - Senior users can see all condominiums and switch context.

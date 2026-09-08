@@ -15,14 +15,11 @@
       action-icon="add_home_work"
       :filters-label="filtersButtonLabel"
       :filters-expanded="advancedFiltersOpen"
-      :show-search="false"
-      :show-status-filter="false"
-      :show-filters="false"
-      :show-sort="false"
       @filters-click="toggleAdvancedFilters"
       @cta-click="goToNewCondominio"
     >
       <template #stats><AppStatsCards :cards="statsCards" /></template>
+      <template #results>{{ resultsRangeLabel }}</template>
       <template #table>
         <div
           v-if="advancedFiltersOpen"
@@ -65,7 +62,7 @@
         <q-table
           flat
           bordered
-          :rows="sortedRows"
+          :rows="pagedRows"
           :columns="columns"
           row-key="id"
           :pagination="{ rowsPerPage: 0 }"
@@ -82,10 +79,10 @@
               title="No hay condominios para mostrar"
               :text="
                 loadError
-                  ? 'Revisa la conexi?n con el backend e intenta nuevamente.'
+                  ? 'Revisa la conexión con el backend e intenta nuevamente.'
                   : hasActiveFilters
                     ? 'No encontramos resultados con los criterios seleccionados.'
-                    : 'A?n no se han registrado condominios en la plataforma.'
+                    : 'Aún no se han registrado condominios en la plataforma.'
               "
           /></template>
           <template #body-cell-condominio="props">
@@ -104,7 +101,9 @@
           </template>
           <template #body-cell-type="props">
             <q-td :props="props">
-              <q-badge outline color="primary" class="type-badge">{{ props.value }}</q-badge>
+              <q-badge outline :color="colorForLabel(props.value)" class="type-badge">{{
+                props.value
+              }}</q-badge>
             </q-td>
           </template>
           <template #body-cell-status="props">
@@ -141,53 +140,13 @@
                 <q-menu
                   anchor="bottom right"
                   self="top right"
+                  transition-show="scale"
+                  transition-hide="scale"
                   class="table-actions-menu"
                   content-class="table-actions-menu__popup"
                 >
-                  <q-card flat bordered class="table-actions-menu__card">
+                  <q-card flat class="table-actions-menu__card">
                     <q-list class="table-actions-menu__list">
-                      <q-item
-                        clickable
-                        v-close-popup
-                        @click="goToNewAdministrator(props.row)"
-                        class="table-actions-menu__item"
-                      >
-                        <q-item-section avatar>
-                          <q-avatar size="32px" class="table-actions-menu__avatar">
-                            <q-icon name="person_add" size="16px" />
-                          </q-avatar>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label class="table-actions-menu__name"
-                            >Agregar administrador</q-item-label
-                          >
-                          <q-item-label caption>Registrar acceso para este condominio</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                      <q-item
-                        clickable
-                        v-close-popup
-                        @click="goToNewUnit(props.row)"
-                        class="table-actions-menu__item"
-                      >
-                        <q-item-section avatar>
-                          <q-avatar
-                            size="32px"
-                            class="table-actions-menu__avatar table-actions-menu__avatar--alt"
-                          >
-                            <q-icon name="add_home_work" size="16px" />
-                          </q-avatar>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label class="table-actions-menu__name"
-                            >Agregar unidades</q-item-label
-                          >
-                          <q-item-label caption
-                            >Crear nuevas unidades en este condominio</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <q-separator class="table-actions-menu__separator" />
                       <q-item
                         clickable
                         v-close-popup
@@ -196,12 +155,9 @@
                         class="table-actions-menu__item table-actions-menu__item--danger"
                       >
                         <q-item-section avatar>
-                          <q-avatar
-                            size="32px"
-                            class="table-actions-menu__avatar table-actions-menu__avatar--danger"
-                          >
+                          <span class="table-actions-menu__icon table-actions-menu__icon--danger">
                             <q-icon name="delete_outline" size="16px" />
-                          </q-avatar>
+                          </span>
                         </q-item-section>
                         <q-item-section>
                           <q-item-label
@@ -247,12 +203,12 @@
       @confirm="confirmDeleteCondominium"
       @cancel="clearDeleteConfirmation"
     />
-    <AppAlertDialog
+    <AppEntityDetailDialog
       v-model="detailDialogOpen"
       tone="primary"
       icon="apartment"
       :title="detailDialog.title"
-      :message="detailDialog.message"
+      :rows="detailDialog.rows"
     />
   </q-page>
 </template>
@@ -261,15 +217,16 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import AppConfirmDialog from '@/components/general/AppConfirmDialog.vue';
-import AppAlertDialog from '@/components/general/AppAlertDialog.vue';
+import AppEntityDetailDialog from '@/components/general/AppEntityDetailDialog.vue';
 import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppStatsCards from '@/components/shared/AppStatsCards.vue';
 import {
   deleteCondominium,
-  fetchCondominiumsPage,
+  fetchCondominiums,
   type CondominiumListItem,
 } from '@/services/condominiums.service';
 import { useSessionStore } from '@/stores/session.store';
+import { colorForLabel } from '@/utils/badge-color';
 type CondoRow = {
   id: number;
   name: string;
@@ -293,22 +250,20 @@ const advancedFiltersOpen = ref(false);
 const sortBy = ref<SortOption>('recent');
 const rowsPerPageOptions = [5, 10, 15, 20, 25] as const;
 const pagination = ref({ page: 1, rowsPerPage: 10 });
-const rows = ref<CondoRow[]>([]);
-const serverTotalItems = ref(0);
-const serverTotalPages = ref(1);
+const allRows = ref<CondoRow[]>([]);
 const isLoadingRows = ref(false);
 const deletingCondominiumId = ref<number | null>(null);
 const deleteConfirmOpen = ref(false);
 const pendingDeleteRow = ref<CondoRow | null>(null);
 const loadError = ref('');
 const detailDialogOpen = ref(false);
-const detailDialog = ref({ title: '', message: '' });
+const detailDialog = ref<{ title: string; rows: { label: string; value: string }[] }>({
+  title: '',
+  rows: [],
+});
 const columns = [
   { name: 'condominio', label: 'Condominio', field: 'name', align: 'left' as const },
   { name: 'type', label: 'Tipo', field: 'type', align: 'left' as const },
-  { name: 'country', label: 'País', field: 'country', align: 'left' as const },
-  { name: 'province', label: 'Provincia', field: 'province', align: 'left' as const },
-  { name: 'city', label: 'Ciudad', field: 'city', align: 'left' as const },
   { name: 'units', label: 'Unidades', field: 'units', align: 'right' as const },
   {
     name: 'principal',
@@ -320,10 +275,10 @@ const columns = [
   { name: 'actions', label: 'Acciones', field: 'actions', align: 'right' as const },
 ];
 const statsCards = computed(() => {
-  const total = serverTotalItems.value;
-  const active = rows.value.filter((row) => row.status === 'Activo').length;
-  const inactive = rows.value.filter((row) => row.status === 'Inactivo').length;
-  const units = rows.value.reduce((total, row) => total + row.units, 0);
+  const total = allRows.value.length;
+  const active = allRows.value.filter((row) => row.status === 'Activo').length;
+  const inactive = allRows.value.filter((row) => row.status === 'Inactivo').length;
+  const units = allRows.value.reduce((total, row) => total + row.units, 0);
   const palette = [
     { bg: 'rgba(37, 99, 235, 0.12)', fg: '#2563eb' },
     { bg: 'rgba(34, 197, 94, 0.12)', fg: '#16a34a' },
@@ -364,7 +319,7 @@ const statusOptions = [
 ];
 const typeFilterOptions = computed(() => [
   { label: 'Tipo: Todos', value: 'Todos' },
-  ...[...new Set(rows.value.map((row) => row.type).filter(Boolean))]
+  ...[...new Set(allRows.value.map((row) => row.type).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b))
     .map((type) => ({ label: type, value: type })),
 ]);
@@ -373,34 +328,79 @@ const sortOptions = [
   { label: 'Mas antiguos', value: 'oldest' },
   { label: 'Nombre A-Z', value: 'name' },
 ] as const;
+const normalizedSearch = computed(() => search.value.trim().toLowerCase());
 const filteredRows = computed(() => {
-  return rows.value;
+  return allRows.value.filter((row) => {
+    if (statusFilter.value !== 'Todos' && row.status !== statusFilter.value) {
+      return false;
+    }
+    if (typeFilter.value !== 'Todos' && row.type !== typeFilter.value) {
+      return false;
+    }
+    if (normalizedSearch.value) {
+      const haystack = `${row.name} ${row.location} ${row.principal}`.toLowerCase();
+      if (!haystack.includes(normalizedSearch.value)) {
+        return false;
+      }
+    }
+    return true;
+  });
 });
-const hasActiveFilters = computed(() => false);
-const activeFiltersCount = computed(() => 0);
+const hasActiveFilters = computed(
+  () =>
+    normalizedSearch.value.length > 0 ||
+    statusFilter.value !== 'Todos' ||
+    typeFilter.value !== 'Todos',
+);
+const activeFiltersCount = computed(
+  () =>
+    [
+      normalizedSearch.value.length > 0,
+      statusFilter.value !== 'Todos',
+      typeFilter.value !== 'Todos',
+    ].filter(Boolean).length,
+);
 const filtersButtonLabel = computed(() =>
   activeFiltersCount.value ? `Filtros (${activeFiltersCount.value})` : 'Filtros',
 );
 const sortedRows = computed(() => {
-  return filteredRows.value;
+  const source = [...filteredRows.value];
+  if (sortBy.value === 'name') {
+    return source.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  if (sortBy.value === 'oldest') {
+    return source.reverse();
+  }
+  return source;
 });
-const totalPages = computed(() => serverTotalPages.value);
+const totalItems = computed(() => sortedRows.value.length);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(totalItems.value / pagination.value.rowsPerPage)),
+);
+const pagedRows = computed(() => {
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+  return sortedRows.value.slice(start, start + pagination.value.rowsPerPage);
+});
+const resultsRangeLabel = computed(() => {
+  const total = totalItems.value;
+  if (total === 0) {
+    return 'Sin resultados';
+  }
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage + 1;
+  const end = Math.min(start + pagination.value.rowsPerPage - 1, total);
+  return `Mostrando ${start}-${end} de ${total}`;
+});
 watch(
-  () => [search.value, statusFilter.value, typeFilter.value] as const,
+  () => [search.value, statusFilter.value, typeFilter.value, pagination.value.rowsPerPage] as const,
   () => {
     pagination.value.page = 1;
   },
 );
-watch(
-  () => [pagination.value.page, pagination.value.rowsPerPage] as const,
-  ([page, rowsPerPage], previous) => {
-    if (previous && rowsPerPage !== previous[1] && page !== 1) {
-      pagination.value.page = 1;
-      return;
-    }
-    void loadCondominiums();
-  },
-);
+watch(totalPages, (pages) => {
+  if (pagination.value.page > pages) {
+    pagination.value.page = pages;
+  }
+});
 function mapCondominiumRow(item: CondominiumListItem): CondoRow {
   return {
     id: item.id,
@@ -418,23 +418,16 @@ function mapCondominiumRow(item: CondominiumListItem): CondoRow {
 }
 async function loadCondominiums() {
   if (!session.accessToken) {
-    rows.value = [];
+    allRows.value = [];
     return;
   }
   isLoadingRows.value = true;
   loadError.value = '';
   try {
-    const result = await fetchCondominiumsPage(
-      pagination.value.page,
-      pagination.value.rowsPerPage,
-      session.accessToken,
-    );
-    rows.value = result.items.map(mapCondominiumRow);
-    serverTotalItems.value = result.total;
-    serverTotalPages.value = result.lastPage;
-    if (pagination.value.page !== result.page) pagination.value.page = result.page;
+    const items = await fetchCondominiums(session.accessToken);
+    allRows.value = items.map(mapCondominiumRow);
   } catch (error) {
-    rows.value = [];
+    allRows.value = [];
     loadError.value =
       error instanceof Error ? error.message : 'No fue posible cargar los condominios.';
   } finally {
@@ -482,10 +475,7 @@ watch(
     search.value = '';
     statusFilter.value = 'Todos';
     typeFilter.value = 'Todos';
-    if (pagination.value.page !== 1) {
-      pagination.value.page = 1;
-      return;
-    }
+    pagination.value.page = 1;
     void loadCondominiums();
   },
 );
@@ -501,7 +491,13 @@ function clearAdvancedFilters() {
 function showCondominiumDetail(row: CondoRow) {
   detailDialog.value = {
     title: row.name,
-    message: `${row.city}, ${row.province}, ${row.country}. Tipo: ${row.type}. Unidades: ${row.units}. Administrador principal: ${row.principal}. Estado: ${row.status}.`,
+    rows: [
+      { label: 'Ubicación', value: `${row.city}, ${row.province}, ${row.country}` },
+      { label: 'Tipo', value: row.type },
+      { label: 'Unidades', value: String(row.units) },
+      { label: 'Administrador principal', value: row.principal },
+      { label: 'Estado', value: row.status },
+    ],
   };
   detailDialogOpen.value = true;
 }
@@ -510,18 +506,6 @@ function goToNewCondominio() {
 }
 function goToEditCondominium(row: CondoRow) {
   void router.push({ name: 'condominios-editar', params: { id: String(row.id) } });
-}
-function goToNewAdministrator(row: CondoRow) {
-  void router.push({
-    path: '/administradores/nuevo',
-    query: { condominioId: String(row.id), condominio: row.name },
-  });
-}
-function goToNewUnit(row: CondoRow) {
-  void router.push({
-    path: '/unidades/nueva',
-    query: { condominioId: String(row.id), condominio: row.name },
-  });
 }
 const deleteConfirmMessage = computed(() => {
   const condoName = pendingDeleteRow.value?.name ?? 'este condominio';
@@ -596,29 +580,8 @@ const deleteConfirmMessage = computed(() => {
   font-size: 11px;
   margin-top: 1px;
 }
-.list-table :deep(.q-table__container) {
-  border-radius: 16px;
-}
-.list-table :deep(.q-table__middle) {
-  overflow-x: auto;
-}
 .list-table :deep(table) {
-  min-width: 1180px;
-}
-.list-table :deep(thead tr th) {
-  color: #334155;
-  font-size: 12px;
-  font-weight: 800;
-  height: 50px;
-  letter-spacing: -0.01em;
-}
-.list-table :deep(tbody tr td) {
-  color: var(--app-text);
-  font-size: 12px;
-  height: 60px;
-}
-.list-table :deep(tbody tr:hover td) {
-  background: rgba(37, 99, 235, 0.025);
+  min-width: 820px;
 }
 .condo-error-banner {
   background: rgba(254, 242, 242, 0.96);
@@ -677,57 +640,10 @@ const deleteConfirmMessage = computed(() => {
 .table-actions {
   white-space: nowrap;
 }
-.table-icon {
-  border-color: rgba(37, 99, 235, 0.14);
-  color: var(--app-primary);
-  height: 34px;
-  width: 34px;
-}
-.table-icon :deep(.q-icon) {
-  font-size: 16px;
-}
 .table-actions-menu__popup {
   background: transparent;
   border-radius: 0;
   box-shadow: none;
-}
-.table-actions-menu__card {
-  border: 0;
-  border-radius: 22px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-  min-width: 280px;
-  overflow: hidden;
-}
-.table-actions-menu__list {
-  padding: 8px;
-}
-.table-actions-menu__item {
-  border-radius: 12px;
-  min-height: 52px;
-}
-.table-actions-menu__item--danger {
-  color: var(--q-negative);
-}
-.table-actions-menu__avatar {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--app-primary);
-}
-.table-actions-menu__avatar--alt {
-  background: rgba(15, 23, 42, 0.06);
-}
-.table-actions-menu__avatar--danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--q-negative);
-}
-.table-actions-menu__name {
-  color: var(--app-text);
-  font-weight: 800;
-}
-.table-actions-menu__name--danger {
-  color: var(--q-negative);
-}
-.table-actions-menu__separator {
-  margin: 4px 8px;
 }
 .table-footer__pagination :deep(.q-pagination__content) {
   gap: 6px;
