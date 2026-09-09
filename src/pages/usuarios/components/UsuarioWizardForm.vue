@@ -17,6 +17,13 @@
         />
       </header>
 
+      <q-banner v-if="!activeCondominiumId" rounded class="initial-load-error" role="alert">
+        <template #avatar>
+          <q-icon name="apartment" color="warning" />
+        </template>
+        Selecciona un condominio activo para gestionar usuarios.
+      </q-banner>
+
       <q-banner v-if="initialLoadError" rounded class="initial-load-error" role="alert">
         <template #avatar>
           <q-icon name="error_outline" color="negative" />
@@ -49,9 +56,9 @@
               <div :key="activeStep" class="wizard-stage">
                 <q-form v-if="activeStep === 'personal'" ref="personalFormRef" class="wizard-form">
                   <div class="step-panel">
-                    <div class="section-title">Administrador de plataforma</div>
+                    <div class="section-title">Información personal</div>
                     <div class="section-subtitle">
-                      Registra los datos personales. El backend asignará el rol administrador senior.
+                      Registra la identidad y el contacto del usuario.
                     </div>
 
                     <div class="field-group q-mt-md">
@@ -59,9 +66,7 @@
                         <q-icon name="badge" size="18px" />
                         <div>
                           <div class="field-group__title">Identificación</div>
-                          <div class="field-group__hint">
-                            Información legal del administrador de plataforma.
-                          </div>
+                          <div class="field-group__hint">Información legal del usuario.</div>
                         </div>
                       </div>
 
@@ -114,9 +119,9 @@
                       <div class="field-group__header">
                         <q-icon name="contact_mail" size="18px" />
                         <div>
-                          <div class="field-group__title">Contacto e invitación</div>
+                          <div class="field-group__title">Contacto</div>
                           <div class="field-group__hint">
-                            La API enviará un correo para activar el acceso.
+                            El backend decide si crea, reutiliza o reenvía la invitación.
                           </div>
                         </div>
                       </div>
@@ -137,6 +142,15 @@
                           </template>
                         </q-input>
                         <q-input
+                          v-model="form.country"
+                          dense
+                          outlined
+                          hide-bottom-space
+                          label="País *"
+                          maxlength="2"
+                          :rules="[requiredRule, countryRule]"
+                        />
+                        <q-input
                           v-model="form.phone"
                           dense
                           outlined
@@ -150,15 +164,101 @@
                             <q-icon name="phone" />
                           </template>
                         </q-input>
+                        <q-input
+                          v-model="form.secondaryPhone"
+                          dense
+                          outlined
+                          hide-bottom-space
+                          type="tel"
+                          label="Teléfono secundario"
+                          maxlength="24"
+                          :rules="[optionalPhoneRule]"
+                        >
+                          <template #prepend>
+                            <q-icon name="phone_in_talk" />
+                          </template>
+                        </q-input>
                       </div>
 
                       <div class="invitation-note q-mt-md">
                         <q-icon name="mark_email_read" size="19px" />
                         <span>
-                          El backend creará el administrador senior y enviará la invitación a
+                          El backend creará el usuario y gestionará la invitación a
                           <strong>{{ normalizedEmail || 'este correo' }}</strong
                           >.
                         </span>
+                      </div>
+                    </div>
+                  </div>
+                </q-form>
+
+                <q-form
+                  v-else-if="activeStep === 'assignment'"
+                  ref="assignmentFormRef"
+                  class="wizard-form"
+                >
+                  <div class="step-panel">
+                    <div class="section-title">Condominio y rol</div>
+                    <div class="section-subtitle">
+                      El condominio se toma del contexto activo de la aplicación.
+                    </div>
+
+                    <div class="scope-panel q-mt-md">
+                      <div class="scope-panel__icon">
+                        <q-icon name="apartment" size="21px" />
+                      </div>
+                      <div>
+                        <div class="scope-panel__title">{{ selectedCondominiumName }}</div>
+                        <div class="scope-panel__text">
+                          El usuario tendrá acceso únicamente a este condominio, con el rol
+                          seleccionado.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="field-group q-mt-md">
+                      <div class="field-group__header">
+                        <q-icon name="admin_panel_settings" size="18px" />
+                        <div>
+                          <div class="field-group__title">Rol</div>
+                          <div class="field-group__hint">
+                            Roles configurados para {{ selectedCondominiumName }}.
+                          </div>
+                        </div>
+                      </div>
+
+                      <q-select
+                        v-model="form.roleId"
+                        class="q-mt-md"
+                        dense
+                        outlined
+                        emit-value
+                        map-options
+                        hide-bottom-space
+                        label="Rol *"
+                        option-label="label"
+                        option-value="value"
+                        :options="roleOptions"
+                        :loading="isLoadingRoles"
+                        :disable="isLoadingRoles || roleOptions.length === 0"
+                        :rules="[requiredRule]"
+                      >
+                        <template #prepend>
+                          <q-icon name="badge" />
+                        </template>
+                        <template #no-option>
+                          <q-item>
+                            <q-item-section class="text-grey"
+                              >No hay roles activos en este condominio</q-item-section
+                            >
+                          </q-item>
+                        </template>
+                      </q-select>
+
+                      <div v-if="rolesLoadError" class="load-error q-mt-sm">
+                        <q-icon name="error_outline" size="18px" />
+                        <span>{{ rolesLoadError }}</span>
+                        <q-btn flat dense no-caps label="Reintentar" @click="loadRoleOptions" />
                       </div>
                     </div>
                   </div>
@@ -168,7 +268,7 @@
                   <div class="step-panel">
                     <div class="section-title">Revisión y confirmación</div>
                     <div class="section-subtitle">
-                      Verifica la información antes de guardar el administrador de plataforma.
+                      Verifica la información antes de guardar el usuario.
                     </div>
 
                     <div class="review-grid q-mt-md">
@@ -196,11 +296,25 @@
                             <span>Correo</span><strong>{{ normalizedEmail || '-' }}</strong>
                           </div>
                           <div>
-                            <span>Teléfono</span><strong>{{ form.phone || '-' }}</strong>
+                            <span>País</span><strong>{{ normalizedCountry }}</strong>
                           </div>
                           <div>
-                            <span>Rol asignado por backend</span>
-                            <strong>Administrador senior</strong>
+                            <span>Teléfono</span><strong>{{ form.phone || '-' }}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="review-card">
+                        <div class="review-card__header">
+                          <q-icon name="admin_panel_settings" size="18px" />
+                          <span>Asignación</span>
+                        </div>
+                        <div class="review-card__list">
+                          <div>
+                            <span>Condominio</span><strong>{{ selectedCondominiumName }}</strong>
+                          </div>
+                          <div>
+                            <span>Rol</span><strong>{{ selectedRoleName || '-' }}</strong>
                           </div>
                         </div>
                       </div>
@@ -212,8 +326,8 @@
                             Invitación por correo electrónico
                           </div>
                           <div class="invitation-confirmation__text">
-                            No se solicitará contraseña. El backend enviará las instrucciones de
-                            activación a {{ normalizedEmail || 'el correo registrado' }}.
+                            No se solicitará contraseña. El backend gestiona la activación del
+                            acceso a {{ normalizedEmail || 'el correo registrado' }}.
                           </div>
                         </div>
                       </div>
@@ -250,7 +364,12 @@
                   :label="primaryActionLabel"
                   :icon="activeStep === 'review' ? 'check' : 'arrow_forward'"
                   :loading="isSubmitting"
-                  :disable="isSubmitting || isLoadingUser || Boolean(initialLoadError)"
+                  :disable="
+                    isSubmitting ||
+                    isLoadingUser ||
+                    Boolean(initialLoadError) ||
+                    !activeCondominiumId
+                  "
                   @click="handlePrimaryAction"
                 />
               </div>
@@ -260,10 +379,10 @@
           <aside class="wizard-summary">
             <div class="summary-card">
               <div class="summary-card__header">
-                <div class="summary-avatar">{{ administratorInitials }}</div>
+                <div class="summary-avatar">{{ userInitials }}</div>
                 <div>
                   <div class="summary-title">Resumen del usuario</div>
-                  <div class="summary-subtitle">Administrador senior de plataforma</div>
+                  <div class="summary-subtitle">La información se actualiza automáticamente</div>
                 </div>
               </div>
 
@@ -281,22 +400,23 @@
                 <strong>{{ form.phone || '-' }}</strong>
               </div>
               <div class="summary-meta">
-                <span>Rol</span>
-                <strong>Administrador senior</strong>
+                <span>Condominio</span>
+                <strong>{{ selectedCondominiumName }}</strong>
               </div>
               <div class="summary-meta">
-                <span>Estado inicial</span>
-                <q-badge color="warning" rounded>Pendiente</q-badge>
+                <span>Rol</span>
+                <strong>{{ selectedRoleName || '-' }}</strong>
               </div>
             </div>
 
             <div class="summary-note">
               <q-icon name="admin_panel_settings" size="20px" />
               <div>
-                <div class="summary-note__title">Gestión de plataforma</div>
+                <div class="summary-note__title">Contrato del backend</div>
                 <div class="summary-note__text">
-                  Este módulo no asigna condominios, roles manuales ni permisos. Todo administrador
-                  creado aquí pertenece al alcance global.
+                  El rol se envía como una asignación para el condominio activo (<code
+                    >assignments: [ condominium_id, role_id ]</code
+                  >).
                 </div>
               </div>
             </div>
@@ -308,24 +428,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, type Ref } from 'vue';
+import { computed, onMounted, ref, watch, type Ref } from 'vue';
 import { Notify, type QForm } from 'quasar';
 import { useRoute, useRouter } from 'vue-router';
 
 import AppStepper from '@/components/shared/AppStepper.vue';
 import { useCatalogOptions } from '@/composables/shared/useCatalogOptions';
 import {
-  createPlatformAdministrator,
-  fetchPlatformAdministratorById,
-  updatePlatformAdministrator,
-  type PlatformAdministratorListItem,
-  type SavePlatformAdministratorPayload,
-  type UpdatePlatformAdministratorPayload,
+  fetchCondominiumRoles,
+  type CondominiumRoleItem,
+} from '@/services/condominium-roles.service';
+import {
+  createUser,
+  fetchUserById,
+  updateUser,
+  type SaveUserPayload,
+  type UpdateUserPayload,
+  type UserListItem,
 } from '@/services/users.service';
 import { useSessionStore } from '@/stores/session.store';
 import type { CatalogItem } from '@/services/catalog.service';
 
-type StepKey = 'personal' | 'review';
+const DIACRITICS_PATTERN = new RegExp('[\\u0300-\\u036f]', 'g');
+
+type StepKey = 'personal' | 'assignment' | 'review';
 
 interface DocumentTypeOption {
   label: string;
@@ -339,7 +465,10 @@ interface UserForm {
   documentTypeId: number | null;
   documentNumber: string;
   email: string;
+  country: string;
   phone: string;
+  secondaryPhone: string;
+  roleId: number | null;
 }
 
 const props = withDefaults(
@@ -355,6 +484,7 @@ const router = useRouter();
 const route = useRoute();
 const session = useSessionStore();
 const personalFormRef = ref<QForm | null>(null);
+const assignmentFormRef = ref<QForm | null>(null);
 const activeStep = ref<StepKey>('personal');
 const form = ref(createEmptyForm()) as Ref<UserForm>;
 const originalForm = ref(createEmptyForm()) as Ref<UserForm>;
@@ -362,6 +492,9 @@ const isSubmitting = ref(false);
 const isLoadingUser = ref(false);
 const initialLoadError = ref('');
 const submitError = ref('');
+const roleOptions = ref<{ label: string; value: number }[]>([]);
+const isLoadingRoles = ref(false);
+const rolesLoadError = ref('');
 
 const {
   options: documentTypeOptions,
@@ -374,16 +507,24 @@ const {
 
 const steps = [
   { key: 'personal', label: 'Información', icon: 'badge' },
+  { key: 'assignment', label: 'Condominio y rol', icon: 'admin_panel_settings' },
   { key: 'review', label: 'Revisión', icon: 'fact_check' },
 ] as const;
 
 const isEditMode = computed(() => props.mode === 'edit');
 const activeStepIndex = computed(() => steps.findIndex((item) => item.key === activeStep.value));
+const activeCondominiumId = computed(() => {
+  const id = Number(session.activeCondoId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+});
+const selectedCondominiumName = computed(
+  () => session.activeCondominium?.name ?? 'Sin condominio activo',
+);
 const pageTitle = computed(() => (isEditMode.value ? 'Editar usuario' : 'Crear nuevo usuario'));
 const pageSubtitle = computed(() =>
   isEditMode.value
-    ? 'Actualiza los datos del administrador senior de plataforma.'
-    : 'Crea un administrador senior de plataforma. El backend enviará la invitación.',
+    ? 'Actualiza los datos y el rol del usuario en el condominio activo.'
+    : 'Crea un usuario con acceso al condominio activo. El backend enviará la invitación.',
 );
 const primaryActionLabel = computed(() =>
   activeStep.value === 'review'
@@ -400,25 +541,61 @@ const fullName = computed(() =>
   `${form.value.firstName.trim()} ${form.value.lastName.trim()}`.trim(),
 );
 const normalizedEmail = computed(() => form.value.email.trim().toLowerCase());
-const administratorInitials = computed(() => {
+const normalizedCountry = computed(() => form.value.country.trim().toUpperCase());
+const userInitials = computed(() => {
   const firstInitial = form.value.firstName.trim().charAt(0);
   const lastInitial = form.value.lastName.trim().charAt(0);
-  return `${firstInitial}${lastInitial}`.toUpperCase() || 'AD';
+  return `${firstInitial}${lastInitial}`.toUpperCase() || 'US';
 });
 const selectedDocumentTypeOption = computed(
-  () => documentTypeOptions.value.find((option) => option.value === form.value.documentTypeId) ?? null,
+  () =>
+    documentTypeOptions.value.find((option) => option.value === form.value.documentTypeId) ?? null,
 );
 const documentSummary = computed(() => {
   const type = selectedDocumentTypeOption.value?.label;
   return [type, form.value.documentNumber.trim()].filter(Boolean).join(' · ') || '-';
 });
+const selectedRoleName = computed(
+  () => roleOptions.value.find((option) => option.value === form.value.roleId)?.label ?? '',
+);
 
 onMounted(async () => {
   await loadDocumentTypeOptionsBase(session.accessToken);
+  await loadRoleOptions();
   if (isEditMode.value) {
     await loadUserForEdit();
   }
 });
+
+watch(activeCondominiumId, () => {
+  void loadRoleOptions();
+});
+
+async function loadRoleOptions() {
+  const condominiumId = activeCondominiumId.value;
+  if (!condominiumId) {
+    roleOptions.value = [];
+    return;
+  }
+
+  isLoadingRoles.value = true;
+  rolesLoadError.value = '';
+
+  try {
+    const roles = await fetchCondominiumRoles(condominiumId, session.accessToken);
+    roleOptions.value = roles.map(mapRoleOption);
+  } catch (error) {
+    roleOptions.value = [];
+    rolesLoadError.value =
+      error instanceof Error ? error.message : 'No fue posible cargar los roles del condominio.';
+  } finally {
+    isLoadingRoles.value = false;
+  }
+}
+
+function mapRoleOption(role: CondominiumRoleItem) {
+  return { label: role.name, value: role.id };
+}
 
 function handleStepSelect(step: string | number) {
   if (typeof step === 'string') {
@@ -451,6 +628,10 @@ async function validateStep(step: StepKey) {
     return Boolean(await personalFormRef.value?.validate());
   }
 
+  if (step === 'assignment') {
+    return Boolean(await assignmentFormRef.value?.validate()) && activeCondominiumId.value !== null;
+  }
+
   return isPayloadReady();
 }
 
@@ -481,9 +662,9 @@ async function submitUser() {
     const result = isEditMode.value
       ? await (async () => {
           if (id === null) throw new Error('El identificador del usuario no es válido.');
-          return updatePlatformAdministrator(id, buildUpdatePayload(), session.accessToken);
+          return updateUser(id, buildUpdatePayload(), session.accessToken);
         })()
-      : await createPlatformAdministrator(buildCreatePayload(), session.accessToken);
+      : await createUser(buildCreatePayload(), session.accessToken);
 
     if (!result.success) throw new Error(result.message);
 
@@ -521,7 +702,7 @@ async function loadUserForEdit() {
   initialLoadError.value = '';
 
   try {
-    const detail = await fetchPlatformAdministratorById(id, session.accessToken);
+    const detail = await fetchUserById(id, session.accessToken);
     if (!detail) throw new Error('No se encontró la información del usuario.');
     applyUserDetail(detail);
   } catch (error) {
@@ -532,14 +713,22 @@ async function loadUserForEdit() {
   }
 }
 
-function applyUserDetail(detail: PlatformAdministratorListItem) {
+function applyUserDetail(detail: UserListItem) {
+  const assignment =
+    detail.assignments.find((item) => item.condominiumId === activeCondominiumId.value) ??
+    detail.assignments[0] ??
+    null;
+
   form.value = {
     firstName: detail.firstName,
     lastName: detail.lastName,
     documentTypeId: detail.documentTypeId,
     documentNumber: detail.documentNumber,
     email: detail.email,
+    country: 'EC',
     phone: detail.phone,
+    secondaryPhone: '',
+    roleId: assignment?.roleId ?? null,
   };
   originalForm.value = { ...form.value };
 }
@@ -547,31 +736,40 @@ function applyUserDetail(detail: PlatformAdministratorListItem) {
 function isPayloadReady() {
   return Boolean(
     form.value.firstName.trim() &&
-      form.value.lastName.trim() &&
-      form.value.documentTypeId &&
-      form.value.documentNumber.trim() &&
-      normalizedEmail.value &&
-      form.value.phone.trim(),
+    form.value.lastName.trim() &&
+    form.value.documentTypeId &&
+    form.value.documentNumber.trim() &&
+    normalizedEmail.value &&
+    normalizedCountry.value &&
+    form.value.phone.trim() &&
+    form.value.roleId &&
+    activeCondominiumId.value,
   );
 }
 
-function buildCreatePayload(): SavePlatformAdministratorPayload {
-  if (!form.value.documentTypeId) throw new Error('La información del usuario está incompleta.');
+function buildCreatePayload(): SaveUserPayload {
+  const condominiumId = activeCondominiumId.value;
+  if (!form.value.documentTypeId || !form.value.roleId || !condominiumId) {
+    throw new Error('La información del usuario está incompleta.');
+  }
 
   return {
     firstName: form.value.firstName,
     lastName: form.value.lastName,
-    country: 'EC',
+    country: normalizedCountry.value,
     documentTypeId: form.value.documentTypeId,
     documentNumber: form.value.documentNumber,
     email: form.value.email,
     phone: form.value.phone,
+    secondaryPhone: form.value.secondaryPhone,
+    assignments: [{ condominiumId, roleId: form.value.roleId }],
   };
 }
 
-function buildUpdatePayload(): UpdatePlatformAdministratorPayload {
+function buildUpdatePayload(): UpdateUserPayload {
   const original = originalForm.value;
-  const payload: UpdatePlatformAdministratorPayload = {};
+  const condominiumId = activeCondominiumId.value;
+  const payload: UpdateUserPayload = {};
 
   if (form.value.firstName.trim() !== original.firstName.trim()) {
     payload.firstName = form.value.firstName;
@@ -590,6 +788,9 @@ function buildUpdatePayload(): UpdatePlatformAdministratorPayload {
   }
   if (form.value.phone.trim() !== original.phone.trim()) {
     payload.phone = form.value.phone;
+  }
+  if (form.value.roleId !== original.roleId && form.value.roleId !== null && condominiumId) {
+    payload.assignments = [{ condominiumId, roleId: form.value.roleId }];
   }
 
   return payload;
@@ -614,6 +815,17 @@ function phoneRule(value: unknown) {
   return digits.length >= 7 || 'Ingresa un teléfono válido';
 }
 
+function optionalPhoneRule(value: unknown) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return true;
+  return phoneRule(value);
+}
+
+function countryRule(value: unknown) {
+  const text = typeof value === 'string' ? value.trim().toUpperCase() : '';
+  return /^[A-Z]{2}$/.test(text) || 'Usa el código ISO de 2 letras';
+}
+
 function documentNumberRule(value: unknown) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) return true;
@@ -634,7 +846,10 @@ function createEmptyForm(): UserForm {
     documentTypeId: null,
     documentNumber: '',
     email: '',
+    country: 'EC',
     phone: '',
+    secondaryPhone: '',
+    roleId: null,
   };
 }
 
@@ -642,11 +857,7 @@ function mapDocumentTypeOption(item: CatalogItem): DocumentTypeOption {
   return {
     label: item.name.trim() || item.code.trim(),
     value: item.id,
-    code: item.code
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-      .toLowerCase(),
+    code: item.code.normalize('NFD').replace(DIACRITICS_PATTERN, '').trim().toLowerCase(),
   };
 }
 </script>
@@ -743,7 +954,8 @@ function mapDocumentTypeOption(item: CatalogItem): DocumentTypeOption {
 .review-card__header,
 .invitation-note,
 .invitation-confirmation,
-.summary-note {
+.summary-note,
+.scope-panel {
   align-items: flex-start;
   display: flex;
   gap: 10px;
@@ -755,7 +967,8 @@ function mapDocumentTypeOption(item: CatalogItem): DocumentTypeOption {
 }
 
 .field-group__title,
-.review-card__header {
+.review-card__header,
+.scope-panel__title {
   color: var(--app-text);
   font-size: 13px;
   font-weight: 800;
@@ -767,13 +980,41 @@ function mapDocumentTypeOption(item: CatalogItem): DocumentTypeOption {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.invitation-note {
+.invitation-note,
+.scope-panel {
   background: rgba(37, 99, 235, 0.055);
   border-radius: 12px;
   color: var(--app-primary);
   font-size: 12px;
   line-height: 1.5;
   padding: 12px 14px;
+}
+
+.scope-panel__icon {
+  align-items: center;
+  background: rgba(37, 99, 235, 0.09);
+  border-radius: 13px;
+  color: var(--app-primary);
+  display: inline-flex;
+  flex: 0 0 42px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.scope-panel__text {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+.load-error {
+  align-items: center;
+  color: var(--app-negative, #dc2626);
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
 }
 
 .initial-load-error,
@@ -833,6 +1074,13 @@ function mapDocumentTypeOption(item: CatalogItem): DocumentTypeOption {
   font-size: 11px;
   line-height: 1.5;
   margin-top: 3px;
+}
+
+.summary-note__text code {
+  background: rgba(37, 99, 235, 0.08);
+  border-radius: 4px;
+  font-size: 10px;
+  padding: 1px 4px;
 }
 
 .summary-card__header {

@@ -1,5 +1,5 @@
+import { appendQueryParams, isRecord, toNumber, toText } from '@/utils/api/common';
 import { buildApiUrl, http } from '@/services/api/http';
-import { isRecord, toNumber, toText } from '@/utils/api/common';
 
 type ApiMutationResponse = {
   success?: unknown;
@@ -14,29 +14,16 @@ type ApiListResponse = ApiMutationResponse & {
   meta?: unknown;
 };
 
-export type PlatformAccessStatus =
-  | 'active'
-  | 'pending_activation'
-  | 'invitation_expired'
-  | 'invitation_revoked'
-  | 'inactive';
+export type UserAccessStatus = 'active' | 'inactive';
 
-export type PlatformInvitationStatus =
-  | 'pending'
-  | 'accepted'
-  | 'expired'
-  | 'revoked'
-  | 'none';
-
-export interface PlatformAdministratorInvitation {
-  status: PlatformInvitationStatus;
-  sentAt: string;
-  expiresAt: string;
-  acceptedAt: string;
-  revokedAt: string;
+export interface UserAssignmentItem {
+  condominiumId: number | null;
+  condominiumName: string;
+  roleId: number | null;
+  roleName: string;
 }
 
-export interface PlatformAdministratorListItem {
+export interface UserListItem {
   id: number;
   firstName: string;
   lastName: string;
@@ -47,28 +34,29 @@ export interface PlatformAdministratorListItem {
   documentNumber: string;
   email: string;
   phone: string;
-  accessStatus: PlatformAccessStatus;
-  invitation: PlatformAdministratorInvitation | null;
-  invitationStatus: PlatformInvitationStatus;
+  accessStatus: UserAccessStatus;
+  assignments: UserAssignmentItem[];
   createdAt: string;
 }
 
-export interface PlatformAdministratorsPageResult {
-  items: PlatformAdministratorListItem[];
-  page: number;
-  perPage: number;
+export interface UsersPageResult {
+  items: UserListItem[];
   total: number;
-  lastPage: number;
 }
 
-export interface FetchPlatformAdministratorsParams {
-  page: number;
-  perPage: number;
+export interface FetchUsersParams {
+  condominiumId: number;
   search?: string;
-  status?: PlatformAccessStatus;
+  roleId?: number;
+  status?: UserAccessStatus;
 }
 
-export interface SavePlatformAdministratorPayload {
+export interface SaveUserAssignment {
+  condominiumId: number;
+  roleId: number;
+}
+
+export interface SaveUserPayload {
   firstName: string;
   lastName: string;
   country: string;
@@ -76,34 +64,39 @@ export interface SavePlatformAdministratorPayload {
   documentNumber: string;
   email: string;
   phone: string;
+  secondaryPhone?: string;
+  isAccessEnabled?: boolean;
+  assignments: SaveUserAssignment[];
 }
 
-export type UpdatePlatformAdministratorPayload = Partial<SavePlatformAdministratorPayload>;
+export type UpdateUserPayload = Partial<Omit<SaveUserPayload, 'assignments'>> & {
+  assignments?: SaveUserAssignment[];
+};
 
-export interface SavePlatformAdministratorResult {
+export interface SaveUserResult {
   success: boolean;
   message: string;
   data: unknown;
 }
 
-export class PlatformAdministratorServiceError extends Error {
+export class UserServiceError extends Error {
   status: number;
   code: string;
   errors: unknown;
 
   constructor(message: string, status: number, code = '', errors: unknown = null) {
     super(message);
-    this.name = 'PlatformAdministratorServiceError';
+    this.name = 'UserServiceError';
     this.status = status;
     this.code = code;
     this.errors = errors;
   }
 }
 
-const platformAdministratorsPath = '/api/platform-administrators';
+const usersPath = '/api/users';
 
-function platformAdministratorPath(id: number) {
-  return `${platformAdministratorsPath}/${encodeURIComponent(String(id))}`;
+function userPath(id: number) {
+  return `${usersPath}/${encodeURIComponent(String(id))}`;
 }
 
 function pickText(record: Record<string, unknown>, keys: string[]) {
@@ -158,38 +151,29 @@ function splitName(name: string) {
 }
 
 function buildInitials(name: string, email: string) {
-  const source = name || email || 'Administrador';
+  const source = name || email || 'Usuario';
   const parts = source
     .split(/[.\s_-]+/)
     .map((part) => part.trim())
     .filter(Boolean);
-  const first = parts[0]?.charAt(0) ?? 'A';
-  const second = parts.length > 1 ? (parts[1]?.charAt(0) ?? '') : (parts[0]?.charAt(1) ?? 'D');
+  const first = parts[0]?.charAt(0) ?? 'U';
+  const second = parts.length > 1 ? (parts[1]?.charAt(0) ?? '') : (parts[0]?.charAt(1) ?? 'S');
   return `${first}${second}`.toUpperCase();
 }
 
-function normalizeKey(value: string) {
-  return value
-    .trim()
+function normalizeAccessStatus(record: Record<string, unknown>): UserAccessStatus {
+  const rawEnabled = record.is_access_enabled ?? record.isAccessEnabled ?? record.is_active;
+  if (rawEnabled === false || rawEnabled === 0 || rawEnabled === '0') {
+    return 'inactive';
+  }
+
+  const rawStatus = pickText(record, ['access_status', 'accessStatus', 'status'])
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
-}
 
-function normalizeAccessStatus(record: Record<string, unknown>): PlatformAccessStatus {
-  const rawStatus = normalizeKey(pickText(record, ['access_status', 'accessStatus', 'status']));
-
-  if (rawStatus === 'pending_activation' || rawStatus === 'pending') {
-    return 'pending_activation';
-  }
-  if (rawStatus === 'invitation_expired' || rawStatus === 'expired') {
-    return 'invitation_expired';
-  }
-  if (rawStatus === 'invitation_revoked' || rawStatus === 'revoked' || rawStatus === 'cancelled') {
-    return 'invitation_revoked';
-  }
   if (rawStatus === 'inactive' || rawStatus === 'disabled' || rawStatus === 'suspended') {
     return 'inactive';
   }
@@ -197,45 +181,37 @@ function normalizeAccessStatus(record: Record<string, unknown>): PlatformAccessS
   return 'active';
 }
 
-function normalizeInvitationStatus(value: string): PlatformInvitationStatus {
-  const normalized = normalizeKey(value);
-
-  if (normalized === 'accepted' || normalized === 'active') return 'accepted';
-  if (normalized === 'expired' || normalized === 'invitation_expired') return 'expired';
-  if (
-    normalized === 'revoked' ||
-    normalized === 'cancelled' ||
-    normalized === 'canceled' ||
-    normalized === 'invitation_revoked'
-  ) {
-    return 'revoked';
-  }
-  if (normalized === 'pending' || normalized === 'pending_activation') return 'pending';
-
-  return 'none';
-}
-
-function normalizeInvitation(record: Record<string, unknown>) {
-  const invitation = isRecord(record.invitation) ? record.invitation : record;
-  const status = normalizeInvitationStatus(
-    pickText(invitation, ['status', 'invitation_status', 'invitationStatus', 'state']),
-  );
-  const sentAt = pickText(invitation, ['sent_at', 'sentAt', 'created_at', 'createdAt']);
-  const expiresAt = pickText(invitation, ['expires_at', 'expiresAt', 'expired_at', 'expiredAt']);
-  const acceptedAt = pickText(invitation, ['accepted_at', 'acceptedAt']);
-  const revokedAt = pickText(invitation, ['revoked_at', 'revokedAt', 'cancelled_at']);
-
-  if (status === 'none' && !sentAt && !expiresAt && !acceptedAt && !revokedAt) {
-    return null;
-  }
-
-  return { status, sentAt, expiresAt, acceptedAt, revokedAt };
-}
-
-function normalizePlatformAdministrator(item: unknown): PlatformAdministratorListItem | null {
+function normalizeAssignment(item: unknown): UserAssignmentItem | null {
   if (!isRecord(item)) return null;
 
-  const id = toNumber(item.id ?? item.user_id ?? item.userId ?? item.administrator_id);
+  const condominium = isRecord(item.condominium) ? item.condominium : null;
+  const role = isRecord(item.role) ? item.role : null;
+
+  const condominiumId = toNumber(item.condominium_id ?? item.condominiumId ?? condominium?.id);
+  const roleId = toNumber(item.role_id ?? item.roleId ?? role?.id);
+  const condominiumName =
+    pickText(condominium ?? {}, ['name', 'label']) ||
+    pickText(item, ['condominium_name', 'condominiumName']) ||
+    'Alcance global';
+  const roleName =
+    pickText(role ?? {}, ['name', 'label']) || pickText(item, ['role_name', 'roleName']) || '';
+
+  if (roleId === null) return null;
+
+  return { condominiumId, condominiumName, roleId, roleName };
+}
+
+function normalizeAssignments(record: Record<string, unknown>): UserAssignmentItem[] {
+  const raw = record.assignments ?? record.roles;
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map(normalizeAssignment).filter((item): item is UserAssignmentItem => item !== null);
+}
+
+function normalizeUserListItem(item: unknown): UserListItem | null {
+  if (!isRecord(item)) return null;
+
+  const id = toNumber(item.id ?? item.user_id ?? item.userId);
   const email = pickText(item, ['email', 'mail']);
   const name = buildFullName(item);
   if (id === null || !email || !name) return null;
@@ -248,7 +224,6 @@ function normalizePlatformAdministrator(item: unknown): PlatformAdministratorLis
     : isRecord(item.documentType)
       ? item.documentType
       : null;
-  const invitation = normalizeInvitation(item);
 
   return {
     id,
@@ -267,8 +242,7 @@ function normalizePlatformAdministrator(item: unknown): PlatformAdministratorLis
     email,
     phone: pickText(item, ['phone', 'phone_number', 'mobile']),
     accessStatus: normalizeAccessStatus(item),
-    invitation,
-    invitationStatus: invitation?.status ?? 'none',
+    assignments: normalizeAssignments(item),
     createdAt: pickText(item, ['created_at', 'createdAt']),
   };
 }
@@ -299,26 +273,11 @@ function extractFirstRecord(payload: unknown) {
   return isRecord(payload) ? payload : null;
 }
 
-function extractMeta(payload: unknown, page: number, perPage: number, itemsLength: number) {
-  const root = isRecord(payload) ? payload : {};
-  const meta = isRecord(root.meta)
-    ? root.meta
-    : isRecord(root.data) && isRecord(root.data.meta)
-      ? root.data.meta
-      : {};
-  const total = toNumber(meta.total) ?? itemsLength;
-  const currentPage = toNumber(meta.current_page ?? meta.currentPage) ?? page;
-  const currentPerPage = toNumber(meta.per_page ?? meta.perPage) ?? perPage;
-  const lastPage =
-    toNumber(meta.last_page ?? meta.lastPage) ?? Math.max(1, Math.ceil(total / currentPerPage));
-
-  return { total, currentPage, currentPerPage, lastPage };
-}
-
 function extractErrorCode(data: unknown, responseStatus: number) {
   if (!isRecord(data)) {
     if (responseStatus === 404) return 'not_found';
     if (responseStatus === 422) return 'validation_failed';
+    if (responseStatus === 403) return 'forbidden';
     return '';
   }
 
@@ -329,19 +288,24 @@ function extractErrorCode(data: unknown, responseStatus: number) {
     firstTextValue(nestedData?.code) ||
     firstTextValue(nestedData?.error) ||
     (responseStatus === 404 ? 'not_found' : '') ||
+    (responseStatus === 403 ? 'forbidden' : '') ||
     (responseStatus === 422 ? 'validation_failed' : '')
   );
 }
 
 function mapErrorMessage(status: number, code: string, fallback: string) {
-  if (code === 'access_token_required') return 'Tu sesión no fue enviada. Inicia sesión nuevamente.';
+  if (code === 'access_token_required')
+    return 'Tu sesión no fue enviada. Inicia sesión nuevamente.';
   if (code === 'access_token_expired') return 'Tu sesión expiró. Inicia sesión nuevamente.';
   if (code === 'access_token_invalid') return 'Tu sesión no es válida. Inicia sesión nuevamente.';
   if (code === 'user_access_disabled') {
     return 'Tu acceso de usuario está deshabilitado. Contacta a un administrador.';
   }
+  if (code === 'forbidden' || status === 403) {
+    return 'No tienes permisos para gestionar usuarios en este condominio.';
+  }
   if (code === 'not_found' || status === 404) {
-    return 'No se encontró el administrador de plataforma solicitado.';
+    return 'No se encontró el usuario solicitado.';
   }
   if (code === 'validation_failed' || status === 422) {
     return 'Revisa los campos marcados. El backend rechazó la información enviada.';
@@ -356,7 +320,7 @@ function throwServiceError(response: Response, data: unknown, fallback: string):
   const code = extractErrorCode(data, response.status);
   const backendMessage = isRecord(data) ? firstTextValue(data.message) : '';
   const errors = isRecord(data) ? data.errors : null;
-  throw new PlatformAdministratorServiceError(
+  throw new UserServiceError(
     backendMessage || mapErrorMessage(response.status, code, fallback),
     response.status,
     code,
@@ -364,53 +328,71 @@ function throwServiceError(response: Response, data: unknown, fallback: string):
   );
 }
 
-function buildCreateBody(payload: SavePlatformAdministratorPayload) {
+function buildAssignmentsBody(assignments: SaveUserAssignment[]) {
+  return assignments.map((assignment) => ({
+    condominium_id: assignment.condominiumId,
+    role_id: assignment.roleId,
+  }));
+}
+
+function buildCreateBody(payload: SaveUserPayload) {
   return {
     first_name: payload.firstName.trim(),
     last_name: payload.lastName.trim(),
+    email: payload.email.trim().toLowerCase(),
     country: payload.country.trim().toUpperCase(),
     document_type_id: payload.documentTypeId,
     document_number: payload.documentNumber.trim(),
-    email: payload.email.trim().toLowerCase(),
     phone: payload.phone.trim(),
+    secondary_phone: payload.secondaryPhone?.trim() || null,
+    ...(payload.isAccessEnabled !== undefined
+      ? { is_access_enabled: payload.isAccessEnabled }
+      : {}),
+    assignments: buildAssignmentsBody(payload.assignments),
   };
 }
 
-function buildUpdateBody(payload: UpdatePlatformAdministratorPayload) {
+function buildUpdateBody(payload: UpdateUserPayload) {
   const body: Record<string, unknown> = {};
 
   if (payload.firstName !== undefined) body.first_name = payload.firstName.trim();
   if (payload.lastName !== undefined) body.last_name = payload.lastName.trim();
+  if (payload.email !== undefined) body.email = payload.email.trim().toLowerCase();
   if (payload.country !== undefined) body.country = payload.country.trim().toUpperCase();
   if (payload.documentTypeId !== undefined) body.document_type_id = payload.documentTypeId;
   if (payload.documentNumber !== undefined) body.document_number = payload.documentNumber.trim();
-  if (payload.email !== undefined) body.email = payload.email.trim().toLowerCase();
   if (payload.phone !== undefined) body.phone = payload.phone.trim();
+  if (payload.secondaryPhone !== undefined) {
+    body.secondary_phone = payload.secondaryPhone.trim() || null;
+  }
+  if (payload.assignments !== undefined) {
+    body.assignments = buildAssignmentsBody(payload.assignments);
+  }
 
   return body;
 }
 
 async function submitMutation(
   path: string,
-  method: 'POST' | 'PATCH' | 'DELETE',
+  method: 'POST' | 'PUT' | 'PATCH',
   token: string | null,
   fallbackMessage: string,
-  body?: Record<string, unknown>,
-): Promise<SavePlatformAdministratorResult> {
+  body: Record<string, unknown>,
+): Promise<SaveUserResult> {
   const requestOptions = {
     token,
     headers: {
       Accept: 'application/json',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      'Content-Type': 'application/json',
     },
-    ...(body ? { body } : {}),
+    body,
   };
   const { response, data, unauthorized } =
     method === 'POST'
       ? await http.post<ApiMutationResponse>(path, requestOptions)
-      : method === 'PATCH'
-        ? await http.patch<ApiMutationResponse>(path, requestOptions)
-        : await http.delete<ApiMutationResponse>(path, requestOptions);
+      : method === 'PUT'
+        ? await http.put<ApiMutationResponse>(path, requestOptions)
+        : await http.patch<ApiMutationResponse>(path, requestOptions);
 
   if (unauthorized) {
     return { success: false, message: 'Sesión expirada.', data: null };
@@ -427,22 +409,23 @@ async function submitMutation(
   };
 }
 
-export async function fetchPlatformAdministratorsPage(
-  params: FetchPlatformAdministratorsParams,
+export async function fetchUsers(
+  params: FetchUsersParams,
   token: string | null,
-): Promise<PlatformAdministratorsPageResult> {
-  const url = new URL(buildApiUrl(platformAdministratorsPath));
-  url.searchParams.set('page', String(params.page));
-  url.searchParams.set('per_page', String(params.perPage));
-  if (params.search?.trim()) url.searchParams.set('search', params.search.trim());
-  if (params.status) url.searchParams.set('status', params.status);
+): Promise<UsersPageResult> {
+  const url = appendQueryParams(new URL(buildApiUrl(usersPath)), {
+    condominium_id: params.condominiumId,
+    search: params.search,
+    role_id: params.roleId,
+    status: params.status,
+  });
 
   const { response, data, unauthorized } = await http.get<ApiListResponse>(url.toString(), {
     token,
   });
 
   if (unauthorized) {
-    return { items: [], page: 1, perPage: params.perPage, total: 0, lastPage: 1 };
+    return { items: [], total: 0 };
   }
 
   if (!response.ok) {
@@ -450,23 +433,17 @@ export async function fetchPlatformAdministratorsPage(
   }
 
   const items = extractItems(data)
-    .map(normalizePlatformAdministrator)
-    .filter((item): item is PlatformAdministratorListItem => item !== null);
-  const meta = extractMeta(data, params.page, params.perPage, items.length);
+    .map(normalizeUserListItem)
+    .filter((item): item is UserListItem => item !== null);
 
-  return {
-    items,
-    page: meta.currentPage,
-    perPage: meta.currentPerPage,
-    total: meta.total,
-    lastPage: meta.lastPage,
-  };
+  return { items, total: items.length };
 }
 
-export async function fetchPlatformAdministratorById(id: number, token: string | null) {
-  const { response, data, unauthorized } = await http.get<unknown>(platformAdministratorPath(id), {
-    token,
-  });
+export async function fetchUserById(
+  id: number,
+  token: string | null,
+): Promise<UserListItem | null> {
+  const { response, data, unauthorized } = await http.get<unknown>(userPath(id), { token });
 
   if (unauthorized) return null;
 
@@ -474,15 +451,12 @@ export async function fetchPlatformAdministratorById(id: number, token: string |
     throwServiceError(response, data, 'No fue posible cargar el usuario.');
   }
 
-  return normalizePlatformAdministrator(extractFirstRecord(data));
+  return normalizeUserListItem(extractFirstRecord(data));
 }
 
-export async function createPlatformAdministrator(
-  payload: SavePlatformAdministratorPayload,
-  token: string | null,
-) {
+export async function createUser(payload: SaveUserPayload, token: string | null) {
   return submitMutation(
-    platformAdministratorsPath,
+    usersPath,
     'POST',
     token,
     'Usuario creado correctamente.',
@@ -490,41 +464,22 @@ export async function createPlatformAdministrator(
   );
 }
 
-export async function updatePlatformAdministrator(
-  id: number,
-  payload: UpdatePlatformAdministratorPayload,
-  token: string | null,
-) {
+export async function updateUser(id: number, payload: UpdateUserPayload, token: string | null) {
   return submitMutation(
-    platformAdministratorPath(id),
-    'PATCH',
+    userPath(id),
+    'PUT',
     token,
     'Usuario actualizado correctamente.',
     buildUpdateBody(payload),
   );
 }
 
-export async function updatePlatformAdministratorStatus(
-  id: number,
-  accessStatus: 'active' | 'inactive',
-  token: string | null,
-) {
+export async function updateUserStatus(id: number, isAccessEnabled: boolean, token: string | null) {
   return submitMutation(
-    `${platformAdministratorPath(id)}/status`,
+    `${userPath(id)}/status`,
     'PATCH',
     token,
-    accessStatus === 'active'
-      ? 'Usuario reactivado correctamente.'
-      : 'Usuario desactivado correctamente.',
-    { access_status: accessStatus },
-  );
-}
-
-export async function deletePlatformAdministrator(id: number, token: string | null) {
-  return submitMutation(
-    platformAdministratorPath(id),
-    'DELETE',
-    token,
-    'Usuario eliminado correctamente.',
+    isAccessEnabled ? 'Usuario reactivado correctamente.' : 'Usuario desactivado correctamente.',
+    { is_access_enabled: isAccessEnabled },
   );
 }

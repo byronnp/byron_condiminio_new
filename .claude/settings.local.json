@@ -2,7 +2,30 @@
   "permissions": {
     "allow": [
       "Bash(npm init *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(curl -s -m 5 http://localhost:8001/api/documentation -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -m 5 http://localhost:8001/docs/api-docs.json)",
+      "Bash(curl -s -m 5 http://localhost:8001/api/documentation -o /tmp/doc.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -m 5 \"http://localhost:8001/docs?api-docs.json\" -o /tmp/spec.json -w \"%{http_code}\\\\n\")",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"console.log\\(require\\('fs'\\).existsSync\\('/tmp/spec.json'\\)\\)\")",
+      "Bash(cp /tmp/spec.json \"C:\\\\Users\\\\byron\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-byron-OneDrive-Documents-Byron-proyectos-proyectos-quasar-byron-condiminio-new\\\\d18c19ca-e724-40a8-a6af-3d68d21d4f02\\\\scratchpad\\\\spec.json\")",
+      "Bash(node dump.js \"/api/users\")",
+      "Bash(MSYS_NO_PATHCONV=1 node dump.js \"/api/users\")",
+      "Bash(MSYS_NO_PATHCONV=1 node dump.js \"/api/users/{user}\")",
+      "Bash(MSYS_NO_PATHCONV=1 node dump.js \"/api/users/{user}/status\")",
+      "Bash(MSYS_NO_PATHCONV=1 node dump.js \"/api/users/form-options\")",
+      "Bash(MSYS_NO_PATHCONV=1 node dump.js \"/api/users/{user}/resend-invitation\")",
+      "Bash(npm run *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(rm -f /tmp/lintout2.txt)",
+      "Bash(npx prettier *)",
+      "Bash(npx eslint *)",
+      "Bash(powershell -Command \"Get-CimInstance Win32_Process -Filter \\\\\"Name='node.exe'\\\\\" | Select-Object ProcessId,CommandLine\")",
+      "Bash(powershell -Command \"Stop-Process -Id 8772,29104 -Force -ErrorAction SilentlyContinue\")",
+      "Bash(MSYS_NO_PATHCONV=1 node dump.js \"/api/administrators\")"
     ]
   }
 }

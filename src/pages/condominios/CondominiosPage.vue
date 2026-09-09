@@ -150,6 +150,36 @@
                       <q-item
                         clickable
                         v-close-popup
+                        :disable="togglingCondominiumId === props.row.id"
+                        @click="handleToggleCondominiumStatus(props.row)"
+                        class="table-actions-menu__item"
+                      >
+                        <q-item-section avatar>
+                          <span class="table-actions-menu__icon">
+                            <q-icon
+                              :name="props.row.status === 'Activo' ? 'toggle_off' : 'toggle_on'"
+                              size="16px"
+                            />
+                          </span>
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="table-actions-menu__name">
+                            {{ props.row.status === 'Activo' ? 'Inactivar' : 'Activar' }}
+                            condominio
+                          </q-item-label>
+                          <q-item-label caption>
+                            {{
+                              props.row.status === 'Activo'
+                                ? 'Deshabilitar el acceso al sistema'
+                                : 'Habilitar el acceso al sistema'
+                            }}
+                          </q-item-label>
+                        </q-item-section>
+                      </q-item>
+                      <q-separator />
+                      <q-item
+                        clickable
+                        v-close-popup
                         :disable="deletingCondominiumId === props.row.id"
                         @click="handleDeleteCondominium(props.row)"
                         class="table-actions-menu__item table-actions-menu__item--danger"
@@ -223,8 +253,10 @@ import AppStatsCards from '@/components/shared/AppStatsCards.vue';
 import {
   deleteCondominium,
   fetchCondominiums,
+  updateCondominiumStatus,
   type CondominiumListItem,
 } from '@/services/condominiums.service';
+import { Notify } from 'quasar';
 import { useSessionStore } from '@/stores/session.store';
 import { colorForLabel } from '@/utils/badge-color';
 type CondoRow = {
@@ -253,6 +285,7 @@ const pagination = ref({ page: 1, rowsPerPage: 10 });
 const allRows = ref<CondoRow[]>([]);
 const isLoadingRows = ref(false);
 const deletingCondominiumId = ref<number | null>(null);
+const togglingCondominiumId = ref<number | null>(null);
 const deleteConfirmOpen = ref(false);
 const pendingDeleteRow = ref<CondoRow | null>(null);
 const loadError = ref('');
@@ -432,6 +465,35 @@ async function loadCondominiums() {
       error instanceof Error ? error.message : 'No fue posible cargar los condominios.';
   } finally {
     isLoadingRows.value = false;
+  }
+}
+async function handleToggleCondominiumStatus(row: CondoRow) {
+  if (togglingCondominiumId.value !== null) {
+    return;
+  }
+  const nextIsActive = row.status !== 'Activo';
+  togglingCondominiumId.value = row.id;
+  try {
+    const result = await updateCondominiumStatus(row.id, nextIsActive, session.accessToken);
+    Notify.create({
+      type: 'positive',
+      message:
+        result.message || `Condominio ${nextIsActive ? 'activado' : 'inactivado'} correctamente.`,
+      position: 'top-right',
+    });
+    await loadCondominiums();
+    window.dispatchEvent(new Event('condominiums:changed'));
+  } catch (error) {
+    Notify.create({
+      type: 'negative',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'No fue posible actualizar el estado del condominio.',
+      position: 'top-right',
+    });
+  } finally {
+    togglingCondominiumId.value = null;
   }
 }
 function handleDeleteCondominium(row: CondoRow) {

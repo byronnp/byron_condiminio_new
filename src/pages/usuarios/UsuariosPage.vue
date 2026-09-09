@@ -5,14 +5,15 @@
       v-model:status="statusFilter"
       v-model:rowsPerPage="pagination.rowsPerPage"
       v-model:sortBy="sortBy"
-      title="Administradores de plataforma"
-      subtitle="Administra los administradores senior de la plataforma."
+      title="Usuarios"
+      subtitle="Administra los usuarios con acceso al condominio activo."
       search-placeholder="Buscar por nombre, documento o correo..."
       :status-options="statusOptions"
       :rows-per-page-options="rowsPerPageOptions"
       :sort-options="sortOptions"
       action-label="Nuevo usuario"
       action-icon="person_add"
+      :action-disabled="!activeCondominiumId"
       :show-filters="false"
       :show-sort="false"
       @cta-click="goToNewUser"
@@ -21,8 +22,17 @@
         <AppStatsCards :cards="statsCards" />
       </template>
 
+      <template #results>{{ resultsRangeLabel }}</template>
+
       <template #table>
-        <q-banner v-if="loadError" rounded class="q-mb-md user-error-banner">
+        <q-banner v-if="!activeCondominiumId" rounded class="user-error-banner q-mb-md">
+          <template #avatar>
+            <q-icon name="apartment" color="warning" />
+          </template>
+          Selecciona un condominio activo para gestionar sus usuarios.
+        </q-banner>
+
+        <q-banner v-if="loadError" rounded class="user-error-banner q-mb-md">
           <template #avatar>
             <q-icon name="error_outline" color="negative" />
           </template>
@@ -32,9 +42,10 @@
         <q-table
           flat
           bordered
-          :rows="rows"
+          :rows="pagedRows"
           :columns="columns"
           row-key="id"
+          :pagination="{ rowsPerPage: 0 }"
           hide-bottom
           :loading="isLoadingRows"
           class="list-table"
@@ -47,7 +58,7 @@
 
           <template #no-data>
             <AppEmptyState
-              icon="admin_panel_settings"
+              icon="manage_accounts"
               title="No hay usuarios para mostrar"
               :text="emptyStateText"
               tight
@@ -62,7 +73,7 @@
                 </q-avatar>
                 <div>
                   <div class="entity-cell__title">{{ props.row.name }}</div>
-                  <div class="entity-cell__subtitle">Administrador senior</div>
+                  <div class="entity-cell__subtitle">{{ props.row.email }}</div>
                 </div>
               </div>
             </q-td>
@@ -77,6 +88,14 @@
             </q-td>
           </template>
 
+          <template #body-cell-role="props">
+            <q-td :props="props">
+              <q-badge outline color="primary" class="status-badge">
+                {{ roleLabel(props.row) }}
+              </q-badge>
+            </q-td>
+          </template>
+
           <template #body-cell-accessStatus="props">
             <q-td :props="props">
               <q-badge
@@ -86,22 +105,6 @@
               >
                 {{ accessStatusLabel(props.row.accessStatus) }}
               </q-badge>
-            </q-td>
-          </template>
-
-          <template #body-cell-invitation="props">
-            <q-td :props="props">
-              <div class="stacked-cell stacked-cell--center">
-                <q-badge
-                  :color="invitationTone(props.row.invitationStatus)"
-                  outline
-                  rounded
-                  class="status-badge"
-                >
-                  {{ invitationStatusLabel(props.row.invitationStatus) }}
-                </q-badge>
-                <span v-if="invitationInfo(props.row)">{{ invitationInfo(props.row) }}</span>
-              </div>
             </q-td>
           </template>
 
@@ -169,7 +172,7 @@
                           <q-item-label class="table-actions-menu__name">
                             Desactivar acceso
                           </q-item-label>
-                          <q-item-label caption>Bloquear acceso a la plataforma</q-item-label>
+                          <q-item-label caption>Bloquear acceso al condominio</q-item-label>
                         </q-item-section>
                       </q-item>
 
@@ -189,30 +192,7 @@
                           <q-item-label class="table-actions-menu__name">
                             Reactivar acceso
                           </q-item-label>
-                          <q-item-label caption>Permitir acceso a la plataforma</q-item-label>
-                        </q-item-section>
-                      </q-item>
-
-                      <q-separator class="table-actions-menu__separator" />
-
-                      <q-item
-                        v-close-popup
-                        clickable
-                        class="table-actions-menu__item table-actions-menu__item--danger"
-                        @click="requestUserAction('delete', props.row)"
-                      >
-                        <q-item-section avatar>
-                          <span class="table-actions-menu__icon table-actions-menu__icon--danger">
-                            <q-icon name="delete_outline" size="16px" />
-                          </span>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label
-                            class="table-actions-menu__name table-actions-menu__name--danger"
-                          >
-                            Eliminar usuario
-                          </q-item-label>
-                          <q-item-label caption>Eliminar administrador de plataforma</q-item-label>
+                          <q-item-label caption>Permitir acceso al condominio</q-item-label>
                         </q-item-section>
                       </q-item>
                     </q-list>
@@ -273,30 +253,27 @@ import AppEmptyState from '@/components/shared/AppEmptyState.vue';
 import AppListPageShell from '@/components/shared/AppListPageShell.vue';
 import AppStatsCards, { type AppStatsCard } from '@/components/shared/AppStatsCards.vue';
 import {
-  deletePlatformAdministrator,
-  fetchPlatformAdministratorsPage,
-  updatePlatformAdministratorStatus,
-  type PlatformAccessStatus,
-  type PlatformAdministratorListItem,
-  type PlatformInvitationStatus,
+  fetchUsers,
+  updateUserStatus,
+  type UserAccessStatus,
+  type UserListItem,
 } from '@/services/users.service';
 import { useSessionStore } from '@/stores/session.store';
 
-type UserRow = PlatformAdministratorListItem;
-type UserAction = 'activate' | 'deactivate' | 'delete';
+type UserRow = UserListItem;
+type UserAction = 'activate' | 'deactivate';
 type DialogTone = 'primary' | 'positive' | 'negative' | 'warning';
-type StatusFilter = 'all' | PlatformAccessStatus;
+type StatusFilter = 'Todos' | UserAccessStatus;
 
 const router = useRouter();
 const session = useSessionStore();
 
 const search = ref('');
-const statusFilter = ref<StatusFilter>('all');
+const statusFilter = ref<StatusFilter>('Todos');
 const sortBy = ref('recent');
 const rowsPerPageOptions = [10, 20, 50] as const;
 const pagination = ref({ page: 1, rowsPerPage: 10 });
-const rows = ref<UserRow[]>([]);
-const totalRows = ref(0);
+const allRows = ref<UserRow[]>([]);
 const isLoadingRows = ref(false);
 const loadError = ref('');
 const confirmDialogOpen = ref(false);
@@ -316,39 +293,39 @@ const detailDialog = ref<{
   rows: [],
 });
 
+const activeCondominiumId = computed(() => {
+  const id = Number(session.activeCondoId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+});
+
 const columns = [
   { name: 'name', label: 'Nombre', field: 'name', align: 'left' as const },
   { name: 'document', label: 'Documento', field: 'documentNumber', align: 'left' as const },
-  { name: 'email', label: 'Correo', field: 'email', align: 'left' as const },
+  { name: 'role', label: 'Rol', field: 'role', align: 'left' as const },
   { name: 'phone', label: 'Teléfono', field: 'phone', align: 'left' as const },
   { name: 'accessStatus', label: 'Acceso', field: 'accessStatus', align: 'center' as const },
-  { name: 'invitation', label: 'Invitación', field: 'invitationStatus', align: 'center' as const },
   { name: 'createdAt', label: 'Creado', field: 'createdAt', align: 'left' as const },
   { name: 'actions', label: 'Acciones', field: 'actions', align: 'right' as const },
 ];
 
 const statusOptions = [
-  { label: 'Estado: Todos', value: 'all' },
+  { label: 'Estado: Todos', value: 'Todos' },
   { label: 'Activo', value: 'active' },
-  { label: 'Pendiente', value: 'pending_activation' },
-  { label: 'Invitación expirada', value: 'invitation_expired' },
-  { label: 'Invitación revocada', value: 'invitation_revoked' },
   { label: 'Inactivo', value: 'inactive' },
-] as const;
+];
 
 const sortOptions = [{ label: 'Más recientes', value: 'recent' }] as const;
 
 const statsCards = computed<AppStatsCard[]>(() => {
-  const total = totalRows.value;
-  const active = rows.value.filter((row) => row.accessStatus === 'active').length;
-  const pending = rows.value.filter((row) => row.accessStatus === 'pending_activation').length;
-  const inactive = rows.value.filter((row) => row.accessStatus === 'inactive').length;
+  const total = allRows.value.length;
+  const active = allRows.value.filter((row) => row.accessStatus === 'active').length;
+  const inactive = allRows.value.filter((row) => row.accessStatus === 'inactive').length;
 
   return [
     {
       label: 'Total usuarios',
       value: String(total),
-      hint: 'Administradores senior',
+      hint: 'En el condominio activo',
       icon: 'manage_accounts',
     },
     {
@@ -356,12 +333,6 @@ const statsCards = computed<AppStatsCard[]>(() => {
       value: String(active),
       hint: 'Con acceso vigente',
       icon: 'verified_user',
-    },
-    {
-      label: 'Pendientes',
-      value: String(pending),
-      hint: 'Esperando activación',
-      icon: 'schedule',
     },
     {
       label: 'Inactivos',
@@ -372,71 +343,87 @@ const statsCards = computed<AppStatsCard[]>(() => {
   ];
 });
 
+const normalizedSearch = computed(() => search.value.trim().toLowerCase());
+const filteredRows = computed(() => {
+  return allRows.value.filter((row) => {
+    if (statusFilter.value !== 'Todos' && row.accessStatus !== statusFilter.value) {
+      return false;
+    }
+    if (normalizedSearch.value) {
+      const haystack = `${row.name} ${row.email} ${row.documentNumber}`.toLowerCase();
+      if (!haystack.includes(normalizedSearch.value)) {
+        return false;
+      }
+    }
+    return true;
+  });
+});
+
+const totalItems = computed(() => filteredRows.value.length);
 const totalPages = computed(() =>
-  Math.max(1, Math.ceil(totalRows.value / pagination.value.rowsPerPage)),
+  Math.max(1, Math.ceil(totalItems.value / pagination.value.rowsPerPage)),
 );
+const pagedRows = computed(() => {
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
+  return filteredRows.value.slice(start, start + pagination.value.rowsPerPage);
+});
+const resultsRangeLabel = computed(() => {
+  const total = totalItems.value;
+  if (total === 0) return 'Sin resultados';
+  const start = (pagination.value.page - 1) * pagination.value.rowsPerPage + 1;
+  const end = Math.min(start + pagination.value.rowsPerPage - 1, total);
+  return `Mostrando ${start}-${end} de ${total}`;
+});
 
 const emptyStateText = computed(() => {
   if (loadError.value) return 'Revisa la conexión con el backend e intenta nuevamente.';
-  if (search.value.trim() || statusFilter.value !== 'all') {
-    return 'No encontramos administradores de plataforma con los criterios seleccionados.';
+  if (search.value.trim() || statusFilter.value !== 'Todos') {
+    return 'No encontramos usuarios con los criterios seleccionados.';
   }
-  return 'Aún no se han registrado administradores de plataforma.';
+  return 'Aún no se han registrado usuarios en este condominio.';
 });
 
-const confirmDialogTitle = computed(() => {
-  if (pendingAction.value === 'activate') return 'Reactivar usuario';
-  if (pendingAction.value === 'deactivate') return 'Desactivar usuario';
-  return 'Eliminar usuario';
-});
+const confirmDialogTitle = computed(() =>
+  pendingAction.value === 'activate' ? 'Reactivar usuario' : 'Desactivar usuario',
+);
 
 const confirmDialogMessage = computed(() => {
   const name = pendingUser.value?.name ?? 'este usuario';
 
   if (pendingAction.value === 'activate') {
-    return `¿Reactivar el acceso de "${name}"? Podrá ingresar nuevamente a la plataforma.`;
+    return `¿Reactivar el acceso de "${name}"? Podrá ingresar nuevamente al condominio.`;
   }
-  if (pendingAction.value === 'deactivate') {
-    return `¿Desactivar el acceso de "${name}"? No podrá ingresar a la plataforma hasta ser reactivado.`;
-  }
-
-  return `¿Eliminar al administrador de plataforma "${name}"? Esta acción no se puede deshacer.`;
+  return `¿Desactivar el acceso de "${name}"? No podrá ingresar al condominio hasta ser reactivado.`;
 });
 
 const confirmDialogTone = computed<DialogTone>(() =>
-  pendingAction.value === 'activate'
-    ? 'positive'
-    : pendingAction.value === 'deactivate'
-      ? 'warning'
-      : 'negative',
+  pendingAction.value === 'activate' ? 'positive' : 'warning',
 );
 
-const confirmDialogIcon = computed(() => {
-  if (pendingAction.value === 'activate') return 'how_to_reg';
-  if (pendingAction.value === 'deactivate') return 'person_off';
-  return 'delete_outline';
-});
+const confirmDialogIcon = computed(() =>
+  pendingAction.value === 'activate' ? 'how_to_reg' : 'person_off',
+);
 
-const confirmDialogLabel = computed(() => {
-  if (pendingAction.value === 'activate') return 'Reactivar';
-  if (pendingAction.value === 'deactivate') return 'Desactivar';
-  return 'Eliminar';
-});
+const confirmDialogLabel = computed(() =>
+  pendingAction.value === 'activate' ? 'Reactivar' : 'Desactivar',
+);
 
 watch(
   () => [search.value, statusFilter.value, pagination.value.rowsPerPage] as const,
   () => {
     pagination.value.page = 1;
-    void loadUsers();
   },
 );
 
-watch(
-  () => pagination.value.page,
-  () => {
-    void loadUsers();
-  },
-);
+watch(totalPages, (pages) => {
+  if (pagination.value.page > pages) {
+    pagination.value.page = pages;
+  }
+});
+
+watch(activeCondominiumId, () => {
+  void loadUsers();
+});
 
 onMounted(() => {
   void loadUsers();
@@ -448,24 +435,20 @@ onBeforeUnmount(() => {
 });
 
 async function loadUsers() {
+  const condominiumId = activeCondominiumId.value;
+  if (!condominiumId) {
+    allRows.value = [];
+    return;
+  }
+
   isLoadingRows.value = true;
   loadError.value = '';
 
   try {
-    const params = {
-      page: pagination.value.page,
-      perPage: pagination.value.rowsPerPage,
-      search: search.value,
-      ...(statusFilter.value === 'all' ? {} : { status: statusFilter.value }),
-    };
-    const result = await fetchPlatformAdministratorsPage(params, session.accessToken);
-    rows.value = result.items;
-    totalRows.value = result.total;
-    pagination.value.page = result.page;
-    pagination.value.rowsPerPage = result.perPage;
+    const result = await fetchUsers({ condominiumId }, session.accessToken);
+    allRows.value = result.items;
   } catch (error) {
-    rows.value = [];
-    totalRows.value = 0;
+    allRows.value = [];
     loadError.value =
       error instanceof Error ? error.message : 'No fue posible cargar los usuarios.';
   } finally {
@@ -500,14 +483,7 @@ async function confirmUserAction() {
   isProcessingAction.value = true;
 
   try {
-    const result =
-      action === 'delete'
-        ? await deletePlatformAdministrator(user.id, session.accessToken)
-        : await updatePlatformAdministratorStatus(
-            user.id,
-            action === 'activate' ? 'active' : 'inactive',
-            session.accessToken,
-          );
+    const result = await updateUserStatus(user.id, action === 'activate', session.accessToken);
 
     Notify.create({
       type: 'positive',
@@ -537,7 +513,7 @@ function clearPendingAction() {
 function showUserDetail(row: UserRow) {
   detailDialog.value = {
     tone: 'primary',
-    icon: 'admin_panel_settings',
+    icon: 'manage_accounts',
     title: row.name,
     rows: [
       {
@@ -546,58 +522,26 @@ function showUserDetail(row: UserRow) {
       },
       { label: 'Correo', value: row.email },
       { label: 'Teléfono', value: row.phone || '-' },
+      { label: 'Rol', value: roleLabel(row) },
       { label: 'Acceso', value: accessStatusLabel(row.accessStatus) },
-      { label: 'Invitación', value: invitationStatusLabel(row.invitationStatus) },
     ],
   };
   detailDialogOpen.value = true;
 }
 
-function accessStatusLabel(status: PlatformAccessStatus) {
-  const labels: Record<PlatformAccessStatus, string> = {
-    active: 'Activo',
-    pending_activation: 'Pendiente',
-    invitation_expired: 'Invitación expirada',
-    invitation_revoked: 'Invitación revocada',
-    inactive: 'Inactivo',
-  };
-  return labels[status];
+function roleLabel(row: UserRow) {
+  const assignment =
+    row.assignments.find((item) => item.condominiumId === activeCondominiumId.value) ??
+    row.assignments[0];
+  return assignment?.roleName || 'Sin rol';
 }
 
-function accessStatusTone(status: PlatformAccessStatus) {
-  if (status === 'active') return 'positive';
-  if (status === 'pending_activation') return 'warning';
-  if (status === 'inactive') return 'grey-7';
-  return 'negative';
+function accessStatusLabel(status: UserAccessStatus) {
+  return status === 'active' ? 'Activo' : 'Inactivo';
 }
 
-function invitationStatusLabel(status: PlatformInvitationStatus) {
-  const labels: Record<PlatformInvitationStatus, string> = {
-    pending: 'Pendiente',
-    accepted: 'Aceptada',
-    expired: 'Expirada',
-    revoked: 'Revocada',
-    none: 'Sin invitación',
-  };
-  return labels[status];
-}
-
-function invitationTone(status: PlatformInvitationStatus) {
-  if (status === 'accepted') return 'positive';
-  if (status === 'pending') return 'warning';
-  if (status === 'expired' || status === 'revoked') return 'negative';
-  return 'grey-7';
-}
-
-function invitationInfo(row: UserRow) {
-  const invitation = row.invitation;
-  if (!invitation) return '';
-
-  if (invitation.acceptedAt) return `Aceptada: ${formatDate(invitation.acceptedAt)}`;
-  if (invitation.revokedAt) return `Revocada: ${formatDate(invitation.revokedAt)}`;
-  if (invitation.expiresAt) return `Expira: ${formatDate(invitation.expiresAt)}`;
-  if (invitation.sentAt) return `Enviada: ${formatDate(invitation.sentAt)}`;
-  return '';
+function accessStatusTone(status: UserAccessStatus) {
+  return status === 'active' ? 'positive' : 'grey-7';
 }
 
 function formatDate(value: string) {
@@ -613,7 +557,6 @@ function formatDate(value: string) {
 }
 
 function buildActionSuccessMessage(action: UserAction, user: UserRow) {
-  if (action === 'delete') return `${user.name} fue eliminado correctamente.`;
   if (action === 'activate') return `${user.name} fue reactivado correctamente.`;
   return `${user.name} fue desactivado correctamente.`;
 }
@@ -629,7 +572,7 @@ function buildActionSuccessMessage(action: UserAction, user: UserRow) {
 }
 
 .list-table :deep(table) {
-  min-width: 1080px;
+  min-width: 1000px;
 }
 
 .user-error-banner {
@@ -673,10 +616,6 @@ function buildActionSuccessMessage(action: UserAction, user: UserRow) {
 .stacked-cell strong {
   color: var(--app-text);
   font-size: 12px;
-}
-
-.stacked-cell--center {
-  justify-items: center;
 }
 
 .status-badge {
